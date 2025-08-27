@@ -415,6 +415,6 @@ If you encounter any issues or have questions:
 3. Include the marketplace URL and version you're trying to download
 
 <div align="left" style="padding-top: 20px; display: flex; flex-direction: row; align-items: center; gap: 10px;">
-  <img src="assets/cursor-logo.png" alt="Built with Cursor" width="100" />
+  <img src="assets/cursor-inside.png" alt="Built with Cursor" width="100" />
   <em>This package is Built with Cursor for Cursor</em>
 </div>
