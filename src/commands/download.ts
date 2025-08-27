@@ -1,6 +1,6 @@
 import * as p from "@clack/prompts";
 import { downloadFile } from "../utils/downloader";
-import { parseMarketplaceUrl, constructDownloadUrl } from "../utils/urlParser";
+import { parseMarketplaceUrl, constructDownloadUrl, getDisplayNameFromUrl } from "../utils/urlParser";
 import { createDownloadDirectory } from "../utils/fileManager";
 import { downloadBulkExtensions } from "../utils/bulkDownloader";
 
@@ -85,7 +85,8 @@ async function downloadSingleExtension(options: DownloadOptions) {
 		throw error;
 	}
 
-	p.note(`Publisher: ${extensionInfo.publisher}\nExtension: ${extensionInfo.extension}`, "Extension Info");
+	const displayName = getDisplayNameFromUrl(marketplaceUrl as string);
+	p.note(`${displayName}`, "Extension");
 
 	// Get version
 	let version = options.version;
@@ -115,7 +116,7 @@ async function downloadSingleExtension(options: DownloadOptions) {
 
 	// Construct download URL and filename
 	const downloadUrl = constructDownloadUrl(extensionInfo, version as string);
-	const filename = `${extensionInfo.publisher}.${extensionInfo.extension}-${version}.vsix`;
+	const filename = `${extensionInfo.itemName}-${version}.vsix`;
 
 	// Create output directory
 	const outputDir = options.output || "./downloads";

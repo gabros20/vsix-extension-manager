@@ -1,6 +1,4 @@
 export interface ExtensionInfo {
-	publisher: string;
-	extension: string;
 	itemName: string;
 }
 
@@ -33,8 +31,6 @@ export function parseMarketplaceUrl(url: string): ExtensionInfo {
 		}
 
 		return {
-			publisher,
-			extension,
 			itemName,
 		};
 	} catch (error) {
@@ -51,7 +47,7 @@ export function parseMarketplaceUrl(url: string): ExtensionInfo {
  * https://[publisher].gallery.vsassets.io/_apis/public/gallery/publisher/[publisher]/extension/[extension]/[version]/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage
  */
 export function constructDownloadUrl(extensionInfo: ExtensionInfo, version: string): string {
-	const { publisher, extension } = extensionInfo;
+	const [publisher, extension] = extensionInfo.itemName.split(".");
 
 	return `https://${publisher}.gallery.vsassets.io/_apis/public/gallery/publisher/${publisher}/extension/${extension}/${version}/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage`;
 }
@@ -65,5 +61,21 @@ export function isValidMarketplaceUrl(url: string): boolean {
 		return true;
 	} catch {
 		return false;
+	}
+}
+
+/**
+ * Get a human-friendly display name from a marketplace URL
+ * Example: publisher.extension -> "publisher - extension"
+ */
+export function getDisplayNameFromUrl(url: string): string {
+	try {
+		const itemName = new URL(url).searchParams.get("itemName");
+		if (itemName) {
+			return itemName.replace(".", " - ");
+		}
+		return "Unknown Extension";
+	} catch {
+		return "Unknown Extension";
 	}
 }

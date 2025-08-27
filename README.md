@@ -91,24 +91,15 @@ Create a JSON file (e.g., `extensions.json`) with the following structure:
 [
 	{
 		"url": "https://marketplace.visualstudio.com/items?itemName=Fuzionix.file-tree-extractor",
-		"version": "1.3.3",
-		"name": "File Tree Extractor",
-		"publisher": "Fuzionix",
-		"extension": "file-tree-extractor"
+		"version": "1.3.3"
 	},
 	{
 		"url": "https://marketplace.visualstudio.com/items?itemName=million.million-lint",
-		"version": "1.0.14",
-		"name": "Million Lint",
-		"publisher": "million",
-		"extension": "million-lint"
+		"version": "1.0.14"
 	},
 	{
 		"url": "https://marketplace.visualstudio.com/items?itemName=sourcegraph.amp",
-		"version": "0.0.1756310942",
-		"name": "Sourcegraph AMP",
-		"publisher": "sourcegraph",
-		"extension": "amp"
+		"version": "0.0.1756310942"
 	}
 ]
 ```
@@ -118,11 +109,7 @@ Create a JSON file (e.g., `extensions.json`) with the following structure:
 -   **`url`**: Full marketplace URL of the extension
 -   **`version`**: Specific version to download
 
-#### Optional Fields
-
--   **`name`**: Human-readable name (for better progress display)
--   **`publisher`**: Publisher name (auto-extracted from URL if not provided)
--   **`extension`**: Extension name (auto-extracted from URL if not provided)
+The extension name is automatically extracted from the URL for display purposes in the CLI.
 
 #### JSON Validation
 
@@ -186,10 +173,9 @@ $ vsix-downloader
 │
 ◇  Extension info extracted
 │
-◇  Extension Info ─────────────────╮
+◇  Extension ──────────────────────╮
 │                                  │
-│  Publisher: ms-python            │
-│  Extension: python               │
+│  ms-python - python              │
 │                                  │
 ├──────────────────────────────────╯
 │
@@ -257,6 +243,37 @@ $ vsix-downloader
 │
 └  🎉 Bulk download completed! 3 extension(s) downloaded successfully.
 ```
+
+## 🧩 Manual Installation Methods
+
+### 1. Command Line (.vsix)
+
+-   Use the `.vsix` you downloaded with this tool (default in `./downloads/`).
+-   Open your terminal and navigate to the directory with the `.vsix` file.
+-   Run:
+
+```bash
+cursor --install-extension your-extension.vsix
+```
+
+-   Restart Cursor IDE to activate the extension.
+
+### 2. Drag and Drop
+
+-   Open Cursor’s Extensions panel (Ctrl+Shift+X).
+-   Drag the `.vsix` file from your file explorer into the Extensions panel.
+-   The extension will install automatically.
+
+### 3. Command Palette
+
+-   Open the Command Palette with Ctrl+Shift+P.
+-   Type and select “Extensions: Install from VSIX…”.
+-   Select your `.vsix` file and confirm.
+
+### Additional Tips
+
+-   Some extensions may have compatibility or license limitations due to Cursor’s fork status, especially for Microsoft (official) extensions.
+-   If you have multiple profiles, you can append `--profile "<profile_name>"` to the install command.
 
 ## 💡 Tips & Best Practices
 
@@ -398,6 +415,6 @@ If you encounter any issues or have questions:
 3. Include the marketplace URL and version you're trying to download
 
 <div align="left" style="padding-top: 20px; display: flex; flex-direction: row; align-items: center; gap: 10px;">
-  <img src="assets/cursor-logo.jpg" alt="Built with Cursor" width="150" />
+  <img src="assets/cursor-logo.png" alt="Built with Cursor" width="100" />
   <em>This package is Built with Cursor for Cursor</em>
 </div>

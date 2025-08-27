@@ -2,15 +2,12 @@ import * as p from "@clack/prompts";
 import fs from "fs-extra";
 import path from "path";
 import { downloadFile } from "./downloader";
-import { parseMarketplaceUrl, constructDownloadUrl } from "./urlParser";
+import { parseMarketplaceUrl, constructDownloadUrl, getDisplayNameFromUrl } from "./urlParser";
 import { createDownloadDirectory } from "./fileManager";
 
 interface BulkExtensionItem {
 	url: string;
 	version: string;
-	name?: string;
-	publisher?: string;
-	extension?: string;
 }
 
 interface ValidationResult {
@@ -18,6 +15,8 @@ interface ValidationResult {
 	errors: string[];
 	validItems: BulkExtensionItem[];
 }
+
+// display name extraction is provided by getDisplayNameFromUrl in urlParser
 
 /**
  * Validate JSON structure and content
@@ -157,9 +156,10 @@ export async function downloadBulkExtensions(filePath: string, outputDir: string
 			// Parse marketplace URL
 			const extensionInfo = parseMarketplaceUrl(ext.url);
 			const downloadUrl = constructDownloadUrl(extensionInfo, ext.version);
-			const filename = `${extensionInfo.publisher}.${extensionInfo.extension}-${ext.version}.vsix`;
+			const filename = `${extensionInfo.itemName}-${ext.version}.vsix`;
+			const displayName = getDisplayNameFromUrl(ext.url);
 
-			spinner.start(`[${i + 1}/${extensions.length}] Downloading ${ext.name || extensionInfo.publisher + "." + extensionInfo.extension}...`);
+			spinner.start(`[${i + 1}/${extensions.length}] Downloading ${displayName}...`);
 
 			// Download the file
 			const filePath = await downloadFile(downloadUrl, outputDir, filename);
@@ -172,11 +172,11 @@ export async function downloadBulkExtensions(filePath: string, outputDir: string
 			successCount++;
 		} catch (error) {
 			const errorMsg = error instanceof Error ? error.message : "Unknown error";
-			const extName = ext.name || `${ext.url.split("itemName=")[1]?.split("&")[0] || "Unknown"}`;
+			const displayName = getDisplayNameFromUrl(ext.url);
 
-			spinner.stop(`[${i + 1}/${extensions.length}] ❌ Failed: ${extName}`, 1);
+			spinner.stop(`[${i + 1}/${extensions.length}] ❌ Failed: ${displayName}`, 1);
 			failureCount++;
-			failedDownloads.push(`${extName}: ${errorMsg}`);
+			failedDownloads.push(`${displayName}: ${errorMsg}`);
 		}
 	}
 
