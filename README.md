@@ -397,12 +397,7 @@ If you encounter any issues or have questions:
 2. Create a new issue with detailed description
 3. Include the marketplace URL and version you're trying to download
 
----
-
-## 🛠️ Built with Cursor
-
-<div align="center">
-  <img src="assets/cursor-inside.jpg" alt="Built with Cursor" width="200" />
-  <br/>
+<div align="left" style="padding-top: 20px; display: flex; flex-direction: row; align-items: center; gap: 10px;">
+  <img src="assets/cursor-logo.jpg" alt="Built with Cursor" width="150" />
   <em>This package is Built with Cursor for Cursor</em>
 </div>
