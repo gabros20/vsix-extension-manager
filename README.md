@@ -396,3 +396,13 @@ If you encounter any issues or have questions:
 1. Check the [Issues](https://github.com/yourusername/vsix-downloader/issues) page
 2. Create a new issue with detailed description
 3. Include the marketplace URL and version you're trying to download
+
+---
+
+## 🛠️ Built with Cursor
+
+<div align="center">
+  <img src="assets/cursor-inside.jpg" alt="Built with Cursor" width="200" />
+  <br/>
+  <em>This package is Built with Cursor for Cursor</em>
+</div>
