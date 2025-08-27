@@ -1,0 +1,23 @@
+[
+	{
+		"url": "https://marketplace.visualstudio.com/items?itemName=Fuzionix.file-tree-extractor",
+		"version": "1.3.3",
+		"name": "File Tree Extractor",
+		"publisher": "Fuzionix",
+		"extension": "file-tree-extractor"
+	},
+	{
+		"url": "https://marketplace.visualstudio.com/items?itemName=million.million-lint",
+		"version": "1.0.14",
+		"name": "Million Lint",
+		"publisher": "million",
+		"extension": "million-lint"
+	},
+	{
+		"url": "https://marketplace.visualstudio.com/items?itemName=sourcegraph.amp",
+		"version": "0.0.1756310942",
+		"name": "Sourcegraph AMP",
+		"publisher": "sourcegraph",
+		"extension": "amp"
+	}
+]
