@@ -107,21 +107,27 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Bumped version to $NEW_VERSION"
 
-      - name: Check if version exists on NPM
+      - name: Ensure unique version on NPM
         if: steps.version.outputs.bump != 'none'
-        id: npm_check
+        id: ensure
         run: |
           NEW_VERSION=$(node -p "require('./package.json').version")
-          if npm view vsix-downloader@$NEW_VERSION version >/dev/null 2>&1; then
-            echo "version_exists=true" >> $GITHUB_OUTPUT
-            echo "Version $NEW_VERSION already exists on NPM, skipping publish"
-          else
-            echo "version_exists=false" >> $GITHUB_OUTPUT
-            echo "Version $NEW_VERSION is available for publishing"
-          fi
+          ATTEMPTS=0
+          while npm view vsix-downloader@$NEW_VERSION version >/dev/null 2>&1; do
+            echo "Version $NEW_VERSION already exists on NPM, bumping patch..."
+            npm version patch --no-git-tag-version
+            NEW_VERSION=$(node -p "require('./package.json').version")
+            ATTEMPTS=$((ATTEMPTS+1))
+            if [ $ATTEMPTS -gt 10 ]; then
+              echo "Exceeded attempts to find an available version" 1>&2
+              exit 1
+            fi
+          done
+          echo "final_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Using version $NEW_VERSION for publish"
 
       - name: Publish to NPM
-        if: steps.version.outputs.bump != 'none' && steps.npm_check.outputs.version_exists == 'false'
+        if: steps.version.outputs.bump != 'none'
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -132,8 +138,8 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add package.json
-          git commit -m "chore: bump version to ${{ steps.bump.outputs.new_version }}"
-          git tag v${{ steps.bump.outputs.new_version }}
+          git commit -m "chore: bump version to ${{ steps.ensure.outputs.final_version }}"
+          git tag v${{ steps.ensure.outputs.final_version }}
           git push origin main --tags
 
       - name: Create GitHub Release
@@ -142,14 +148,14 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ steps.bump.outputs.new_version }}
-          release_name: Release v${{ steps.bump.outputs.new_version }}
+          tag_name: v${{ steps.ensure.outputs.final_version }}
+          release_name: Release v${{ steps.ensure.outputs.final_version }}
           body: |
             ## What's Changed
 
             This release includes the latest changes from the main branch.
 
-            ### Version: ${{ steps.bump.outputs.new_version }}
+            ### Version: ${{ steps.ensure.outputs.final_version }}
 
             For detailed changes, see the commit history.
           draft: false
@@ -161,9 +167,6 @@ jobs:
           echo "No version bump needed, skipping publish"
           echo "This usually means no conventional commits were found"
 
-      - name: Skip publish - version exists
-        if: steps.version.outputs.bump != 'none' && steps.npm_check.outputs.version_exists == 'true'
-        run: |
-          NEW_VERSION=$(node -p "require('./package.json').version")
-          echo "Version $NEW_VERSION already exists on NPM, skipping publish"
-          echo "This can happen if a previous run failed after publishing but before tagging"
+      - name: Skip publish - no-op
+        if: steps.version.outputs.bump == 'none'
+        run: echo "No publish actions required"
