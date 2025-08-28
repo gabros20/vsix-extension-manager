@@ -4,16 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 1.2.3)'
+        description: "Version to release (e.g., 1.2.3)"
         required: true
         type: string
       prerelease:
-        description: 'Mark as pre-release'
+        description: "Mark as pre-release"
         required: false
         default: false
         type: boolean
       draft:
-        description: 'Create as draft'
+        description: "Create as draft"
         required: false
         default: false
         type: boolean
@@ -51,19 +51,19 @@ jobs:
       - name: Check if version exists
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          
+
           # Check NPM
           if npm view vsix-downloader@$VERSION version >/dev/null 2>&1; then
             echo "❌ Version $VERSION already exists on NPM"
             exit 1
           fi
-          
+
           # Check Git tags
           if git rev-parse "v$VERSION" >/dev/null 2>&1; then
             echo "❌ Tag v$VERSION already exists"
             exit 1
           fi
-          
+
           echo "✅ Version $VERSION is available"
 
       - name: Install dependencies
@@ -90,10 +90,10 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.version }}"
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          
+
           echo "# Release v$VERSION" > RELEASE_NOTES.md
           echo "" >> RELEASE_NOTES.md
-          
+
           if [ "$LATEST_TAG" = "v0.0.0" ]; then
             echo "## Initial Release" >> RELEASE_NOTES.md
             echo "" >> RELEASE_NOTES.md
@@ -127,9 +127,9 @@ jobs:
               echo "" >> RELEASE_NOTES.md
             fi
           fi
-          
+
           echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${LATEST_TAG}...v$VERSION" >> RELEASE_NOTES.md
-          
+
           # Set output
           {
             echo "notes<<EOF"
@@ -141,10 +141,10 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.version }}"
           echo "🚀 Publishing v$VERSION to NPM..."
-          
+
           # Show what will be published
           npm pack --dry-run
-          
+
           # Publish
           npm publish --access public
           echo "✅ Successfully published to NPM"
@@ -155,14 +155,14 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.version }}"
           TAG_NAME="v$VERSION"
-          
+
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          
+
           # Commit version bump
           git add package.json package-lock.json
           git commit -m "chore: release version $VERSION [skip ci]"
-          
+
           # Create and push tag
           git tag "$TAG_NAME"
           git push origin main --follow-tags

@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       release-type:
-        description: 'Release type'
+        description: "Release type"
         required: true
-        default: 'auto'
+        default: "auto"
         type: choice
         options:
           - auto
@@ -60,28 +60,28 @@ jobs:
           # Get current version
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-          
+
           # Manual override from workflow dispatch
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.release-type }}" != "auto" ]; then
             echo "release_type=${{ github.event.inputs.release-type }}" >> $GITHUB_OUTPUT
             echo "Manual release type: ${{ github.event.inputs.release-type }}"
             exit 0
           fi
-          
+
           # Get latest tag
           LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
           echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-          
+
           # Get commits since latest tag
           if [ "$LATEST_TAG" = "v0.0.0" ]; then
             COMMITS=$(git log --oneline)
           else
             COMMITS=$(git log ${LATEST_TAG}..HEAD --oneline)
           fi
-          
+
           echo "Commits since $LATEST_TAG:"
           echo "$COMMITS"
-          
+
           # Determine release type based on conventional commits
           if echo "$COMMITS" | grep -Eq "^[a-f0-9]+ [a-zA-Z]+(\([^)]*\))?!:|BREAKING CHANGE:"; then
             echo "release_type=major" >> $GITHUB_OUTPUT
@@ -105,7 +105,7 @@ jobs:
         if: steps.version.outputs.release_type != 'none'
         run: |
           RELEASE_TYPE="${{ steps.version.outputs.release_type }}"
-          
+
           # Bump version
           case "$RELEASE_TYPE" in
             major|minor|patch|prerelease)
@@ -116,7 +116,7 @@ jobs:
               exit 1
               ;;
           esac
-          
+
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "📦 Version bumped to $NEW_VERSION"
@@ -126,7 +126,7 @@ jobs:
         if: steps.version.outputs.release_type != 'none'
         run: |
           NEW_VERSION="${{ steps.bump.outputs.new_version }}"
-          
+
           if npm view vsix-downloader@$NEW_VERSION version >/dev/null 2>&1; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "❌ Version $NEW_VERSION already exists on NPM"
@@ -142,10 +142,10 @@ jobs:
         run: |
           NEW_VERSION="${{ steps.bump.outputs.new_version }}"
           LATEST_TAG="${{ steps.version.outputs.latest_tag }}"
-          
+
           echo "# Changelog for v$NEW_VERSION" > CHANGELOG.md
           echo "" >> CHANGELOG.md
-          
+
           if [ "$LATEST_TAG" = "v0.0.0" ]; then
             echo "## Initial Release" >> CHANGELOG.md
             git log --oneline --pretty=format:"- %s (%h)" >> CHANGELOG.md
@@ -153,10 +153,10 @@ jobs:
             echo "## Changes since $LATEST_TAG" >> CHANGELOG.md
             git log ${LATEST_TAG}..HEAD --oneline --pretty=format:"- %s (%h)" >> CHANGELOG.md
           fi
-          
+
           echo "" >> CHANGELOG.md
           echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${LATEST_TAG}...v$NEW_VERSION" >> CHANGELOG.md
-          
+
           # Set output for release notes
           {
             echo "changelog<<EOF"
@@ -175,10 +175,10 @@ jobs:
         run: |
           NEW_VERSION="${{ steps.bump.outputs.new_version }}"
           echo "🚀 Publishing v$NEW_VERSION to NPM..."
-          
+
           # Dry run first
           npm publish --dry-run
-          
+
           # Actual publish
           npm publish --access public
           echo "✅ Successfully published to NPM"
@@ -190,14 +190,14 @@ jobs:
         run: |
           NEW_VERSION="${{ steps.bump.outputs.new_version }}"
           TAG_NAME="v$NEW_VERSION"
-          
+
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          
+
           # Commit version bump
           git add package.json package-lock.json
           git commit -m "chore: bump version to $NEW_VERSION [skip ci]" || echo "No changes to commit"
-          
+
           # Create and push tag
           git tag "$TAG_NAME"
           git push origin main --follow-tags
