@@ -1,0 +1,115 @@
+name: Publish to NPM
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        registry-url: 'https://registry.npmjs.org'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build project
+      run: npm run build
+
+    - name: Run tests (if any)
+      run: npm test --if-present
+
+    - name: Determine version bump
+      id: version
+      run: |
+        # Get the latest version from package.json
+        CURRENT_VERSION=$(node -p "require('./package.json').version")
+        echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        
+        # Get commit messages since last tag
+        COMMITS=$(git log --oneline $(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD)
+        
+        # Determine version bump based on conventional commits
+        if echo "$COMMITS" | grep -q "^[a-f0-9]* feat"; then
+          echo "bump=minor" >> $GITHUB_OUTPUT
+          echo "New features detected, bumping minor version"
+        elif echo "$COMMITS" | grep -q "^[a-f0-9]* fix\|^[a-f0-9]* chore\|^[a-f0-9]* docs\|^[a-f0-9]* style\|^[a-f0-9]* refactor\|^[a-f0-9]* perf\|^[a-f0-9]* test"; then
+          echo "bump=patch" >> $GITHUB_OUTPUT
+          echo "Bug fixes or minor changes detected, bumping patch version"
+        elif echo "$COMMITS" | grep -q "^[a-f0-9]* BREAKING CHANGE\|^[a-f0-9]* feat.*!:"; then
+          echo "bump=major" >> $GITHUB_OUTPUT
+          echo "Breaking changes detected, bumping major version"
+        else
+          echo "bump=none" >> $GITHUB_OUTPUT
+          echo "No version bump needed"
+        fi
+
+    - name: Bump version
+      id: bump
+      if: steps.version.outputs.bump != 'none'
+      run: |
+        BUMP_TYPE=${{ steps.version.outputs.bump }}
+        if [ "$BUMP_TYPE" = "major" ]; then
+          npm version major --no-git-tag-version
+        elif [ "$BUMP_TYPE" = "minor" ]; then
+          npm version minor --no-git-tag-version
+        else
+          npm version patch --no-git-tag-version
+        fi
+        
+        NEW_VERSION=$(node -p "require('./package.json').version")
+        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "Bumped version to $NEW_VERSION"
+
+    - name: Publish to NPM
+      if: steps.version.outputs.bump != 'none'
+      run: npm publish
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+    - name: Create Git tag
+      if: steps.version.outputs.bump != 'none'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add package.json
+        git commit -m "Bump version to ${{ steps.bump.outputs.new_version }}"
+        git tag v${{ steps.bump.outputs.new_version }}
+        git push origin main --tags
+
+    - name: Create GitHub Release
+      if: steps.version.outputs.bump != 'none'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.bump.outputs.new_version }}
+        release_name: Release v${{ steps.bump.outputs.new_version }}
+        body: |
+          ## What's Changed
+          
+          This release includes the latest changes from the main branch.
+          
+          ### Version: ${{ steps.bump.outputs.new_version }}
+          
+          For detailed changes, see the commit history.
+        draft: false
+        prerelease: false
+
+    - name: Skip publish
+      if: steps.version.outputs.bump == 'none'
+      run: |
+        echo "No version bump needed, skipping publish"
+        echo "This usually means no conventional commits were found"

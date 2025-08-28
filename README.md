@@ -393,9 +393,55 @@ The tool handles various error scenarios:
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
+3. Commit your changes using conventional commits (see below)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+### Conventional Commits
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/) for automatic versioning and releases. Please follow this format:
+
+```bash
+# Format: <type>[optional scope]: <description>
+
+# Examples:
+git commit -m "feat: add new download feature"
+git commit -m "fix: resolve URL parsing issue"
+git commit -m "docs: update README with new examples"
+git commit -m "feat!: breaking change in API"
+git commit -m "feat(download): add bulk download capability"
+```
+
+**Commit Types:**
+- `feat`: New features
+- `fix`: Bug fixes
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, etc.)
+- `refactor`: Code refactoring
+- `perf`: Performance improvements
+- `test`: Adding or updating tests
+- `chore`: Build process or tooling changes
+
+**Breaking Changes:** Add `!` after the type for breaking changes (e.g., `feat!: breaking change`)
+
+## 🚀 Automated Publishing
+
+This project uses GitHub Actions for automated publishing to NPM:
+
+- **Automatic Versioning**: Version bumps based on conventional commits
+- **NPM Publishing**: Automatic publish on push to main branch
+- **GitHub Releases**: Automatic release creation with tags
+- **Version Sync**: GitHub releases and NPM versions stay in sync
+
+**Workflow:**
+1. Make changes and commit with conventional commit format
+2. Push to main branch
+3. GitHub Actions automatically:
+   - Determines version bump (patch/minor/major)
+   - Updates package.json version
+   - Publishes to NPM
+   - Creates GitHub release with tag
+   - Pushes version changes back to repository
 
 ## 📄 License
 

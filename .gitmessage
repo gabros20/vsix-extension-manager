@@ -1,0 +1,28 @@
+# Conventional Commits - https://www.conventionalcommits.org/
+
+# Type: feat, fix, docs, style, refactor, perf, test, chore
+# Scope: (optional) what part of the codebase is affected
+# Breaking: (optional) add ! after type/scope for breaking changes
+# Subject: short description in present tense, no period at end
+
+# Examples:
+# feat: add new download feature
+# fix: resolve URL parsing issue
+# docs: update README with new examples
+# feat!: breaking change in API
+# feat(download): add bulk download capability
+
+# Type must be one of the following:
+#   feat     A new feature
+#   fix      A bug fix
+#   docs     Documentation only changes
+#   style    Changes that do not affect the meaning of the code
+#   refactor A code change that neither fixes a bug nor adds a feature
+#   perf     A code change that improves performance
+#   test     Adding missing tests or correcting existing tests
+#   chore    Changes to the build process or auxiliary tools
+
+# Body: (optional) detailed description
+# Footer: (optional) breaking changes, issue references
+
+# Your commit message:
