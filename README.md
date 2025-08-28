@@ -83,7 +83,7 @@ vsix-downloader download
 Follow the prompts to enter:
 
 1. Marketplace URL
-2. Extension version
+2. Extension version (or type `latest`)
 3. Output directory (optional; press Enter to use `./downloads`)
 
 #### Command Line Arguments
@@ -93,6 +93,12 @@ You can also provide arguments directly for single downloads:
 ```bash
 # Download with URL and version
 vsix-downloader download --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" --version "2023.20.0"
+
+# Resolve and download the latest version (stable by default)
+vsix-downloader download --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" --version latest
+
+# Prefer pre-release when resolving 'latest'
+vsix-downloader download --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" --version latest --pre-release
 
 # Specify custom output directory
 vsix-downloader download --url "..." --version "1.2.3" --output "./my-extensions"
@@ -133,7 +139,7 @@ Create a JSON file (e.g., `extensions.json`) with the following structure:
 #### Required Fields
 
 - **`url`**: Full marketplace URL of the extension
-- **`version`**: Specific version to download
+- **`version`**: Specific version to download (or `latest`)
 
 The extension name is automatically extracted from the URL for display purposes in the CLI.
 
@@ -186,6 +192,7 @@ vsix-downloader download \
 
 ```bash
 vsix-downloader download [options]    # Download a VSIX file
+vsix-downloader versions [options]    # List available versions for an extension
 vsix-downloader --help               # Show help
 vsix-downloader --version            # Show version
 ```
@@ -193,7 +200,8 @@ vsix-downloader --version            # Show version
 ### Options
 
 - `-u, --url <url>` - Marketplace URL of the extension
-- `-v, --version <version>` - Version of the extension to download
+- `-v, --version <version>` - Version of the extension to download (or `latest`)
+- `--pre-release` - Prefer pre-release when resolving `latest`
 - `-o, --output <path>` - Output directory (default: ./downloads)
 - `-f, --file <path>` - Bulk JSON file path (non-interactive)
 - `--parallel <n>` - Number of parallel downloads in bulk mode (default: 4)
@@ -205,6 +213,18 @@ vsix-downloader --version            # Show version
 - `--json` - Machine-readable logs (reserved for future)
 - `--summary <path>` - Write bulk summary JSON to the given path
 - `-h, --help` - Display help information
+
+### Versions Command
+
+List all available versions for an extension. Useful when picking a pinned version or checking pre-releases.
+
+```bash
+# Prompt for URL, display human-readable list
+vsix-downloader versions
+
+# Provide URL and output JSON
+vsix-downloader versions --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" --json
+```
 
 ## 📋 Examples
 
