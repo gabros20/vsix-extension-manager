@@ -37,7 +37,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.ADMIN_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -95,13 +95,17 @@ jobs:
             echo "📝 No significant changes - skipping release"
           fi
 
-      - name: Bump version
+      - name: Bump version and commit to main
         id: bump
         if: steps.version.outputs.release_type != 'none'
         run: |
           RELEASE_TYPE="${{ steps.version.outputs.release_type }}"
 
-          # Bump version
+          # Configure git with bypass permissions
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          # Bump version (this updates package.json and package-lock.json)
           case "$RELEASE_TYPE" in
             major|minor|patch|prerelease)
               npm version $RELEASE_TYPE --no-git-tag-version
@@ -115,6 +119,19 @@ jobs:
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "📦 Version bumped to $NEW_VERSION"
+
+          # Commit version change directly to main
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to v$NEW_VERSION
+
+          🤖 Automated version bump by GitHub Actions
+          Release type: $RELEASE_TYPE
+          
+          [skip ci]"
+
+          # Push directly to main (requires admin token to bypass branch protection)
+          git push origin HEAD:main
+          echo "✅ Version v$NEW_VERSION committed to main"
 
       - name: Check if version exists on NPM
         id: check
@@ -186,10 +203,7 @@ jobs:
           NEW_VERSION="${{ steps.bump.outputs.new_version }}"
           TAG_NAME="v$NEW_VERSION"
 
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-
-          # Create and push tag only (no commit to main due to branch protection)
+          # Create and push tag (git config already set in bump step)
           git tag "$TAG_NAME"
           git push origin "refs/tags/$TAG_NAME"
           echo "🏷️ Created and pushed tag $TAG_NAME"
@@ -207,10 +221,15 @@ jobs:
       - name: Publish summary
         if: steps.version.outputs.release_type != 'none'
         run: |
-          echo "✅ Version ${{ steps.bump.outputs.new_version }} published successfully"
-          echo "📦 Package published: https://www.npmjs.com/package/vsix-downloader"
-          echo "📋 Release created: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.bump.outputs.new_version }}"
-          echo "🔄 A follow-up PR will be created to sync package.json version"
+          echo "🎉 **FULLY AUTOMATED RELEASE COMPLETED!**"
+          echo ""
+          echo "✅ Version bumped to v${{ steps.bump.outputs.new_version }}"
+          echo "✅ package.json committed to main branch"
+          echo "✅ Published to NPM: https://www.npmjs.com/package/vsix-downloader"
+          echo "✅ Git tag created: v${{ steps.bump.outputs.new_version }}"
+          echo "✅ GitHub release: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.bump.outputs.new_version }}"
+          echo ""
+          echo "🚀 Everything is in sync - ready for next release!"
 
       - name: No release needed
         if: steps.version.outputs.release_type == 'none'
