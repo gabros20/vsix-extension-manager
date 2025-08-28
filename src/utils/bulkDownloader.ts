@@ -18,7 +18,15 @@ import {
 import { resolveVersion } from "./extensionRegistry";
 import { generateFilename, DEFAULT_FILENAME_TEMPLATE, validateTemplate } from "./filenameTemplate";
 import { generateSHA256, isValidSHA256, verifySHA256 } from "./checksum";
-import { ProgressInfo, formatSpeed } from "./progressTracker";
+import { ProgressInfo, formatBytes, createProgressBar } from "./progressTracker";
+
+/**
+ * Truncate display name to avoid overly long progress messages
+ */
+function truncateDisplayName(name: string, maxLength: number = 30): string {
+  if (name.length <= maxLength) return name;
+  return name.slice(0, maxLength - 3) + "...";
+}
 
 interface SpinnerInstance {
   start: (message: string) => void;
@@ -256,7 +264,7 @@ export async function downloadBulkExtensions(
   }
 
   async function downloadSingleExtension(ext: BulkExtensionItem, index: number) {
-    const displayName = getDisplayNameFromUrl(ext.url);
+    const displayName = truncateDisplayName(getDisplayNameFromUrl(ext.url));
     const startMs = Date.now();
 
     // Update spinner message
@@ -319,13 +327,20 @@ export async function downloadBulkExtensions(
           bulkSpinner.message(`[${index + 1}/${extensions.length}] Downloading ${displayName}...`);
         }
 
+        let lastProgressUpdate = Date.now();
         const progressCallback = (progress: ProgressInfo) => {
           if (bulkSpinner) {
-            const progressPercent = progress.percentage.toFixed(1);
-            const speed = formatSpeed(progress.speed);
-            bulkSpinner.message(
-              `[${index + 1}/${extensions.length}] ${displayName} - ${progressPercent}% @ ${speed}`,
-            );
+            const now = Date.now();
+            // Update every 100ms to avoid overwhelming the terminal
+            if (now - lastProgressUpdate >= 100) {
+              const progressBar = createProgressBar(progress.percentage, 10);
+              const downloaded = formatBytes(progress.downloaded);
+              const total = formatBytes(progress.total);
+              bulkSpinner.message(
+                `[${index + 1}/${extensions.length}] ${displayName} - ${progressBar} ${downloaded}/${total}`,
+              );
+              lastProgressUpdate = now;
+            }
           }
         };
 
@@ -384,11 +399,11 @@ export async function downloadBulkExtensions(
 
         // Complete successfully
         completedCount++;
-        const sizeInKB = Math.round(stats.size / 1024);
+        const formattedSize = formatBytes(stats.size);
         const checksumInfo = checksum ? ` - SHA256: ${checksum.slice(0, 8)}...` : "";
         if (bulkSpinner) {
           bulkSpinner.message(
-            `[${completedCount}/${extensions.length}] ✅ ${displayName} (${sizeInKB} KB)${checksumInfo}${verificationStatus}`,
+            `[${completedCount}/${extensions.length}] ✅ ${displayName} (${formattedSize})${checksumInfo}${verificationStatus}`,
           );
         }
 
@@ -453,23 +468,20 @@ export async function downloadBulkExtensions(
     );
   }
 
-  // Show final summary
-  const summaryLines = [
-    `Total extensions: ${extensions.length}`,
-    `✅ Successful: ${successCount}`,
-    `❌ Failed: ${failureCount}`,
-    `📁 Output directory: ${effectiveOutputDir}`,
-  ];
-
-  if (failedDownloads.length > 0) {
-    summaryLines.push("", "Failed downloads:");
-    failedDownloads.forEach((failure) => {
-      summaryLines.push(`  • ${failure}`);
-    });
-  }
-
+  // Show final summary in same format as single download
   if (!options.quiet) {
-    p.note(summaryLines.join("\n"), "Download Summary");
+    let summaryContent = `Total: ${extensions.length} extensions\nSuccessful: ${successCount}\nFailed: ${failureCount}\nOutput: ${effectiveOutputDir}`;
+
+    if (failedDownloads.length > 0) {
+      summaryContent += "\n\nFailed downloads:\n";
+      failedDownloads.forEach((failure) => {
+        summaryContent += `• ${failure}\n`;
+      });
+      // Remove trailing newline
+      summaryContent = summaryContent.slice(0, -1);
+    }
+
+    p.note(summaryContent, "Download Complete");
 
     if (successCount > 0) {
       p.outro(`🎉 Bulk download completed! ${successCount} extension(s) downloaded successfully.`);

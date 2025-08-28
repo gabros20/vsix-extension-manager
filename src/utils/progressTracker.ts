@@ -122,7 +122,9 @@ export function formatDuration(milliseconds: number): string {
  * Create a simple progress bar string
  */
 export function createProgressBar(percentage: number, width: number = 20): string {
-  const filled = Math.floor((percentage / 100) * width);
-  const empty = width - filled;
-  return `[${"█".repeat(filled)}${" ".repeat(empty)}] ${percentage.toFixed(1)}%`;
+  // Clamp percentage to 0-100 range to prevent errors
+  const clampedPercentage = Math.min(100, Math.max(0, percentage));
+  const filled = Math.min(width, Math.floor((clampedPercentage / 100) * width));
+  const empty = Math.max(0, width - filled);
+  return `[${"█".repeat(filled)}${" ".repeat(empty)}] ${clampedPercentage.toFixed(1)}%`;
 }

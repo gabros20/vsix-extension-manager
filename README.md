@@ -378,8 +378,8 @@ vsix-downloader download \
 
 **Progress Features:**
 
-- **Single downloads**: Real-time progress bars with percentage completion, download speed, and file size
-- **Bulk downloads**: Sequential progress with clean, readable updates per file
+- **Single downloads**: Real-time progress bars with percentage completion and file size
+- **Bulk downloads**: Sequential progress with visual progress bars and file sizes per file
 - Time remaining estimates for single downloads
 - Non-intrusive updates (100ms intervals)
 
@@ -422,8 +422,8 @@ $ vsix-downloader
 │                                  │
 ├──────────────────────────────────╯
 │
-◇  Enter the extension version:
-│  2023.20.0
+◇  Enter the extension version (or use the version number):
+│  latest
 │
 ◇  Enter output directory:
 │  ./downloads
@@ -475,28 +475,28 @@ $ vsix-downloader
 │
 ◆  ✅ JSON validation passed! Found 3 extension(s) to download.
 │
-●  [1/3] Downloading ms-python.python - 45.2% @ 2.1 MB/s...
+●  [1/3] ms-python.python - [██████████░░░░░░░░░░] 45.2% 15.0 MB/38.4 MB
 │
-●  [1/3] ✅ ms-python.python (15420 KB) - SHA256: a1b2c3d4... ✅
+●  [1/3] ✅ ms-python.python (38.4 MB) - SHA256: a1b2c3d4... ✅
 │
-●  [2/3] Downloading esbenp.prettier-vscode - 78.9% @ 1.8 MB/s...
+●  [2/3] esbenp.prettier-vscode - [███████████████░░░░░] 78.9% 218 KB/276 KB
 │
 ●  [2/3] ✅ esbenp.prettier-vscode (276 KB) - SHA256: e5f6g7h8... ✅
 │
-●  [3/3] Downloading PKief.material-icon-theme - 92.1% @ 3.2 MB/s...
+●  [3/3] PKief.material-icon... - [██████████████████░░] 92.1% 738 KB/801 KB
 │
 ●  [3/3] ✅ PKief.material-icon-theme (801 KB) - SHA256: i9j0k1l2... ✅
 │
 ●  Bulk download completed! 3 successful, 0 failed.
 │
-◇  Download Summary ─────────────────╮
-│                                    │
-│  Total extensions: 3               │
-│  ✅ Successful: 3                   │
-│  ❌ Failed: 0                       │
-│  📁 Output directory: ./downloads  │
-│                                    │
-├────────────────────────────────────╯
+◇  Download Complete ─────────────────╮
+│                                     │
+│  Total: 3 extensions                │
+│  Successful: 3                      │
+│  Failed: 0                          │
+│  Output: ./downloads                │
+│                                     │
+├─────────────────────────────────────╯
 │
 └  🎉 Bulk download completed! 3 extension(s) downloaded successfully.
 ```

@@ -22,12 +22,15 @@ import {
   isValidSHA256,
   formatHashForDisplay,
 } from "../utils/checksum";
-import {
-  ProgressInfo,
-  formatBytes,
-  formatSpeed,
-  createProgressBar,
-} from "../utils/progressTracker";
+import { ProgressInfo, formatBytes, createProgressBar } from "../utils/progressTracker";
+
+/**
+ * Truncate display name to avoid overly long progress messages
+ */
+function truncateDisplayName(name: string, maxLength: number = 30): string {
+  if (name.length <= maxLength) return name;
+  return name.slice(0, maxLength - 3) + "...";
+}
 
 interface DownloadOptions {
   url?: string;
@@ -143,8 +146,9 @@ async function downloadSingleExtension(options: DownloadOptions) {
   let version = options.version;
   if (!version) {
     const versionResult = await p.text({
-      message: "Enter the extension version (or 'latest'):",
+      message: "Enter the extension version (or use version number):",
       placeholder: "e.g., 1.2.3 or latest",
+      initialValue: "latest",
       validate: (input: string) => {
         if (!input.trim()) {
           return "Please enter a version number";
@@ -313,14 +317,13 @@ async function downloadSingleExtension(options: DownloadOptions) {
       const progressBar = createProgressBar(progress.percentage, 30);
       const downloaded = formatBytes(progress.downloaded);
       const total = formatBytes(progress.total);
-      const speed = formatSpeed(progress.speed);
 
-      downloadSpinner.message(`${progressBar} ${downloaded}/${total} @ ${speed}`);
+      downloadSpinner.message(`${progressBar} ${downloaded}/${total}`);
       lastProgressUpdate = now;
     }
   };
 
-  downloadSpinner.start(`Downloading ${filename}...`);
+  downloadSpinner.start(`Downloading ${truncateDisplayName(filename)}...`);
 
   try {
     const downloadedFilePath = await downloadFile(
@@ -334,7 +337,7 @@ async function downloadSingleExtension(options: DownloadOptions) {
     // Get file size for display
     const fs = await import("fs-extra");
     const stats = await fs.stat(downloadedFilePath);
-    const sizeInKB = Math.round(stats.size / 1024);
+    const formattedSize = formatBytes(stats.size);
 
     let checksumInfo = "";
     let verificationInfo = "";
@@ -381,7 +384,7 @@ async function downloadSingleExtension(options: DownloadOptions) {
     }
 
     p.note(
-      `File: ${filename}\nLocation: ${downloadedFilePath}\nSize: ${sizeInKB} KB${checksumInfo}${verificationInfo}`,
+      `File: ${filename}\nLocation: ${downloadedFilePath}\nSize: ${formattedSize}${checksumInfo}${verificationInfo}`,
       "Download Complete",
     );
 
