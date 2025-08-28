@@ -46,16 +46,20 @@ jobs:
         run: |
           git fetch --tags --force --prune
           CURRENT_VERSION=$(node -p "require('./package.json').version")
-          LAST_TAG=$(git tag --list 'v*' | sed 's/^v//' | sort -V | tail -1)
+          LAST_TAG=$(git tag --list 'v*' | sed 's/^v//' | sort -V | tail -1 || echo "0.0.0")
           LAST_NPM=$(npm view vsix-downloader version 2>/dev/null || echo "0.0.0")
-          BASE=$(printf "%s\n%s\n" "$LAST_TAG" "$LAST_NPM" | sort -V | tail -1)
-          MAX_OF_CURR_AND_BASE=$(printf "%s\n%s\n" "$CURRENT_VERSION" "$BASE" | sort -V | tail -1)
-          if [ "$MAX_OF_CURR_AND_BASE" = "$CURRENT_VERSION" ] && [ "$CURRENT_VERSION" != "$BASE" ]; then
-            echo "mode=publish" >> $GITHUB_OUTPUT
-            echo "Detected package.json ahead of tags/npm ($CURRENT_VERSION > $BASE). Will publish."
-          else
+          
+          echo "Current version: $CURRENT_VERSION"
+          echo "Last tag: $LAST_TAG"
+          echo "Last NPM: $LAST_NPM"
+          
+          # Check if version already exists on NPM
+          if npm view vsix-downloader@$CURRENT_VERSION version >/dev/null 2>&1; then
             echo "mode=bump" >> $GITHUB_OUTPUT
-            echo "Detected package.json not ahead ($CURRENT_VERSION <= $BASE). Will prepare bump PR."
+            echo "Version $CURRENT_VERSION already exists on NPM. Will prepare bump PR."
+          else
+            echo "mode=publish" >> $GITHUB_OUTPUT
+            echo "Version $CURRENT_VERSION not found on NPM. Will publish."
           fi
 
       - name: Install dependencies
@@ -66,6 +70,13 @@ jobs:
 
       - name: Run tests (if any)
         run: npm test --if-present
+
+      - name: Debug workflow state
+        run: |
+          echo "Workflow mode: ${{ steps.decide.outputs.mode }}"
+          echo "Current version: $(node -p "require('./package.json').version")"
+          echo "Git SHA: $GITHUB_SHA"
+          echo "Event: ${{ github.event_name }}"
 
       - name: Determine version bump
         id: version
@@ -126,28 +137,19 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Bumped version to $NEW_VERSION"
 
-      - name: Ensure unique version on NPM
+      - name: Set final version
         if: (steps.decide.outputs.mode == 'bump' && steps.version.outputs.bump != 'none') || (steps.decide.outputs.mode == 'publish')
         id: ensure
         run: |
-          NEW_VERSION=$(node -p "require('./package.json').version")
-          ATTEMPTS=0
-          while npm view vsix-downloader@$NEW_VERSION version >/dev/null 2>&1; do
-            echo "Version $NEW_VERSION already exists on NPM, bumping patch..."
-            npm version patch --no-git-tag-version
-            NEW_VERSION=$(node -p "require('./package.json').version")
-            ATTEMPTS=$((ATTEMPTS+1))
-            if [ $ATTEMPTS -gt 10 ]; then
-              echo "Exceeded attempts to find an available version" 1>&2
-              exit 1
-            fi
-          done
-          echo "final_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "Using version $NEW_VERSION for publish"
+          FINAL_VERSION=$(node -p "require('./package.json').version")
+          echo "final_version=$FINAL_VERSION" >> $GITHUB_OUTPUT
+          echo "Using version $FINAL_VERSION for publish"
 
       - name: Publish to NPM
         if: steps.decide.outputs.mode == 'publish'
-        run: npm publish
+        run: |
+          echo "Publishing version $(node -p "require('./package.json').version") to NPM..."
+          npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -156,9 +158,18 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          # Tag the merge commit without pushing code to protected main
-          git tag v${{ steps.ensure.outputs.final_version }} $GITHUB_SHA
-          git push origin refs/tags/v${{ steps.ensure.outputs.final_version }}
+          TAG_NAME="v${{ steps.ensure.outputs.final_version }}"
+          echo "Creating tag $TAG_NAME"
+          
+          # Create and push tag
+          if git tag "$TAG_NAME" $GITHUB_SHA; then
+            echo "Tag created successfully"
+            git push origin "refs/tags/$TAG_NAME"
+            echo "Tag pushed successfully"
+          else
+            echo "Failed to create tag (may already exist)"
+            exit 1
+          fi
 
       - name: Create version bump PR
         if: steps.decide.outputs.mode == 'bump' && steps.version.outputs.bump != 'none'
@@ -176,12 +187,10 @@ jobs:
 
       - name: Create GitHub Release
         if: steps.decide.outputs.mode == 'publish'
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.ensure.outputs.final_version }}
-          release_name: Release v${{ steps.ensure.outputs.final_version }}
+          name: Release v${{ steps.ensure.outputs.final_version }}
           body: |
             ## What's Changed
 
