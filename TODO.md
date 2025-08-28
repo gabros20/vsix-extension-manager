@@ -63,15 +63,15 @@
   - Enhanced bulk downloads with clack-native spinners to eliminate layout jumps
   - Improved TypeScript type safety with proper spinner interface definitions
 
+- [x] **Export installed and from-list commands** (`todo-export-from-list`)
+  - Added `export-installed` command to list currently installed VS Code extensions
+  - Added `from-list` command to download extensions from simple text file
+  - Support for VS Code's extensions.json format parsing and generation
+  - Added `--format` flag for different output formats (json, txt, extensions.json)
+  - Added workspace extensions.json detection and export functionality
+  - Integrated with existing bulk download infrastructure for seamless operation
+
 ## Pending Features 🔄
-
-### Medium Priority
-
-- [ ] **Export installed and from-list commands** (`todo-export-from-list`)
-  - Add `export-installed` command to list currently installed extensions
-  - Add `from-list` command to download from simple text file
-  - Support VS Code's extensions.json format
-  - Add `--format` flag for different output formats
 
 - [ ] **Enhanced bulk-download-example.json schema and docs** (`todo-docs-schema`)
   - Add schema validation with JSON Schema
@@ -149,5 +149,5 @@ Conventional commits, automated changelogs, code quality enforcement, and depend
 
 ---
 
-**Last Updated:** v1.5.0 release  
-**Next Priority:** Export installed and from-list commands (VS Code integration and workflow improvements)
+**Last Updated:** Export and from-list commands implementation  
+**Next Priority:** Enhanced schema validation and documentation improvements

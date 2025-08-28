@@ -5,17 +5,11 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      release-type:
-        description: "Release type"
-        required: true
-        default: "auto"
-        type: choice
-        options:
-          - auto
-          - patch
-          - minor
-          - major
-          - prerelease
+      force-publish:
+        description: "Force publish even if version exists"
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   publish:
@@ -49,106 +43,81 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run quality checks
+      - name: Get package.json version
+        id: package-version
         run: |
-          npm run build
-          npm run lint
-          npm test --if-present
-          npx tsc --noEmit
-
-      - name: Determine version bump
-        id: version
-        run: |
-          # Get current version
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
-
-          # Manual override from workflow dispatch
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.release-type }}" != "auto" ]; then
-            echo "release_type=${{ github.event.inputs.release-type }}" >> $GITHUB_OUTPUT
-            echo "Manual release type: ${{ github.event.inputs.release-type }}"
-            exit 0
-          fi
-
-          # Get latest tag
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-
-          # Get commits since latest tag
-          if [ "$LATEST_TAG" = "v0.0.0" ]; then
-            COMMITS=$(git log --oneline)
-          else
-            COMMITS=$(git log ${LATEST_TAG}..HEAD --oneline)
-          fi
-
-          echo "Commits since $LATEST_TAG:"
-          echo "$COMMITS"
-
-          # Determine release type based on conventional commits
-          if echo "$COMMITS" | grep -Eq "^[a-f0-9]+ [a-zA-Z]+(\([^)]*\))?!:|BREAKING CHANGE:"; then
-            echo "release_type=major" >> $GITHUB_OUTPUT
-            echo "🚨 Breaking changes detected - major release"
-          elif echo "$COMMITS" | grep -Eq "^[a-f0-9]+ feat(\([^)]*\))?:"; then
-            echo "release_type=minor" >> $GITHUB_OUTPUT
-            echo "✨ New features detected - minor release"
-          elif echo "$COMMITS" | grep -Eq "^[a-f0-9]+ (fix|perf)(\([^)]*\))?:"; then
-            echo "release_type=patch" >> $GITHUB_OUTPUT
-            echo "🐛 Bug fixes/performance improvements - patch release"
-          elif echo "$COMMITS" | grep -Eq "^[a-f0-9]+ (docs|style|refactor|test|chore|ci|build)(\([^)]*\))?:"; then
-            echo "release_type=patch" >> $GITHUB_OUTPUT
-            echo "🔧 Maintenance changes - patch release"
-          else
-            echo "release_type=none" >> $GITHUB_OUTPUT
-            echo "📝 No significant changes - skipping release"
-          fi
-
-      - name: Bump version
-        id: bump
-        if: steps.version.outputs.release_type != 'none'
-        run: |
-          RELEASE_TYPE="${{ steps.version.outputs.release_type }}"
-
-          # Bump version
-          case "$RELEASE_TYPE" in
-            major|minor|patch|prerelease)
-              npm version $RELEASE_TYPE --no-git-tag-version
-              ;;
-            *)
-              echo "Invalid release type: $RELEASE_TYPE"
-              exit 1
-              ;;
-          esac
-
-          NEW_VERSION=$(node -p "require('./package.json').version")
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "📦 Version bumped to $NEW_VERSION"
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          echo "version=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Package.json version: $PACKAGE_VERSION"
 
       - name: Check if version exists on NPM
-        id: check
-        if: steps.version.outputs.release_type != 'none'
+        id: npm-check
         run: |
-          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
+          PACKAGE_VERSION="${{ steps.package-version.outputs.version }}"
 
-          if npm view vsix-downloader@$NEW_VERSION version >/dev/null 2>&1; then
+          if npm view vsix-downloader@$PACKAGE_VERSION version >/dev/null 2>&1; then
+            NPM_VERSION=$(npm view vsix-downloader@$PACKAGE_VERSION version)
             echo "exists=true" >> $GITHUB_OUTPUT
-            echo "❌ Version $NEW_VERSION already exists on NPM"
-            exit 1
+            echo "npm_version=$NPM_VERSION" >> $GITHUB_OUTPUT
+            echo "📦 Version $PACKAGE_VERSION already exists on NPM"
           else
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "✅ Version $NEW_VERSION is available for publishing"
+            echo "npm_version=" >> $GITHUB_OUTPUT
+            echo "✅ Version $PACKAGE_VERSION is available for publishing"
+          fi
+
+      - name: Determine if should publish
+        id: should-publish
+        run: |
+          PACKAGE_VERSION="${{ steps.package-version.outputs.version }}"
+          VERSION_EXISTS="${{ steps.npm-check.outputs.exists }}"
+          FORCE_PUBLISH="${{ github.event.inputs.force-publish }}"
+
+          if [ "$VERSION_EXISTS" = "true" ] && [ "$FORCE_PUBLISH" != "true" ]; then
+            echo "should_publish=false" >> $GITHUB_OUTPUT
+            echo "reason=version-exists" >> $GITHUB_OUTPUT
+            echo "ℹ️ Skipping publish - version $PACKAGE_VERSION already exists on NPM"
+            echo "💡 To publish anyway, use workflow_dispatch with force-publish=true"
+            echo "💡 Or update the version in package.json and push again"
+          else
+            echo "should_publish=true" >> $GITHUB_OUTPUT
+            if [ "$FORCE_PUBLISH" = "true" ]; then
+              echo "reason=force-publish" >> $GITHUB_OUTPUT
+              echo "🚀 Force publishing version $PACKAGE_VERSION"
+            else
+              echo "reason=new-version" >> $GITHUB_OUTPUT
+              echo "🚀 Publishing new version $PACKAGE_VERSION"
+            fi
+          fi
+
+      - name: Check if git tag exists
+        id: tag-check
+        if: steps.should-publish.outputs.should_publish == 'true'
+        run: |
+          PACKAGE_VERSION="${{ steps.package-version.outputs.version }}"
+          TAG_NAME="v$PACKAGE_VERSION"
+
+          if git tag -l | grep -q "^$TAG_NAME$"; then
+            echo "tag_exists=true" >> $GITHUB_OUTPUT
+            echo "🏷️ Tag $TAG_NAME already exists"
+          else
+            echo "tag_exists=false" >> $GITHUB_OUTPUT
+            echo "✅ Tag $TAG_NAME is available"
           fi
 
       - name: Generate changelog
         id: changelog
-        if: steps.version.outputs.release_type != 'none'
+        if: steps.should-publish.outputs.should_publish == 'true'
         run: |
-          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
-          LATEST_TAG="${{ steps.version.outputs.latest_tag }}"
+          PACKAGE_VERSION="${{ steps.package-version.outputs.version }}"
 
-          echo "# Changelog for v$NEW_VERSION" > CHANGELOG.md
+          # Get latest tag for changelog generation
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+
+          echo "# Changelog for v$PACKAGE_VERSION" > CHANGELOG.md
           echo "" >> CHANGELOG.md
 
-          if [ "$LATEST_TAG" = "v0.0.0" ]; then
+          if [ -z "$LATEST_TAG" ] || [ "$LATEST_TAG" = "v0.0.0" ]; then
             echo "## Initial Release" >> CHANGELOG.md
             git log --oneline --pretty=format:"- %s (%h)" >> CHANGELOG.md
           else
@@ -157,7 +126,9 @@ jobs:
           fi
 
           echo "" >> CHANGELOG.md
-          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${LATEST_TAG}...v$NEW_VERSION" >> CHANGELOG.md
+          if [ -n "$LATEST_TAG" ]; then
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${LATEST_TAG}...v$PACKAGE_VERSION" >> CHANGELOG.md
+          fi
 
           # Set output for release notes
           {
@@ -167,63 +138,85 @@ jobs:
           } >> $GITHUB_OUTPUT
 
       - name: Build final artifact
-        if: steps.version.outputs.release_type != 'none'
+        if: steps.should-publish.outputs.should_publish == 'true'
         run: |
           npm run build
           echo "🏗️ Final build completed"
 
       - name: Publish to NPM
-        if: steps.version.outputs.release_type != 'none'
+        if: steps.should-publish.outputs.should_publish == 'true'
         run: |
-          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
-          echo "🚀 Publishing v$NEW_VERSION to NPM..."
+          PACKAGE_VERSION="${{ steps.package-version.outputs.version }}"
+          echo "🚀 Publishing v$PACKAGE_VERSION to NPM..."
 
           # Dry run first
           npm publish --dry-run
 
           # Actual publish
           npm publish --access public
-          echo "✅ Successfully published to NPM"
+          echo "✅ Successfully published v$PACKAGE_VERSION to NPM"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create and push git tag
-        if: steps.version.outputs.release_type != 'none'
+        if: steps.should-publish.outputs.should_publish == 'true' && steps.tag-check.outputs.tag_exists == 'false'
         run: |
-          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
-          TAG_NAME="v$NEW_VERSION"
+          PACKAGE_VERSION="${{ steps.package-version.outputs.version }}"
+          TAG_NAME="v$PACKAGE_VERSION"
 
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
 
-          # Create and push tag only (no commit to main due to branch protection)
-          git tag "$TAG_NAME"
+          # Create and push tag
+          git tag "$TAG_NAME" -m "Release v$PACKAGE_VERSION"
           git push origin "refs/tags/$TAG_NAME"
           echo "🏷️ Created and pushed tag $TAG_NAME"
 
       - name: Create GitHub Release
-        if: steps.version.outputs.release_type != 'none'
+        if: steps.should-publish.outputs.should_publish == 'true'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.bump.outputs.new_version }}
-          name: Release v${{ steps.bump.outputs.new_version }}
+          tag_name: v${{ steps.package-version.outputs.version }}
+          name: Release v${{ steps.package-version.outputs.version }}
           body: ${{ steps.changelog.outputs.changelog }}
           draft: false
-          prerelease: ${{ contains(steps.bump.outputs.new_version, 'alpha') || contains(steps.bump.outputs.new_version, 'beta') || contains(steps.bump.outputs.new_version, 'rc') }}
+          prerelease: ${{ contains(steps.package-version.outputs.version, 'alpha') || contains(steps.package-version.outputs.version, 'beta') || contains(steps.package-version.outputs.version, 'rc') }}
 
       - name: Publish summary
-        if: steps.version.outputs.release_type != 'none'
+        if: steps.should-publish.outputs.should_publish == 'true'
         run: |
-          echo "✅ Version ${{ steps.bump.outputs.new_version }} published successfully"
-          echo "📦 Package published: https://www.npmjs.com/package/vsix-downloader"
-          echo "📋 Release created: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.bump.outputs.new_version }}"
-          echo "🔄 A follow-up PR will be created to sync package.json version"
+          PACKAGE_VERSION="${{ steps.package-version.outputs.version }}"
+          echo "✅ Version $PACKAGE_VERSION published successfully!"
+          echo "📦 NPM Package: https://www.npmjs.com/package/vsix-downloader/v/$PACKAGE_VERSION"
+          echo "📋 GitHub Release: https://github.com/${{ github.repository }}/releases/tag/v$PACKAGE_VERSION"
+          echo "🏷️ Git Tag: v$PACKAGE_VERSION"
 
-      - name: No release needed
-        if: steps.version.outputs.release_type == 'none'
+          echo "## 📋 Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Published version **$PACKAGE_VERSION** to NPM" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏷️ Created git tag **v$PACKAGE_VERSION**" >> $GITHUB_STEP_SUMMARY
+          echo "- 📋 Created GitHub release" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 [View on NPM](https://www.npmjs.com/package/vsix-downloader/v/$PACKAGE_VERSION)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Skip publish summary
+        if: steps.should-publish.outputs.should_publish == 'false'
         run: |
-          echo "ℹ️ No significant changes detected. Skipping release."
-          echo "💡 Ensure commits follow conventional commit format for automatic releases:"
-          echo "   feat: for new features (minor bump)"
-          echo "   fix: for bug fixes (patch bump)"
-          echo "   feat!: or BREAKING CHANGE: for breaking changes (major bump)"
+          PACKAGE_VERSION="${{ steps.package-version.outputs.version }}"
+          REASON="${{ steps.should-publish.outputs.reason }}"
+
+          echo "ℹ️ No publish needed for version $PACKAGE_VERSION"
+
+          if [ "$REASON" = "version-exists" ]; then
+            echo "📦 Version $PACKAGE_VERSION already exists on NPM"
+            echo ""
+            echo "## Next steps:"
+            echo "1. 📝 Update version in package.json (e.g., to $PACKAGE_VERSION)"
+            echo "2. 🔄 Push changes to main branch"
+            echo "3. 🚀 Automatic publish will trigger"
+            echo ""
+            echo "Or run workflow manually with 'force-publish' enabled."
+          fi
+
+          echo "## 📋 Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- ℹ️ Skipped publishing" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 Version **$PACKAGE_VERSION** already exists on NPM" >> $GITHUB_STEP_SUMMARY
+          echo "- 💡 Update package.json version to trigger publish" >> $GITHUB_STEP_SUMMARY
