@@ -164,6 +164,7 @@ jobs:
         if: steps.decide.outputs.mode == 'bump' && steps.version.outputs.bump != 'none'
         uses: peter-evans/create-pull-request@v6
         with:
+          base: main
           commit-message: "chore: bump version to ${{ steps.ensure.outputs.final_version }}"
           branch: chore/release-v${{ steps.ensure.outputs.final_version }}
           title: "chore: bump version to ${{ steps.ensure.outputs.final_version }}"
