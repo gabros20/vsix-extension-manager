@@ -4,16 +4,16 @@ A modern CLI tool to download VS Code extensions as VSIX files directly from the
 
 ## 🚀 Features
 
--   **Beautiful CLI**: Stunning interface powered by [Clack](https://github.com/bombshell-dev/clack)
--   **Dual Download Modes**: Choose between single extension or bulk download from JSON
--   **Interactive Prompts**: Elegant bordered prompts with validation
--   **Bulk Download**: Download multiple extensions at once with progress tracking
--   **JSON Validation**: Comprehensive validation for bulk download files
--   **Modern Stack**: Built with TypeScript, Commander.js, and Clack
--   **Error Handling**: Comprehensive error handling and validation
--   **Progress Indicators**: Beautiful spinners and visual feedback
--   **Flexible Output**: Customizable download directory
--   **Smart Parsing**: Automatically extracts extension info from marketplace URLs
+- **Beautiful CLI**: Stunning interface powered by [Clack](https://github.com/bombshell-dev/clack)
+- **Dual Download Modes**: Choose between single extension or bulk download from JSON
+- **Interactive Prompts**: Elegant bordered prompts with validation
+- **Bulk Download**: Download multiple extensions at once with progress tracking
+- **JSON Validation**: Comprehensive validation for bulk download files
+- **Modern Stack**: Built with TypeScript, Commander.js, and Clack
+- **Error Handling**: Comprehensive error handling and validation
+- **Progress Indicators**: Beautiful spinners and visual feedback
+- **Flexible Output**: Customizable download directory
+- **Smart Parsing**: Automatically extracts extension info from marketplace URLs
 
 ## 📦 Installation
 
@@ -41,8 +41,8 @@ vsix-downloader
 
 You'll be prompted to choose between:
 
--   **📦 Single Extension**: Download one extension interactively
--   **📚 Bulk Download**: Download multiple extensions from JSON file
+- **📦 Single Extension**: Download one extension interactively
+- **📚 Bulk Download**: Download multiple extensions from JSON file
 
 Or use the download command directly:
 
@@ -89,25 +89,25 @@ Create a JSON file (e.g., `extensions.json`) with the following structure:
 
 ```json
 [
-	{
-		"url": "https://marketplace.visualstudio.com/items?itemName=Fuzionix.file-tree-extractor",
-		"version": "1.3.3"
-	},
-	{
-		"url": "https://marketplace.visualstudio.com/items?itemName=million.million-lint",
-		"version": "1.0.14"
-	},
-	{
-		"url": "https://marketplace.visualstudio.com/items?itemName=sourcegraph.amp",
-		"version": "0.0.1756310942"
-	}
+  {
+    "url": "https://marketplace.visualstudio.com/items?itemName=Fuzionix.file-tree-extractor",
+    "version": "1.3.3"
+  },
+  {
+    "url": "https://marketplace.visualstudio.com/items?itemName=million.million-lint",
+    "version": "1.0.14"
+  },
+  {
+    "url": "https://marketplace.visualstudio.com/items?itemName=sourcegraph.amp",
+    "version": "0.0.1756310942"
+  }
 ]
 ```
 
 #### Required Fields
 
--   **`url`**: Full marketplace URL of the extension
--   **`version`**: Specific version to download
+- **`url`**: Full marketplace URL of the extension
+- **`version`**: Specific version to download
 
 The extension name is automatically extracted from the URL for display purposes in the CLI.
 
@@ -117,23 +117,23 @@ The CLI performs comprehensive validation on your JSON file before starting down
 
 ✅ **File Validation**:
 
--   File exists and is readable
--   Valid JSON format
--   Array structure (must be an array of objects)
--   Non-empty array
+- File exists and is readable
+- Valid JSON format
+- Array structure (must be an array of objects)
+- Non-empty array
 
 ✅ **Extension Validation**:
 
--   Required `url` field (must be a marketplace URL)
--   Required `version` field (non-empty string)
--   URL format validation (must contain `marketplace.visualstudio.com`)
+- Required `url` field (must be a marketplace URL)
+- Required `version` field (non-empty string)
+- URL format validation (must contain `marketplace.visualstudio.com`)
 
 ❌ **Error Handling**:
 
--   Clear error messages for invalid JSON structure
--   Specific validation errors for each extension object
--   Failed downloads don't stop the bulk process
--   Detailed summary of successes and failures
+- Clear error messages for invalid JSON structure
+- Specific validation errors for each extension object
+- Failed downloads don't stop the bulk process
+- Detailed summary of successes and failures
 
 ### Available Commands
 
@@ -145,10 +145,10 @@ vsix-downloader --version            # Show version
 
 ### Options
 
--   `-u, --url <url>` - Marketplace URL of the extension
--   `-v, --version <version>` - Version of the extension to download
--   `-o, --output <path>` - Output directory (default: ./downloads)
--   `-h, --help` - Display help information
+- `-u, --url <url>` - Marketplace URL of the extension
+- `-v, --version <version>` - Version of the extension to download
+- `-o, --output <path>` - Output directory (default: ./downloads)
+- `-h, --help` - Display help information
 
 ## 📋 Examples
 
@@ -248,32 +248,32 @@ $ vsix-downloader
 
 ### 1. Command Line (.vsix)
 
--   Use the `.vsix` you downloaded with this tool (default in `./downloads/`).
--   Open your terminal and navigate to the directory with the `.vsix` file.
--   Run:
+- Use the `.vsix` you downloaded with this tool (default in `./downloads/`).
+- Open your terminal and navigate to the directory with the `.vsix` file.
+- Run:
 
 ```bash
 cursor --install-extension your-extension.vsix
 ```
 
--   Restart Cursor IDE to activate the extension.
+- Restart Cursor IDE to activate the extension.
 
 ### 2. Drag and Drop
 
--   Open Cursor’s Extensions panel (Ctrl+Shift+X).
--   Drag the `.vsix` file from your file explorer into the Extensions panel.
--   The extension will install automatically.
+- Open Cursor’s Extensions panel (Ctrl+Shift+X).
+- Drag the `.vsix` file from your file explorer into the Extensions panel.
+- The extension will install automatically.
 
 ### 3. Command Palette
 
--   Open the Command Palette with Ctrl+Shift+P.
--   Type and select “Extensions: Install from VSIX…”.
--   Select your `.vsix` file and confirm.
+- Open the Command Palette with Ctrl+Shift+P.
+- Type and select “Extensions: Install from VSIX…”.
+- Select your `.vsix` file and confirm.
 
 ### Additional Tips
 
--   Some extensions may have compatibility or license limitations due to Cursor’s fork status, especially for Microsoft (official) extensions.
--   If you have multiple profiles, you can append `--profile "<profile_name>"` to the install command.
+- Some extensions may have compatibility or license limitations due to Cursor’s fork status, especially for Microsoft (official) extensions.
+- If you have multiple profiles, you can append `--profile "<profile_name>"` to the install command.
 
 ## 💡 Tips & Best Practices
 
@@ -281,16 +281,16 @@ cursor --install-extension your-extension.vsix
 
 1. **Create Extension Lists**: Save commonly used extension combinations in JSON files:
 
-    ```bash
-    # Frontend development stack
-    ./frontend-extensions.json
+   ```bash
+   # Frontend development stack
+   ./frontend-extensions.json
 
-    # Backend development stack
-    ./backend-extensions.json
+   # Backend development stack
+   ./backend-extensions.json
 
-    # Data science toolkit
-    ./datascience-extensions.json
-    ```
+   # Data science toolkit
+   ./datascience-extensions.json
+   ```
 
 2. **Version Pinning**: Always specify exact versions in your JSON for reproducible setups.
 
@@ -308,8 +308,8 @@ cursor --install-extension your-extension.vsix
 
 ### Prerequisites
 
--   Node.js 16+
--   npm or yarn
+- Node.js 16+
+- npm or yarn
 
 ### Setup
 
@@ -340,10 +340,10 @@ npm run dev
 
 ### Scripts
 
--   `npm run build` - Compile TypeScript to JavaScript
--   `npm run dev` - Run in development mode with ts-node
--   `npm start` - Run the compiled version
--   `npm run prepare` - Build before publishing
+- `npm run build` - Compile TypeScript to JavaScript
+- `npm run dev` - Run in development mode with ts-node
+- `npm start` - Run the compiled version
+- `npm run prepare` - Build before publishing
 
 ## 📁 Project Structure
 
@@ -383,11 +383,11 @@ https://[publisher].gallery.vsassets.io/_apis/public/gallery/publisher/[publishe
 
 The tool handles various error scenarios:
 
--   **Invalid URLs**: Validates marketplace URL format
--   **Missing Versions**: Validates version number format
--   **Network Errors**: Handles timeouts and connection issues
--   **File System Errors**: Manages directory creation and permissions
--   **404 Errors**: Clear messages for non-existent extensions/versions
+- **Invalid URLs**: Validates marketplace URL format
+- **Missing Versions**: Validates version number format
+- **Network Errors**: Handles timeouts and connection issues
+- **File System Errors**: Manages directory creation and permissions
+- **404 Errors**: Clear messages for non-existent extensions/versions
 
 ## 🤝 Contributing
 
@@ -413,6 +413,7 @@ git commit -m "feat(download): add bulk download capability"
 ```
 
 **Commit Types:**
+
 - `feat`: New features
 - `fix`: Bug fixes
 - `docs`: Documentation changes
@@ -434,6 +435,7 @@ This project uses GitHub Actions for automated publishing to NPM:
 - **Version Sync**: GitHub releases and NPM versions stay in sync
 
 **Workflow:**
+
 1. Make changes and commit with conventional commit format
 2. Push to main branch
 3. GitHub Actions automatically:
@@ -449,8 +451,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
--   Original inspiration from [mjmirza/download-vsix-from-visual-studio-market-place](https://github.com/mjmirza/download-vsix-from-visual-studio-market-place)
--   Built with modern CLI tools: Commander.js, Inquirer.js, Chalk, and Ora
+- Original inspiration from [mjmirza/download-vsix-from-visual-studio-market-place](https://github.com/mjmirza/download-vsix-from-visual-studio-market-place)
+- Built with modern CLI tools: Commander.js, Inquirer.js, Chalk, and Ora
 
 ## 📞 Support
 
