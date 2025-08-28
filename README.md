@@ -414,11 +414,26 @@ The tool handles various error scenarios:
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes using conventional commits (see below)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+We welcome contributions! This project uses a protected main branch workflow to ensure code quality and maintain a clean git history.
+
+### 🚀 Quick Start
+
+1. **Fork the repository** on GitHub
+2. **Clone your fork** locally:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/vsix-downloader.git
+   cd vsix-downloader
+   ```
+3. **Create a feature branch**:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+4. **Make your changes** and commit using conventional commits (see below)
+5. **Push to your fork**:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+6. **Create a Pull Request** from your fork to the main repository
 
 ### Conventional Commits
 
@@ -453,20 +468,24 @@ git commit -m "feat(download): add bulk download capability"
 This project uses GitHub Actions for automated publishing to NPM:
 
 - **Automatic Versioning**: Version bumps based on conventional commits
-- **NPM Publishing**: Automatic publish on push to main branch
+- **NPM Publishing**: Automatic publish on merge to main branch
 - **GitHub Releases**: Automatic release creation with tags
 - **Version Sync**: GitHub releases and NPM versions stay in sync
 
 **Workflow:**
 
 1. Make changes and commit with conventional commit format
-2. Push to main branch
-3. GitHub Actions automatically:
+2. Create Pull Request from feature branch
+3. Get review and approval
+4. Merge PR to main branch
+5. GitHub Actions automatically:
    - Determines version bump (patch/minor/major)
    - Updates package.json version
    - Publishes to NPM
    - Creates GitHub release with tag
    - Pushes version changes back to repository
+
+**Note**: Since main branch is protected, publishing only occurs after PR approval and merge, ensuring all changes are reviewed.
 
 ## 📄 License
 
