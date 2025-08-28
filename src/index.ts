@@ -29,6 +29,13 @@ program
   .option("--summary <path>", "Write bulk summary JSON to the given path")
   .option("--pre-release", "Prefer pre-release when resolving 'latest'", false)
   .option("--source <source>", "Source registry: marketplace|open-vsx|auto (default: marketplace)")
+  .option(
+    "--filename-template <template>",
+    "Custom filename template (default: {name}-{version}.vsix)",
+  )
+  .option("--cache-dir <path>", "Cache directory for downloads (overrides output)")
+  .option("--checksum", "Generate SHA256 checksum for downloaded files", false)
+  .option("--verify-checksum <hash>", "Verify downloaded file against provided SHA256 hash")
   .action(downloadVsix);
 
 program

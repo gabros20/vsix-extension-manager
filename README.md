@@ -33,12 +33,17 @@ Recently, Microsoft quietly blocked Cursor (an AI-powered VSCode fork) from acce
 - **Bulk Download**: Download multiple extensions at once with progress tracking
 - **JSON Validation**: Comprehensive validation for bulk download files
 - **Non-Interactive Bulk Mode**: Use `--file` to run bulk downloads without prompts
-- **Concurrent Downloads**: Control concurrency with `--parallel` plus `--retry`/`--retry-delay`
+- **Sequential Downloads**: Clean, readable progress with `--retry`/`--retry-delay` options
 - **Summary Output**: Write machine-readable results with `--summary <path>.json`
 - **Modern Stack**: Built with TypeScript, Commander.js, and Clack
 - **Error Handling**: Comprehensive error handling and validation
 - **Progress Indicators**: Beautiful spinners and visual feedback
 - **Flexible Output**: Customizable download directory (defaults to `./downloads` in current directory)
+- **Custom Filename Templates**: Organize downloads with variable substitution (`{name}`, `{version}`, `{source}`, `{publisher}`)
+- **Cache Directory Support**: Persistent storage with skip/overwrite behavior for efficient re-downloads
+- **Smart File Handling**: Skip existing files or overwrite with intelligent existence checking
+- **Progress Indicators**: Real-time download progress with file size, speed, and progress bars
+- **Checksum Verification**: Generate SHA256 checksums and verify file integrity
 - **Smart Parsing**: Extracts extension info from Marketplace and OpenVSX URLs
 - **Interactive Source Selection**: Auto-detects source from URL with ability to switch
 - **Mixed-Source Bulk**: Use Marketplace and OpenVSX URLs in the same JSON list
@@ -180,15 +185,34 @@ vsix-downloader download \
   --file ./extensions.json \
   --output ./downloads
 
-# Advanced: parallel downloads, retries with backoff, quiet logs and JSON summary
+# Advanced: sequential downloads with retries, backoff, quiet logs and JSON summary
 vsix-downloader download \
   --file ./extensions.json \
   --output ./downloads \
-  --parallel 6 \
   --retry 3 \
   --retry-delay 1500 \
   --summary ./summary.json \
   --quiet
+
+# Bulk download with custom naming and cache directory
+vsix-downloader download \
+  --file ./extensions.json \
+  --cache-dir ~/.vsix-cache \
+  --filename-template "{source}/{publisher}-{name}-v{version}.vsix" \
+  --skip-existing
+
+# Bulk download with progress and checksums
+vsix-downloader download \
+  --file ./extensions.json \
+  --checksum \
+  --cache-dir ~/.extensions \
+  --quiet
+
+# Bulk download with verification against known checksums
+vsix-downloader download \
+  --file ./extensions.json \
+  --verify-checksum "a1b2c3d4e5f6..." \
+  --retry 3
 ```
 
 ### Available Commands
@@ -214,6 +238,10 @@ vsix-downloader --version            # Show version
 - `--retry-delay <ms>` - Base delay between retries in ms (exponential backoff)
 - `--skip-existing` - Skip downloads if target file already exists
 - `--overwrite` - Overwrite existing files
+- `--filename-template <template>` - Custom filename template (default: `{name}-{version}.vsix`)
+- `--cache-dir <path>` - Cache directory for downloads (overrides output)
+- `--checksum` - Generate SHA256 checksum for downloaded files
+- `--verify-checksum <hash>` - Verify downloaded file against provided SHA256 hash
 - `--quiet` - Reduce output (suppress interactive notes/spinners)
 - `--json` - Machine-readable logs (reserved for future)
 - `--summary <path>` - Write bulk summary JSON to the given path
@@ -252,6 +280,119 @@ vsix-downloader download \
 
 Note: `auto` source is reserved for future fallback behavior. Currently, set `--source` explicitly to `marketplace` or `open-vsx`.
 
+### Custom Filename Templates
+
+Customize how downloaded files are named using the `--filename-template` option with variable substitution:
+
+```bash
+# Use a custom filename template
+vsix-downloader download \
+  --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" \
+  --version "2023.20.0" \
+  --filename-template "{publisher}_{name}_v{version}.vsix"
+# Results in: ms-python_ms-python.python_v2023.20.0.vsix
+
+# Include source in filename
+vsix-downloader download \
+  --url "..." \
+  --version "1.2.3" \
+  --filename-template "{source}-{name}-{version}.vsix"
+# Results in: marketplace-publisher.extension-1.2.3.vsix
+
+# Bulk download with custom template
+vsix-downloader download \
+  --file ./extensions.json \
+  --filename-template "{publisher}/{name}-{version}.vsix"
+```
+
+#### Available Template Variables
+
+- `{name}` - Full extension identifier (e.g., `ms-python.python`)
+- `{version}` - Version number (e.g., `2023.20.0`)
+- `{source}` - Source registry (`marketplace` or `open-vsx`)
+- `{publisher}` - Publisher name (e.g., `ms-python`)
+- `{displayName}` - Display name when available
+
+#### Template Requirements
+
+- Templates must include at least `{name}` or `{version}`
+- Invalid filesystem characters are automatically sanitized
+- `.vsix` extension is automatically added if missing
+- Default template: `{name}-{version}.vsix`
+
+### Cache Directory
+
+Use a dedicated cache directory for downloads that persists across sessions:
+
+```bash
+# Use cache directory (overrides --output)
+vsix-downloader download \
+  --url "..." \
+  --version "1.2.3" \
+  --cache-dir ~/.vsix-cache
+
+# Skip existing files in cache
+vsix-downloader download \
+  --file ./extensions.json \
+  --cache-dir ~/.vsix-cache \
+  --skip-existing
+
+# Bulk download to cache with custom naming
+vsix-downloader download \
+  --file ./extensions.json \
+  --cache-dir ~/.vsix-cache \
+  --filename-template "{source}/{publisher}/{name}-{version}.vsix" \
+  --overwrite
+```
+
+**Cache Directory Benefits:**
+
+- Persistent storage across download sessions
+- Organized extension storage with custom templates
+- Efficient re-downloads with `--skip-existing`
+- Overrides `--output` when both are specified
+
+### Progress Indicators & Checksums
+
+Monitor download progress and verify file integrity:
+
+```bash
+# Generate checksum after download
+vsix-downloader download \
+  --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" \
+  --version "2023.20.0" \
+  --checksum
+
+# Verify downloaded file against known checksum
+vsix-downloader download \
+  --url "..." \
+  --version "1.2.3" \
+  --verify-checksum "a1b2c3d4e5f6...your-sha256-hash-here"
+
+# Bulk download with progress and checksums
+vsix-downloader download \
+  --file ./extensions.json \
+  --checksum \
+  --cache-dir ~/.extensions
+```
+
+**Progress Features:**
+
+- **Single downloads**: Real-time progress bars with percentage completion and file size
+- **Bulk downloads**: Sequential progress with visual progress bars and file sizes per file
+- Time remaining estimates for single downloads
+- Non-intrusive updates (100ms intervals)
+
+**Checksum Features:**
+
+- SHA256 hash generation for integrity verification (both single and bulk)
+- File verification against provided checksums (both single and bulk)
+- Visual indicators: ✅ PASSED, ❌ FAILED, ⚠️ WARNING
+- Graceful error handling for checksum failures
+- Short hash display in bulk mode for readability
+- Full hash display in single mode
+- Bulk verification stops on failed checksums to prevent corrupted files
+
 ## 📋 Examples
 
 ### Example 1: Single Extension (Command Line)
@@ -281,8 +422,8 @@ $ vsix-downloader
 │                                  │
 ├──────────────────────────────────╯
 │
-◇  Enter the extension version:
-│  2023.20.0
+◇  Enter the extension version (or use the version number):
+│  latest
 │
 ◇  Enter output directory:
 │  ./downloads
@@ -291,6 +432,8 @@ $ vsix-downloader
 │                                                     │
 │  Filename: ms-python.python-2023.20.0.vsix          │
 │  Output: ./downloads                                │
+│  Resolved Version: 2023.20.0                       │
+│  Template: {name}-{version}.vsix                    │
 │  URL: https://ms-python.gallery.vs...SIXPackage     │
 │                                                     │
 ├─────────────────────────────────────────────────────╯
@@ -305,6 +448,7 @@ $ vsix-downloader
 │  File: ms-python.python-2023.20.0.vsix                        │
 │  Location: downloads/ms-python.python-2023.20.0.vsix          │
 │  Size: 15420 KB                                              │
+│  SHA256: a1b2c3d4e5f6789...                                  │
 │                                                               │
 ├───────────────────────────────────────────────────────────────╯
 │
@@ -331,20 +475,28 @@ $ vsix-downloader
 │
 ◆  ✅ JSON validation passed! Found 3 extension(s) to download.
 │
-◇  [1/3] ✅ Downloaded publisher1.awesome-extension-1.2.3.vsix (276 KB)
+●  [1/3] ms-python.python - [██████████░░░░░░░░░░] 45.2% 15.0 MB/38.4 MB
 │
-◇  [2/3] ✅ Downloaded publisher2.cool-tool-2.0.1.vsix (8993 KB)
+●  [1/3] ✅ ms-python.python (38.4 MB) - SHA256: a1b2c3d4... ✅
 │
-◇  [3/3] ✅ Downloaded publisher3.dev-helper-0.5.0.vsix (18031 KB)
+●  [2/3] esbenp.prettier-vscode - [███████████████░░░░░] 78.9% 218 KB/276 KB
 │
-◇  Download Summary ─────────────────╮
-│                                    │
-│  Total extensions: 3               │
-│  ✅ Successful: 3                   │
-│  ❌ Failed: 0                       │
-│  📁 Output directory: ./downloads  │
-│                                    │
-├────────────────────────────────────╯
+●  [2/3] ✅ esbenp.prettier-vscode (276 KB) - SHA256: e5f6g7h8... ✅
+│
+●  [3/3] PKief.material-icon... - [██████████████████░░] 92.1% 738 KB/801 KB
+│
+●  [3/3] ✅ PKief.material-icon-theme (801 KB) - SHA256: i9j0k1l2... ✅
+│
+●  Bulk download completed! 3 successful, 0 failed.
+│
+◇  Download Complete ─────────────────╮
+│                                     │
+│  Total: 3 extensions                │
+│  Successful: 3                      │
+│  Failed: 0                          │
+│  Output: ./downloads                │
+│                                     │
+├─────────────────────────────────────╯
 │
 └  🎉 Bulk download completed! 3 extension(s) downloaded successfully.
 ```
@@ -402,6 +554,49 @@ cursor --install-extension your-extension.vsix
 3. **Error Recovery**: The CLI continues downloading even if one extension fails, so you can retry just the failed ones.
 
 4. **Large Batches**: For downloading many extensions, the progress tracking helps you monitor the process.
+
+5. **Organized Storage**: Use filename templates and cache directories for better organization:
+
+   ```bash
+   # Organize by source and publisher
+   --cache-dir ~/.extensions \
+   --filename-template "{source}/{publisher}/{name}-{version}.vsix"
+
+   # Version-focused naming
+   --filename-template "{name}_v{version}_{source}.vsix"
+   ```
+
+6. **Efficient Re-downloads**: Use `--skip-existing` with cache directories to avoid re-downloading:
+
+   ```bash
+   # Only download new or updated extensions
+   vsix-downloader download \
+     --file ./extensions.json \
+     --cache-dir ~/.extensions \
+     --skip-existing
+   ```
+
+7. **Integrity Verification**: Generate and verify checksums for downloaded files:
+
+   ```bash
+   # Generate checksums for verification
+   vsix-downloader download \
+     --file ./extensions.json \
+     --checksum \
+     --summary ./results.json
+
+   # Verify single extension against known hash
+   vsix-downloader download \
+     --url "..." \
+     --version "1.2.3" \
+     --verify-checksum "a1b2c3d4e5f6..."
+
+   # Verify all files in bulk download against same hash
+   vsix-downloader download \
+     --file ./extensions.json \
+     --verify-checksum "a1b2c3d4e5f6..." \
+     --parallel 4
+   ```
 
 ### Finding Extension URLs and Versions
 

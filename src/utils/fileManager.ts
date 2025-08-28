@@ -99,3 +99,65 @@ export function isValidPath(dirPath: string): boolean {
     return false;
   }
 }
+
+/**
+ * File existence handling strategy
+ */
+export enum FileExistsAction {
+  SKIP = "skip",
+  OVERWRITE = "overwrite",
+  PROMPT = "prompt",
+  ERROR = "error",
+}
+
+/**
+ * Handle file existence based on strategy
+ * Returns true if download should proceed, false if it should be skipped
+ */
+export async function handleFileExists(
+  filePath: string,
+  action: FileExistsAction,
+  promptCallback?: () => Promise<boolean>,
+): Promise<boolean> {
+  const exists = await checkFileExists(filePath);
+
+  if (!exists) {
+    return true; // File doesn't exist, proceed with download
+  }
+
+  switch (action) {
+    case FileExistsAction.SKIP:
+      return false; // Skip download
+
+    case FileExistsAction.OVERWRITE:
+      return true; // Proceed with download (will overwrite)
+
+    case FileExistsAction.PROMPT:
+      if (promptCallback) {
+        return await promptCallback();
+      }
+      // Fall back to overwrite if no prompt callback
+      return true;
+
+    case FileExistsAction.ERROR:
+      throw new Error(`File already exists: ${filePath}`);
+
+    default:
+      return true;
+  }
+}
+
+/**
+ * Determine output directory, preferring cache directory over regular output
+ */
+export function resolveOutputDirectory(cacheDir?: string, outputDir?: string): string {
+  if (cacheDir && cacheDir.trim()) {
+    return cacheDir.trim();
+  }
+
+  if (outputDir && outputDir.trim()) {
+    return outputDir.trim();
+  }
+
+  return "./downloads";
+}
