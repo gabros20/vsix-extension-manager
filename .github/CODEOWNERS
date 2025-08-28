@@ -1,0 +1,19 @@
+# Global code owners
+* @gabros20
+
+# Workflow and CI/CD changes require extra scrutiny
+/.github/ @gabros20
+/package.json @gabros20
+/package-lock.json @gabros20
+
+# Documentation
+/README.md @gabros20
+/docs/ @gabros20
+
+# Core source code
+/src/ @gabros20
+
+# Configuration files
+/.eslintrc* @gabros20
+/tsconfig.json @gabros20
+/commitlint.config.cjs @gabros20

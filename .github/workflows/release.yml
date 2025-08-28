@@ -1,0 +1,187 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.2.3)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
+      draft:
+        description: 'Create as draft'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+          cache: "npm"
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[0-9]+)?)?$'; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "✅ Valid format: X.Y.Z or X.Y.Z-alpha.1"
+            exit 1
+          fi
+          echo "✅ Version format is valid: $VERSION"
+
+      - name: Check if version exists
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          
+          # Check NPM
+          if npm view vsix-downloader@$VERSION version >/dev/null 2>&1; then
+            echo "❌ Version $VERSION already exists on NPM"
+            exit 1
+          fi
+          
+          # Check Git tags
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "❌ Tag v$VERSION already exists"
+            exit 1
+          fi
+          
+          echo "✅ Version $VERSION is available"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run quality checks
+        run: |
+          npm run build
+          npm run lint
+          npm test --if-present
+          npx tsc --noEmit
+
+      - name: Update version in package.json
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          npm version $VERSION --no-git-tag-version
+          echo "📦 Updated package.json to version $VERSION"
+
+      - name: Build project
+        run: npm run build
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          
+          echo "# Release v$VERSION" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          
+          if [ "$LATEST_TAG" = "v0.0.0" ]; then
+            echo "## Initial Release" >> RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            echo "### Features" >> RELEASE_NOTES.md
+            git log --oneline --grep="^feat" --pretty=format:"- %s (%h)" >> RELEASE_NOTES.md || echo "- Initial release" >> RELEASE_NOTES.md
+          else
+            echo "## Changes since $LATEST_TAG" >> RELEASE_NOTES.md
+            echo "" >> RELEASE_NOTES.md
+            
+            # Features
+            FEATURES=$(git log ${LATEST_TAG}..HEAD --oneline --grep="^feat" --pretty=format:"- %s (%h)")
+            if [ -n "$FEATURES" ]; then
+              echo "### ✨ Features" >> RELEASE_NOTES.md
+              echo "$FEATURES" >> RELEASE_NOTES.md
+              echo "" >> RELEASE_NOTES.md
+            fi
+            
+            # Bug fixes
+            FIXES=$(git log ${LATEST_TAG}..HEAD --oneline --grep="^fix" --pretty=format:"- %s (%h)")
+            if [ -n "$FIXES" ]; then
+              echo "### 🐛 Bug Fixes" >> RELEASE_NOTES.md
+              echo "$FIXES" >> RELEASE_NOTES.md
+              echo "" >> RELEASE_NOTES.md
+            fi
+            
+            # Other changes
+            OTHER=$(git log ${LATEST_TAG}..HEAD --oneline --invert-grep --grep="^feat" --grep="^fix" --pretty=format:"- %s (%h)")
+            if [ -n "$OTHER" ]; then
+              echo "### 🔧 Other Changes" >> RELEASE_NOTES.md
+              echo "$OTHER" >> RELEASE_NOTES.md
+              echo "" >> RELEASE_NOTES.md
+            fi
+          fi
+          
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${LATEST_TAG}...v$VERSION" >> RELEASE_NOTES.md
+          
+          # Set output
+          {
+            echo "notes<<EOF"
+            cat RELEASE_NOTES.md
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Publish to NPM
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "🚀 Publishing v$VERSION to NPM..."
+          
+          # Show what will be published
+          npm pack --dry-run
+          
+          # Publish
+          npm publish --access public
+          echo "✅ Successfully published to NPM"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create git tag and push
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          TAG_NAME="v$VERSION"
+          
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Commit version bump
+          git add package.json package-lock.json
+          git commit -m "chore: release version $VERSION [skip ci]"
+          
+          # Create and push tag
+          git tag "$TAG_NAME"
+          git push origin main --follow-tags
+          echo "🏷️ Created and pushed tag $TAG_NAME"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          name: Release v${{ github.event.inputs.version }}
+          body: ${{ steps.changelog.outputs.notes }}
+          draft: ${{ github.event.inputs.draft }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+
+      - name: Release summary
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          echo "🎉 Release v$VERSION completed successfully!"
+          echo ""
+          echo "📦 NPM: https://www.npmjs.com/package/vsix-downloader"
+          echo "📋 Release: https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
+          echo "🏷️ Tag: v$VERSION"
