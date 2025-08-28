@@ -113,16 +113,16 @@ Create a JSON file (e.g., `extensions.json`) with the following structure:
 ```json
 [
   {
-    "url": "https://marketplace.visualstudio.com/items?itemName=Fuzionix.file-tree-extractor",
-    "version": "1.3.3"
+    "url": "https://marketplace.visualstudio.com/items?itemName=publisher1.awesome-extension",
+    "version": "1.2.3"
   },
   {
-    "url": "https://marketplace.visualstudio.com/items?itemName=million.million-lint",
-    "version": "1.0.14"
+    "url": "https://marketplace.visualstudio.com/items?itemName=publisher2.cool-tool",
+    "version": "2.0.1"
   },
   {
-    "url": "https://marketplace.visualstudio.com/items?itemName=sourcegraph.amp",
-    "version": "0.0.1756310942"
+    "url": "https://marketplace.visualstudio.com/items?itemName=publisher3.dev-helper",
+    "version": "0.5.0"
   }
 ]
 ```
@@ -249,11 +249,11 @@ $ vsix-downloader
 │
 ◆  ✅ JSON validation passed! Found 3 extension(s) to download.
 │
-◇  [1/3] ✅ Downloaded Fuzionix.file-tree-extractor-1.3.3.vsix (276 KB)
+◇  [1/3] ✅ Downloaded publisher1.awesome-extension-1.2.3.vsix (276 KB)
 │
-◇  [2/3] ✅ Downloaded million.million-lint-1.0.14.vsix (8993 KB)
+◇  [2/3] ✅ Downloaded publisher2.cool-tool-2.0.1.vsix (8993 KB)
 │
-◇  [3/3] ✅ Downloaded sourcegraph.amp-0.0.1756310942.vsix (18031 KB)
+◇  [3/3] ✅ Downloaded publisher3.dev-helper-0.5.0.vsix (18031 KB)
 │
 ◇  Download Summary ─────────────────╮
 │                                    │
