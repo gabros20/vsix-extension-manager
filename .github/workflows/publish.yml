@@ -4,12 +4,21 @@ on:
   pull_request:
     types: [closed]
     branches: [main]
+  push:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true
+    # Run when a PR into main is merged, or on direct pushes to main (e.g. squash merges)
+    if: |
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch')
+    concurrency:
+      group: publish-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
       contents: write
       id-token: write
@@ -19,6 +28,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
+          # On PR merge event, check out the actual merge commit; otherwise fallback to current sha
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
           persist-credentials: true
 
@@ -40,6 +52,9 @@ jobs:
       - name: Determine version bump
         id: version
         run: |
+          # Ensure tags are available for accurate diffing
+          git fetch --tags --force --prune
+
           # Get the latest version from package.json
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
@@ -112,7 +127,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create Git tag
-        if: steps.version.outputs.bump != 'none' && steps.npm_check.outputs.version_exists == 'false'
+        if: steps.version.outputs.bump != 'none'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
@@ -122,7 +137,7 @@ jobs:
           git push origin main --tags
 
       - name: Create GitHub Release
-        if: steps.version.outputs.bump != 'none' && steps.npm_check.outputs.version_exists == 'false'
+        if: steps.version.outputs.bump != 'none'
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
