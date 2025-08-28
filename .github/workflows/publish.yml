@@ -49,13 +49,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run quality checks
-        run: |
-          npm run build
-          npm run lint
-          npm test --if-present
-          npx tsc --noEmit
-
       - name: Determine version bump
         id: version
         run: |

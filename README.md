@@ -49,6 +49,9 @@ Recently, Microsoft quietly blocked Cursor (an AI-powered VSCode fork) from acce
 - **Mixed-Source Bulk**: Use Marketplace and OpenVSX URLs in the same JSON list
 - **Source-Aware "latest"**: Resolve `latest` for both Marketplace and OpenVSX (single and bulk)
 - **Versions Command (Both Sources)**: List versions from Marketplace or OpenVSX via URL
+- **Export Installed Extensions**: Export currently installed extensions from VS Code or Cursor in multiple formats
+- **Import from Lists**: Download extensions from text files, JSON arrays, or VS Code extensions.json
+- **Seamless Editor Integration**: Export extensions from VS Code or Cursor and import to another environment
 
 ## 📦 Installation
 
@@ -215,16 +218,104 @@ vsix-downloader download \
   --retry 3
 ```
 
+### Export Installed Extensions
+
+Export your currently installed extensions from VS Code or Cursor to share across environments or backup your setup:
+
+```bash
+# Interactive export - choose editor, format and output
+vsix-downloader export-installed
+
+# Export from specific editor
+vsix-downloader export-installed --editor cursor -o my-extensions.txt -f txt
+vsix-downloader export-installed --editor vscode -o my-extensions.txt -f txt
+vsix-downloader export-installed --editor auto -o my-extensions.txt -f txt
+
+# Export to specific file and format (auto-detects editor)
+vsix-downloader export-installed -o my-extensions.json -f json
+vsix-downloader export-installed -o my-extensions.txt -f txt
+vsix-downloader export-installed -o extensions.json -f extensions.json
+
+# Export workspace extensions.json (if it exists)
+vsix-downloader export-installed --workspace
+
+# Machine-readable output (no prompts)
+vsix-downloader export-installed --json --editor cursor
+```
+
+**Export Formats:**
+
+- `json` - Detailed extension info with metadata (name, version, publisher, description)
+- `txt` - Simple list of extension IDs (one per line, supports `#` comments)
+- `extensions.json` - VS Code workspace format (recommendations array)
+
+### Download from Extension Lists
+
+Download extensions from various list formats:
+
+```bash
+# Interactive mode - select file and proceed
+vsix-downloader from-list
+
+# From text file (extension IDs, one per line)
+vsix-downloader from-list --file extensions.txt
+
+# From VS Code extensions.json
+vsix-downloader from-list --file .vscode/extensions.json
+
+# With all bulk download options
+vsix-downloader from-list \
+  --file extensions.txt \
+  --output ./downloads \
+  --parallel 5 \
+  --retry 3 \
+  --checksum \
+  --quiet
+```
+
+**Supported Input Formats:**
+
+- Text files (`.txt`) - One extension ID per line, `#` comments supported
+- JSON arrays - Array of extension ID strings
+- VS Code extensions.json - Standard workspace format with `recommendations` array
+- Auto-detection based on file content
+
+### Complete Export → Import Workflow
+
+1. **Export extensions from your current setup:**
+
+   ```bash
+   # Export your installed extensions
+   vsix-downloader export-installed -o my-setup.txt -f txt
+   ```
+
+2. **Transfer to new environment and download:**
+
+   ```bash
+   # Download all extensions from the list
+   vsix-downloader from-list --file my-setup.txt --output ./extensions
+   ```
+
+3. **Install manually in Cursor/VS Code:**
+   ```bash
+   # Install all downloaded extensions
+   cursor --install-extension ./extensions/*.vsix
+   ```
+
 ### Available Commands
 
 ```bash
-vsix-downloader download [options]    # Download a VSIX file
-vsix-downloader versions [options]    # List available versions for an extension
-vsix-downloader --help               # Show help
-vsix-downloader --version            # Show version
+vsix-downloader download [options]           # Download a VSIX file
+vsix-downloader versions [options]           # List available versions for an extension
+vsix-downloader export-installed [options]   # Export currently installed extensions
+vsix-downloader from-list [options]          # Download extensions from a list file
+vsix-downloader --help                      # Show help
+vsix-downloader --version                   # Show version
 ```
 
 ### Options
+
+#### Download Command Options
 
 - `-u, --url <url>` - Marketplace URL of the extension
 - `-v, --version <version>` - Version of the extension to download (or `latest`)
@@ -245,7 +336,26 @@ vsix-downloader --version            # Show version
 - `--quiet` - Reduce output (suppress interactive notes/spinners)
 - `--json` - Machine-readable logs (reserved for future)
 - `--summary <path>` - Write bulk summary JSON to the given path
+
+#### Export-Installed Command Options
+
+- `-o, --output <path>` - Output file path
+- `-f, --format <format>` - Output format: `json` | `txt` | `extensions.json`
+- `-e, --editor <editor>` - Editor to export from: `vscode` | `cursor` | `auto` (default: auto)
+- `-w, --workspace` - Export workspace extensions.json instead of globally installed extensions
+- `--json` - Machine-readable output (no interactive prompts)
+
+#### From-List Command Options
+
+- `-f, --file <path>` - Path to extensions list file
+- `-o, --output <path>` - Output directory (default: ./downloads)
+- `--format <format>` - Input file format: `json` | `txt` | `extensions.json` | `auto`
+- All bulk download options from the download command (parallel, retry, checksum, etc.)
+
+#### Global Options
+
 - `-h, --help` - Display help information
+- `-V, --version` - Display version number
 
 ### Versions Command
 
@@ -401,7 +511,63 @@ vsix-downloader download \
 vsix-downloader download --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" --version "2023.20.0"
 ```
 
-### Example 2: Single Extension (Interactive)
+### Example 2: Export → Import Workflow (Cursor to new environment)
+
+```bash
+# Step 1: Export your current Cursor extensions
+$ vsix-downloader export-installed --editor cursor -o my-cursor-extensions.txt -f txt
+
+# Step 2: Review the exported list
+$ cat my-cursor-extensions.txt
+# ms-python.python
+# eamodio.gitlens
+# PKief.material-icon-theme
+# Continue.continue
+# Prisma.prisma
+
+# Step 3: Download all extensions on new machine
+$ vsix-downloader from-list --file my-cursor-extensions.txt --output ./downloads
+
+# Step 4: Install in Cursor
+$ cursor --install-extension ./downloads/*.vsix
+```
+
+### Example 3: Cross-Editor Migration (VS Code → Cursor)
+
+```bash
+# Step 1: Export your VS Code extensions
+$ vsix-downloader export-installed --editor vscode -o vscode-extensions.txt -f txt
+
+# Step 2: Download extensions for Cursor installation
+$ vsix-downloader from-list --file vscode-extensions.txt --output ./cursor-migration
+
+# Step 3: Install in Cursor
+$ cursor --install-extension ./cursor-migration/*.vsix
+
+# Step 4: Verify Cursor now has the extensions
+$ vsix-downloader export-installed --editor cursor --json | grep -c '"id"'
+```
+
+### Example 4: VS Code Workspace Integration
+
+```bash
+# Export to VS Code workspace format
+$ vsix-downloader export-installed -o .vscode/extensions.json -f extensions.json
+
+# Contents of .vscode/extensions.json:
+{
+  "recommendations": [
+    "ms-python.python",
+    "eamodio.gitlens",
+    "PKief.material-icon-theme"
+  ]
+}
+
+# Download from workspace extensions.json
+$ vsix-downloader from-list --file .vscode/extensions.json --output ./team-extensions
+```
+
+### Example 5: Single Extension (Interactive)
 
 ```bash
 $ vsix-downloader
@@ -455,7 +621,7 @@ $ vsix-downloader
 └  🎉 Successfully downloaded VSIX extension!
 ```
 
-### Example 3: Bulk Download
+### Example 6: Bulk Download
 
 ```bash
 $ vsix-downloader
@@ -534,9 +700,62 @@ cursor --install-extension your-extension.vsix
 
 ## 💡 Tips & Best Practices
 
+### Extension Management Workflow
+
+1. **Export-Import Workflow**: The most efficient way to migrate extensions between environments:
+
+   ```bash
+   # On source machine: export current extensions (auto-detects editor)
+   vsix-downloader export-installed -o dev-setup.txt -f txt
+
+   # Or export from specific editor
+   vsix-downloader export-installed --editor cursor -o cursor-setup.txt -f txt
+   vsix-downloader export-installed --editor vscode -o vscode-setup.txt -f txt
+
+   # On target machine: download all extensions
+   vsix-downloader from-list --file dev-setup.txt --cache-dir ~/.extensions
+
+   # Install all at once (Cursor or VS Code)
+   cursor --install-extension ~/.extensions/*.vsix
+   code --install-extension ~/.extensions/*.vsix
+   ```
+
+2. **Team Extension Standardization**: Use workspace extensions.json for team consistency:
+
+   ```bash
+   # Create team extension recommendations
+   vsix-downloader export-installed -o .vscode/extensions.json -f extensions.json
+
+   # Team members can download recommended extensions
+   vsix-downloader from-list --file .vscode/extensions.json
+   ```
+
+3. **Multiple Environment Support**: Maintain different extension sets for different purposes:
+
+   ```bash
+   # Export different setups from specific editors
+   vsix-downloader export-installed --editor cursor -o frontend-setup.txt -f txt
+   vsix-downloader export-installed --editor vscode -o backend-setup.txt -f txt
+   vsix-downloader export-installed --editor auto -o datascience-setup.txt -f txt
+
+   # Quick setup on new machines
+   vsix-downloader from-list --file frontend-setup.txt --parallel 5
+   ```
+
+4. **Editor Auto-Detection**: The tool intelligently detects available editors:
+
+   ```bash
+   # Auto mode prefers Cursor if both editors have extensions
+   vsix-downloader export-installed --editor auto
+
+   # Explicit editor selection when you need specific one
+   vsix-downloader export-installed --editor cursor  # Force Cursor
+   vsix-downloader export-installed --editor vscode  # Force VS Code
+   ```
+
 ### Bulk Download Tips
 
-1. **Create Extension Lists**: Save commonly used extension combinations in JSON files:
+1. **Create Extension Lists**: Save commonly used extension combinations in files:
 
    ```bash
    # Frontend development stack
@@ -651,11 +870,20 @@ npm run dev
 vsix-downloader/
 ├── src/
 │   ├── commands/
-│   │   └── download.ts          # Main download command logic
+│   │   ├── download.ts          # Main download command logic
+│   │   ├── versions.ts          # List extension versions
+│   │   ├── exportInstalled.ts   # Export installed extensions
+│   │   └── fromList.ts          # Download from extension lists
 │   ├── utils/
 │   │   ├── urlParser.ts         # URL parsing utilities
 │   │   ├── downloader.ts        # File download utilities
-│   │   └── fileManager.ts       # File system utilities
+│   │   ├── fileManager.ts       # File system utilities
+│   │   ├── bulkDownloader.ts    # Bulk download functionality
+│   │   ├── extensionRegistry.ts # Extension version resolution
+│   │   ├── extensionExporter.ts # Export/import functionality
+│   │   ├── filenameTemplate.ts  # Custom filename templates
+│   │   ├── checksum.ts          # SHA256 checksum utilities
+│   │   └── progressTracker.ts   # Progress bar utilities
 │   └── index.ts                 # CLI entry point
 ├── dist/                        # Compiled JavaScript (generated)
 ├── package.json
@@ -665,11 +893,24 @@ vsix-downloader/
 
 ## 🔍 How It Works
 
+### Core Download Process
+
 1. **URL Parsing**: Extracts `publisher.extension` from Marketplace or OpenVSX URLs
 2. **Extension Info**: Splits the `itemName` into publisher and extension name
 3. **Download URL Construction**: Builds the VSIX download URL using the selected source
 4. **File Download**: Downloads the VSIX file using axios with progress tracking
 5. **File Management**: Creates output directory and saves the file with proper naming
+
+### Export/Import Process
+
+1. **Extension Discovery**: Scans editor extensions directory:
+   - VS Code: `~/.vscode/extensions/`
+   - Cursor: `~/.cursor/extensions/`
+   - Auto-detection prefers Cursor if both exist
+2. **Metadata Extraction**: Reads `package.json` from each extension directory
+3. **Format Conversion**: Converts to requested format (JSON, text, or extensions.json)
+4. **List Processing**: Parses extension lists and converts IDs to marketplace URLs
+5. **Bulk Download**: Uses existing bulk download infrastructure for efficient processing
 
 ### URL Patterns
 
