@@ -1,6 +1,6 @@
 {
 	"name": "vsix-downloader",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "A CLI tool to download VS Code extensions as VSIX files from the Visual Studio Marketplace",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
