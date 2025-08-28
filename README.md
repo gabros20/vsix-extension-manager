@@ -2,6 +2,29 @@
 
 A modern CLI tool to download VS Code extensions as VSIX files directly from the Visual Studio Marketplace. Supports both single extension downloads and bulk downloads from JSON configuration files.
 
+## 🎯 What This Tool Solves
+
+### The Microsoft-Cursor Extension Block
+
+Recently, Microsoft quietly blocked Cursor (an AI-powered VSCode fork) from accessing the VSCode extension marketplace by adding a simple environment check. This means Cursor users can no longer install extensions directly through the marketplace, seeing "This extension is not available in your environment" errors.
+
+### Why You Need This Tool
+
+**VSIX Downloader** provides a workaround by downloading extensions as `.vsix` files that can be manually installed in Cursor. This is particularly valuable for:
+
+- **Cursor Users**: Bypass Microsoft's marketplace restrictions and continue using your favorite extensions
+- **Offline Development**: Download extensions once and install them on machines without internet access
+- **Version Control**: Pin specific extension versions for consistent development environments
+- **Bulk Setup**: Quickly set up new development environments with all your preferred extensions
+- **Backup Strategy**: Create local backups of extensions you depend on
+
+### Perfect For
+
+- Developers using Cursor who need to maintain their extension workflow
+- Teams wanting to standardize development environments
+- Offline development scenarios
+- Extension version management and rollbacks
+
 ## 🚀 Features
 
 - **Beautiful CLI**: Stunning interface powered by [Clack](https://github.com/bombshell-dev/clack)
