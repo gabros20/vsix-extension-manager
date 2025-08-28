@@ -1,28 +1,33 @@
 name: Publish to NPM
 
 on:
-  pull_request:
-    types: [closed]
-    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release-type:
+        description: "Release type"
+        required: true
+        default: "auto"
+        type: choice
+        options:
+          - auto
+          - patch
+          - minor
+          - major
+          - prerelease
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # Run when a PR into main is merged, or on direct pushes to main (e.g. squash merges)
-    if: |
-      (github.event_name == 'pull_request' && github.event.pull_request.merged == true) ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch')
     concurrency:
       group: publish-${{ github.ref }}
       cancel-in-progress: false
     permissions:
       contents: write
-      pull-requests: write
       id-token: write
+      issues: write
+      pull-requests: write
 
     steps:
       - name: Checkout code
@@ -30,175 +35,196 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
-          # On PR merge event, check out the actual merge commit; otherwise fallback to current sha
-          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          persist-credentials: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20"
           registry-url: "https://registry.npmjs.org"
-
-      - name: Decide publish or bump mode
-        id: decide
-        run: |
-          git fetch --tags --force --prune
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-          LAST_TAG=$(git tag --list 'v*' | sed 's/^v//' | sort -V | tail -1)
-          LAST_NPM=$(npm view vsix-downloader version 2>/dev/null || echo "0.0.0")
-          BASE=$(printf "%s\n%s\n" "$LAST_TAG" "$LAST_NPM" | sort -V | tail -1)
-          MAX_OF_CURR_AND_BASE=$(printf "%s\n%s\n" "$CURRENT_VERSION" "$BASE" | sort -V | tail -1)
-          if [ "$MAX_OF_CURR_AND_BASE" = "$CURRENT_VERSION" ] && [ "$CURRENT_VERSION" != "$BASE" ]; then
-            echo "mode=publish" >> $GITHUB_OUTPUT
-            echo "Detected package.json ahead of tags/npm ($CURRENT_VERSION > $BASE). Will publish."
-          else
-            echo "mode=bump" >> $GITHUB_OUTPUT
-            echo "Detected package.json not ahead ($CURRENT_VERSION <= $BASE). Will prepare bump PR."
-          fi
+          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build project
-        run: npm run build
-
-      - name: Run tests (if any)
-        run: npm test --if-present
+      - name: Run quality checks
+        run: |
+          npm run build
+          npm run lint
+          npm test --if-present
+          npx tsc --noEmit
 
       - name: Determine version bump
         id: version
-        if: steps.decide.outputs.mode == 'bump'
         run: |
-          # Ensure tags are available for accurate diffing
-          git fetch --tags --force --prune
-
-          # Get the latest version from package.json
+          # Get current version
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
 
-          # Get commit messages since last tag OR since last 5 commits if no tags
-          if git describe --tags --abbrev=0 >/dev/null 2>&1; then
-            SINCE_REF=$(git describe --tags --abbrev=0)
-          else
-            SINCE_REF=$(git rev-list --max-parents=0 HEAD)
-          fi
-          COMMITS=$(git log --oneline ${SINCE_REF}..HEAD)
-
-          # Only process if there are new commits
-          if [ -z "$COMMITS" ]; then
-            echo "bump=none" >> $GITHUB_OUTPUT
-            echo "No new commits since last tag"
+          # Manual override from workflow dispatch
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.release-type }}" != "auto" ]; then
+            echo "release_type=${{ github.event.inputs.release-type }}" >> $GITHUB_OUTPUT
+            echo "Manual release type: ${{ github.event.inputs.release-type }}"
             exit 0
           fi
 
-          # Determine version bump based on conventional commits
-          # Prioritize BREAKING changes first, then features, then fixes/chore/etc
-          if echo "$COMMITS" | grep -Eq "^[a-f0-9]+ .*!:|BREAKING CHANGE"; then
-              echo "bump=major" >> $GITHUB_OUTPUT
-              echo "Breaking changes detected, bumping major version"
-          elif echo "$COMMITS" | grep -Eq "^[a-f0-9]+ feat(\(|:| )"; then
-              echo "bump=minor" >> $GITHUB_OUTPUT
-              echo "New features detected, bumping minor version"
-          elif echo "$COMMITS" | grep -Eq "^[a-f0-9]+ (fix|chore|docs|style|refactor|perf|test|ci|build)(\(|:| )"; then
-              echo "bump=patch" >> $GITHUB_OUTPUT
-              echo "Bug fixes or minor changes detected, bumping patch version"
+          # Get latest tag
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+          # Get commits since latest tag
+          if [ "$LATEST_TAG" = "v0.0.0" ]; then
+            COMMITS=$(git log --oneline)
           else
-              echo "bump=none" >> $GITHUB_OUTPUT
-              echo "No version bump needed"
+            COMMITS=$(git log ${LATEST_TAG}..HEAD --oneline)
+          fi
+
+          echo "Commits since $LATEST_TAG:"
+          echo "$COMMITS"
+
+          # Determine release type based on conventional commits
+          if echo "$COMMITS" | grep -Eq "^[a-f0-9]+ [a-zA-Z]+(\([^)]*\))?!:|BREAKING CHANGE:"; then
+            echo "release_type=major" >> $GITHUB_OUTPUT
+            echo "🚨 Breaking changes detected - major release"
+          elif echo "$COMMITS" | grep -Eq "^[a-f0-9]+ feat(\([^)]*\))?:"; then
+            echo "release_type=minor" >> $GITHUB_OUTPUT
+            echo "✨ New features detected - minor release"
+          elif echo "$COMMITS" | grep -Eq "^[a-f0-9]+ (fix|perf)(\([^)]*\))?:"; then
+            echo "release_type=patch" >> $GITHUB_OUTPUT
+            echo "🐛 Bug fixes/performance improvements - patch release"
+          elif echo "$COMMITS" | grep -Eq "^[a-f0-9]+ (docs|style|refactor|test|chore|ci|build)(\([^)]*\))?:"; then
+            echo "release_type=patch" >> $GITHUB_OUTPUT
+            echo "🔧 Maintenance changes - patch release"
+          else
+            echo "release_type=none" >> $GITHUB_OUTPUT
+            echo "📝 No significant changes - skipping release"
           fi
 
       - name: Bump version
         id: bump
-        if: steps.decide.outputs.mode == 'bump' && steps.version.outputs.bump != 'none'
+        if: steps.version.outputs.release_type != 'none'
         run: |
-          BUMP_TYPE=${{ steps.version.outputs.bump }}
-          if [ "$BUMP_TYPE" = "major" ]; then
-            npm version major --no-git-tag-version
-          elif [ "$BUMP_TYPE" = "minor" ]; then
-            npm version minor --no-git-tag-version
-          else
-            npm version patch --no-git-tag-version
-          fi
+          RELEASE_TYPE="${{ steps.version.outputs.release_type }}"
+
+          # Bump version
+          case "$RELEASE_TYPE" in
+            major|minor|patch|prerelease)
+              npm version $RELEASE_TYPE --no-git-tag-version
+              ;;
+            *)
+              echo "Invalid release type: $RELEASE_TYPE"
+              exit 1
+              ;;
+          esac
 
           NEW_VERSION=$(node -p "require('./package.json').version")
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "Bumped version to $NEW_VERSION"
+          echo "📦 Version bumped to $NEW_VERSION"
 
-      - name: Ensure unique version on NPM
-        if: (steps.decide.outputs.mode == 'bump' && steps.version.outputs.bump != 'none') || (steps.decide.outputs.mode == 'publish')
-        id: ensure
+      - name: Check if version exists on NPM
+        id: check
+        if: steps.version.outputs.release_type != 'none'
         run: |
-          NEW_VERSION=$(node -p "require('./package.json').version")
-          ATTEMPTS=0
-          while npm view vsix-downloader@$NEW_VERSION version >/dev/null 2>&1; do
-            echo "Version $NEW_VERSION already exists on NPM, bumping patch..."
-            npm version patch --no-git-tag-version
-            NEW_VERSION=$(node -p "require('./package.json').version")
-            ATTEMPTS=$((ATTEMPTS+1))
-            if [ $ATTEMPTS -gt 10 ]; then
-              echo "Exceeded attempts to find an available version" 1>&2
-              exit 1
-            fi
-          done
-          echo "final_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "Using version $NEW_VERSION for publish"
+          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
+
+          if npm view vsix-downloader@$NEW_VERSION version >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "❌ Version $NEW_VERSION already exists on NPM"
+            exit 1
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✅ Version $NEW_VERSION is available for publishing"
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        if: steps.version.outputs.release_type != 'none'
+        run: |
+          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
+          LATEST_TAG="${{ steps.version.outputs.latest_tag }}"
+
+          echo "# Changelog for v$NEW_VERSION" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          if [ "$LATEST_TAG" = "v0.0.0" ]; then
+            echo "## Initial Release" >> CHANGELOG.md
+            git log --oneline --pretty=format:"- %s (%h)" >> CHANGELOG.md
+          else
+            echo "## Changes since $LATEST_TAG" >> CHANGELOG.md
+            git log ${LATEST_TAG}..HEAD --oneline --pretty=format:"- %s (%h)" >> CHANGELOG.md
+          fi
+
+          echo "" >> CHANGELOG.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${LATEST_TAG}...v$NEW_VERSION" >> CHANGELOG.md
+
+          # Set output for release notes
+          {
+            echo "changelog<<EOF"
+            cat CHANGELOG.md
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Build final artifact
+        if: steps.version.outputs.release_type != 'none'
+        run: |
+          npm run build
+          echo "🏗️ Final build completed"
 
       - name: Publish to NPM
-        if: steps.decide.outputs.mode == 'publish'
-        run: npm publish
+        if: steps.version.outputs.release_type != 'none'
+        run: |
+          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
+          echo "🚀 Publishing v$NEW_VERSION to NPM..."
+
+          # Dry run first
+          npm publish --dry-run
+
+          # Actual publish
+          npm publish --access public
+          echo "✅ Successfully published to NPM"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Create Git tag
-        if: steps.decide.outputs.mode == 'publish'
+      - name: Create and push git tag
+        if: steps.version.outputs.release_type != 'none'
         run: |
+          NEW_VERSION="${{ steps.bump.outputs.new_version }}"
+          TAG_NAME="v$NEW_VERSION"
+
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          # Tag the merge commit without pushing code to protected main
-          git tag v${{ steps.ensure.outputs.final_version }} $GITHUB_SHA
-          git push origin refs/tags/v${{ steps.ensure.outputs.final_version }}
 
-      - name: Create version bump PR
-        if: steps.decide.outputs.mode == 'bump' && steps.version.outputs.bump != 'none'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          base: main
-          commit-message: "chore: bump version to ${{ steps.ensure.outputs.final_version }}"
-          branch: chore/release-v${{ steps.ensure.outputs.final_version }}
-          title: "chore: bump version to ${{ steps.ensure.outputs.final_version }}"
-          body: |
-            This automated PR bumps the package version to `${{ steps.ensure.outputs.final_version }}`
-            to reflect the published release. Merging will sync `package.json` with NPM.
-          add-paths: |
-            package.json
+          # Commit version bump
+          git add package.json package-lock.json
+          git commit -m "chore: bump version to $NEW_VERSION [skip ci]" || echo "No changes to commit"
+
+          # Create and push tag
+          git tag "$TAG_NAME"
+          git push origin main --follow-tags
+          echo "🏷️ Created and pushed tag $TAG_NAME"
 
       - name: Create GitHub Release
-        if: steps.decide.outputs.mode == 'publish'
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: steps.version.outputs.release_type != 'none'
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.ensure.outputs.final_version }}
-          release_name: Release v${{ steps.ensure.outputs.final_version }}
-          body: |
-            ## What's Changed
-
-            This release includes the latest changes from the main branch.
-
-            ### Version: ${{ steps.ensure.outputs.final_version }}
-
-            For detailed changes, see the commit history.
+          tag_name: v${{ steps.bump.outputs.new_version }}
+          name: Release v${{ steps.bump.outputs.new_version }}
+          body: ${{ steps.changelog.outputs.changelog }}
           draft: false
-          prerelease: false
+          prerelease: ${{ contains(steps.bump.outputs.new_version, 'alpha') || contains(steps.bump.outputs.new_version, 'beta') || contains(steps.bump.outputs.new_version, 'rc') }}
 
-      - name: Skip publish - no version bump
-        if: steps.decide.outputs.mode == 'bump' && steps.version.outputs.bump == 'none'
+      - name: Update package.json in repository
+        if: steps.version.outputs.release_type != 'none'
         run: |
-          echo "No version bump needed, skipping publish"
-          echo "This usually means no conventional commits were found"
+          echo "✅ Version bump committed and tagged successfully"
+          echo "📦 Package published: https://www.npmjs.com/package/vsix-downloader"
+          echo "📋 Release created: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.bump.outputs.new_version }}"
 
-      - name: Skip publish - no-op
-        if: steps.decide.outputs.mode == 'bump' && steps.version.outputs.bump == 'none'
-        run: echo "No publish actions required"
+      - name: No release needed
+        if: steps.version.outputs.release_type == 'none'
+        run: |
+          echo "ℹ️ No significant changes detected. Skipping release."
+          echo "💡 Ensure commits follow conventional commit format for automatic releases:"
+          echo "   feat: for new features (minor bump)"
+          echo "   fix: for bug fixes (patch bump)"
+          echo "   feat!: or BREAKING CHANGE: for breaking changes (major bump)"
