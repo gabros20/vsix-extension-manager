@@ -37,7 +37,8 @@ jobs:
       - name: Run tests (if any)
         run: npm test --if-present
 
-      - name: Lint code
+      - name: Lint code (skip on Windows due to line ending issues)
+        if: matrix.os != 'windows-latest'
         run: npm run lint --if-present
 
       - name: Security audit
