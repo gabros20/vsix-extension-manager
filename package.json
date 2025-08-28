@@ -3,15 +3,24 @@
 	"version": "1.0.0",
 	"description": "A CLI tool to download VS Code extensions as VSIX files from the Visual Studio Marketplace",
 	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"type": "commonjs",
 	"bin": {
 		"vsix-downloader": "./dist/index.js",
 		"download-vsix": "./dist/index.js"
 	},
+	"files": [
+		"dist/**",
+		"README.md",
+		"LICENSE",
+		"assets/"
+	],
 	"scripts": {
 		"build": "tsc",
 		"start": "node dist/index.js",
 		"dev": "ts-node src/index.ts",
-		"prepare": "npm run build",
+		"prepack": "npm run build",
+		"prepublishOnly": "npm run build",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"keywords": [
@@ -22,29 +31,33 @@
 		"marketplace",
 		"cli"
 	],
-	"author": "Your Name",
+	"author": "tamas_gr",
 	"license": "MIT",
-  "dependencies": {
-    "@clack/prompts": "^0.7.0",
-    "commander": "^11.1.0",
-    "axios": "^1.6.2",
-    "fs-extra": "^11.2.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.10.5",
-    "@types/fs-extra": "^11.0.4",
-    "typescript": "^5.3.3",
-    "ts-node": "^10.9.2"
-  },
+	"preferGlobal": true,
+	"publishConfig": {
+		"access": "public"
+	},
+	"dependencies": {
+		"@clack/prompts": "^0.7.0",
+		"commander": "^11.1.0",
+		"axios": "^1.6.2",
+		"fs-extra": "^11.2.0"
+	},
+	"devDependencies": {
+		"@types/node": "^20.10.5",
+		"@types/fs-extra": "^11.0.4",
+		"typescript": "^5.3.3",
+		"ts-node": "^10.9.2"
+	},
 	"engines": {
 		"node": ">=16.0.0"
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/yourusername/vsix-downloader.git"
+		"url": "https://github.com/gabros20/vsix-downloader"
 	},
 	"bugs": {
-		"url": "https://github.com/yourusername/vsix-downloader/issues"
+		"url": "https://github.com/gabros20/vsix-downloader/issues"
 	},
-	"homepage": "https://github.com/yourusername/vsix-downloader#readme"
+	"homepage": "https://github.com/gabros20/vsix-downloader#readme"
 }
