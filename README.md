@@ -35,7 +35,7 @@ Recently, Microsoft quietly blocked Cursor (an AI-powered VSCode fork) from acce
 - **Modern Stack**: Built with TypeScript, Commander.js, and Clack
 - **Error Handling**: Comprehensive error handling and validation
 - **Progress Indicators**: Beautiful spinners and visual feedback
-- **Flexible Output**: Customizable download directory
+- **Flexible Output**: Customizable download directory (defaults to `./downloads` in current directory)
 - **Smart Parsing**: Automatically extracts extension info from marketplace URLs
 
 ## 📦 Installation
@@ -81,7 +81,7 @@ Follow the prompts to enter:
 
 1. Marketplace URL
 2. Extension version
-3. Output directory (optional)
+3. Output directory (optional; press Enter to use `./downloads`)
 
 #### Command Line Arguments
 
@@ -103,7 +103,7 @@ For downloading multiple extensions, create a JSON file with the extension detai
 
 1. Select "📚 Bulk Download" from the main menu
 2. Enter the path to your JSON file
-3. Specify output directory
+3. Specify output directory (optional; press Enter to use `./downloads`)
 4. Watch the progress as each extension downloads
 
 #### JSON Template
@@ -204,6 +204,9 @@ $ vsix-downloader
 │
 ◇  Enter the extension version:
 │  2023.20.0
+│
+◇  Enter output directory:
+│  ./downloads
 │
 ◇  Download Details ──────────────────────────────────╮
 │                                                     │

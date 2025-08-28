@@ -130,8 +130,25 @@ async function downloadSingleExtension(options: DownloadOptions) {
   const downloadUrl = constructDownloadUrl(extensionInfo, version as string);
   const filename = `${extensionInfo.itemName}-${version}.vsix`;
 
-  // Create output directory
-  const outputDir = options.output || "./downloads";
+  // Get output directory (prompt, with fallback to ./downloads)
+  let outputDir = options.output as string | undefined;
+  if (!outputDir) {
+    const outputInput = await p.text({
+      message: "Enter output directory:",
+      placeholder: "./downloads",
+      initialValue: "./downloads",
+    });
+
+    if (p.isCancel(outputInput)) {
+      p.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    outputDir = (outputInput as string).trim() || "./downloads";
+  } else {
+    outputDir = outputDir.trim() || "./downloads";
+  }
+
   await createDownloadDirectory(outputDir);
 
   // Truncate URL for display (keep first 30 chars + ... + last 10 chars)
@@ -196,18 +213,23 @@ async function downloadBulkFromJson(options: DownloadOptions) {
     process.exit(0);
   }
 
-  // Get output directory
-  const outputDir =
-    options.output ||
-    (await p.text({
+  // Get output directory (prompt, with fallback to ./downloads)
+  let outputDir = options.output as string | undefined;
+  if (!outputDir) {
+    const outputInput = await p.text({
       message: "Enter output directory:",
       placeholder: "./downloads",
       initialValue: "./downloads",
-    }));
+    });
 
-  if (p.isCancel(outputDir)) {
-    p.cancel("Operation cancelled.");
-    process.exit(0);
+    if (p.isCancel(outputInput)) {
+      p.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    outputDir = (outputInput as string).trim() || "./downloads";
+  } else {
+    outputDir = outputDir.trim() || "./downloads";
   }
 
   // Start bulk download process
