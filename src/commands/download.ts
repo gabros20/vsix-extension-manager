@@ -1,9 +1,11 @@
 import * as p from "@clack/prompts";
 import { downloadFile } from "../utils/downloader";
 import {
-  parseMarketplaceUrl,
   constructDownloadUrl,
   getDisplayNameFromUrl,
+  constructOpenVsxDownloadUrl,
+  parseExtensionUrl,
+  inferSourceFromUrl,
 } from "../utils/urlParser";
 import { createDownloadDirectory } from "../utils/fileManager";
 import { downloadBulkExtensions, BulkOptions } from "../utils/bulkDownloader";
@@ -23,6 +25,7 @@ interface DownloadOptions {
   json?: boolean;
   summary?: string;
   preRelease?: boolean;
+  source?: string;
 }
 
 export async function downloadVsix(options: DownloadOptions) {
@@ -81,13 +84,10 @@ async function downloadSingleExtension(options: DownloadOptions) {
   let marketplaceUrl = options.url;
   if (!marketplaceUrl) {
     const urlResult = await p.text({
-      message: "Enter the VS Code extension marketplace URL:",
+      message: "Enter the extension URL (Marketplace or OpenVSX):",
       validate: (input: string) => {
         if (!input.trim()) {
           return "Please enter a valid URL";
-        }
-        if (!input.includes("marketplace.visualstudio.com")) {
-          return "Please enter a valid Visual Studio Marketplace URL";
         }
         return undefined;
       },
@@ -103,14 +103,14 @@ async function downloadSingleExtension(options: DownloadOptions) {
 
   // Parse URL to extract extension info
   const parseSpinner = p.spinner();
-  parseSpinner.start("Parsing marketplace URL...");
+  parseSpinner.start("Parsing extension URL...");
 
   let extensionInfo;
   try {
-    extensionInfo = parseMarketplaceUrl(marketplaceUrl as string);
+    extensionInfo = parseExtensionUrl(marketplaceUrl as string);
     parseSpinner.stop("Extension info extracted");
   } catch (error) {
-    parseSpinner.stop("Failed to parse marketplace URL", 1);
+    parseSpinner.stop("Failed to parse extension URL", 1);
     throw error;
   }
 
@@ -145,15 +145,39 @@ async function downloadSingleExtension(options: DownloadOptions) {
     version = (versionResult as string).trim();
   }
 
+  // Source selection (interactive with default inference)
+  let effectiveSource = (
+    options.source || inferSourceFromUrl(marketplaceUrl as string)
+  ).toLowerCase();
+  if (!options.source) {
+    const pick = await p.select({
+      message: "Select source registry:",
+      options: [
+        { value: "marketplace", label: "Visual Studio Marketplace" },
+        { value: "open-vsx", label: "OpenVSX" },
+      ],
+      initialValue: effectiveSource,
+    });
+    if (p.isCancel(pick)) {
+      p.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+    effectiveSource = (pick as string).toLowerCase();
+  }
+
   // Resolve version if 'latest'
   const resolvedVersion = await resolveVersion(
     extensionInfo.itemName,
     version as string,
     Boolean(options.preRelease),
+    effectiveSource as "marketplace" | "open-vsx" | "auto",
   );
 
-  // Construct download URL and filename
-  const downloadUrl = constructDownloadUrl(extensionInfo, resolvedVersion);
+  // Construct download URL by source
+  const downloadUrl =
+    effectiveSource === "open-vsx"
+      ? constructOpenVsxDownloadUrl(extensionInfo, resolvedVersion)
+      : constructDownloadUrl(extensionInfo, resolvedVersion);
   const filename = `${extensionInfo.itemName}-${resolvedVersion}.vsix`;
 
   // Get output directory (prompt, with fallback to ./downloads)

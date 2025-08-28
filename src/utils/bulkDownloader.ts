@@ -1,12 +1,20 @@
 import * as p from "@clack/prompts";
 import fs from "fs-extra";
 import { downloadFile } from "./downloader";
-import { parseMarketplaceUrl, constructDownloadUrl, getDisplayNameFromUrl } from "./urlParser";
+import {
+  parseExtensionUrl,
+  constructDownloadUrl,
+  getDisplayNameFromUrl,
+  constructOpenVsxDownloadUrl,
+  inferSourceFromUrl,
+} from "./urlParser";
 import { createDownloadDirectory } from "./fileManager";
+import { resolveVersion } from "./extensionRegistry";
 
 interface BulkExtensionItem {
   url: string;
   version: string;
+  source?: "marketplace" | "open-vsx";
 }
 
 export interface BulkOptions {
@@ -16,6 +24,7 @@ export interface BulkOptions {
   quiet?: boolean;
   json?: boolean;
   summaryPath?: string;
+  source?: "marketplace" | "open-vsx";
 }
 
 interface ValidationResult {
@@ -59,9 +68,13 @@ export function validateBulkJson(data: unknown): ValidationResult {
     if (!item.url || typeof item.url !== "string") {
       itemErrors.push(`Item ${index + 1}: Missing or invalid 'url' field`);
     } else {
-      // Validate URL format
-      if (!item.url.includes("marketplace.visualstudio.com")) {
-        itemErrors.push(`Item ${index + 1}: URL must be a valid Visual Studio Marketplace URL`);
+      // Validate URL format by attempting to parse either Marketplace or OpenVSX
+      try {
+        parseExtensionUrl(item.url);
+      } catch (e) {
+        itemErrors.push(
+          `Item ${index + 1}: URL must be a valid Marketplace or OpenVSX URL (${e instanceof Error ? e.message : "invalid"})`,
+        );
       }
     }
 
@@ -191,9 +204,19 @@ export async function downloadBulkExtensions(
     const spinner = options.quiet ? null : p.spinner();
     const startMs = Date.now();
 
-    const extensionInfo = parseMarketplaceUrl(ext.url);
-    const downloadUrl = constructDownloadUrl(extensionInfo, ext.version);
-    const filename = `${extensionInfo.itemName}-${ext.version}.vsix`;
+    const extensionInfo = parseExtensionUrl(ext.url);
+    const resolvedSource = (ext.source || options.source || inferSourceFromUrl(ext.url)) as
+      | "marketplace"
+      | "open-vsx";
+    const versionToUse =
+      (ext.version || "").trim().toLowerCase() === "latest"
+        ? await resolveVersion(extensionInfo.itemName, "latest", false, resolvedSource)
+        : ext.version;
+    const downloadUrl =
+      resolvedSource === "open-vsx"
+        ? constructOpenVsxDownloadUrl(extensionInfo, versionToUse)
+        : constructDownloadUrl(extensionInfo, versionToUse);
+    const filename = `${extensionInfo.itemName}-${versionToUse}.vsix`;
 
     let attempt = 0;
     while (true) {
@@ -201,7 +224,7 @@ export async function downloadBulkExtensions(
       try {
         if (spinner) {
           spinner.start(
-            `[${index + 1}/${extensions.length}] Downloading ${displayName} (attempt ${attempt})...`,
+            `[${index + 1}/${extensions.length}] Fetching ${displayName} (attempt ${attempt})...`,
           );
         }
         const pathOnDisk = await downloadFile(downloadUrl, outputDir, filename);
@@ -210,7 +233,7 @@ export async function downloadBulkExtensions(
         if (spinner) {
           const sizeInKB = Math.round(stats.size / 1024);
           spinner.stop(
-            `[${index + 1}/${extensions.length}] ✅ Downloaded ${filename} (${sizeInKB} KB)`,
+            `[${index + 1}/${extensions.length}] Completed ${filename} (${sizeInKB} KB)`,
           );
         }
         successCount++;

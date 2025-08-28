@@ -1,6 +1,6 @@
 import * as p from "@clack/prompts";
-import { parseMarketplaceUrl, getDisplayNameFromUrl } from "../utils/urlParser";
-import { fetchExtensionVersions } from "../utils/extensionRegistry";
+import { parseExtensionUrl, getDisplayNameFromUrl, inferSourceFromUrl } from "../utils/urlParser";
+import { fetchExtensionVersions, fetchOpenVsxVersions } from "../utils/extensionRegistry";
 
 interface VersionsOptions {
   url?: string;
@@ -23,11 +23,15 @@ export async function listVersions(options: VersionsOptions) {
       url = res as string;
     }
 
-    const info = parseMarketplaceUrl(url);
+    const info = parseExtensionUrl(url);
     const displayName = getDisplayNameFromUrl(url);
     const spinner = p.spinner();
     spinner.start(`Fetching versions for ${displayName}...`);
-    const versions = await fetchExtensionVersions(info.itemName);
+    const source = inferSourceFromUrl(url);
+    const versions =
+      source === "open-vsx"
+        ? await fetchOpenVsxVersions(info.itemName)
+        : await fetchExtensionVersions(info.itemName);
     spinner.stop(`Found ${versions.length} version(s)`);
 
     if (options.json) {

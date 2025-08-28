@@ -28,6 +28,7 @@ program
   .option("--json", "Machine-readable logs (where applicable)", false)
   .option("--summary <path>", "Write bulk summary JSON to the given path")
   .option("--pre-release", "Prefer pre-release when resolving 'latest'", false)
+  .option("--source <source>", "Source registry: marketplace|open-vsx|auto (default: marketplace)")
   .action(downloadVsix);
 
 program

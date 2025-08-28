@@ -39,7 +39,11 @@ Recently, Microsoft quietly blocked Cursor (an AI-powered VSCode fork) from acce
 - **Error Handling**: Comprehensive error handling and validation
 - **Progress Indicators**: Beautiful spinners and visual feedback
 - **Flexible Output**: Customizable download directory (defaults to `./downloads` in current directory)
-- **Smart Parsing**: Automatically extracts extension info from marketplace URLs
+- **Smart Parsing**: Extracts extension info from Marketplace and OpenVSX URLs
+- **Interactive Source Selection**: Auto-detects source from URL with ability to switch
+- **Mixed-Source Bulk**: Use Marketplace and OpenVSX URLs in the same JSON list
+- **Source-Aware "latest"**: Resolve `latest` for both Marketplace and OpenVSX (single and bulk)
+- **Versions Command (Both Sources)**: List versions from Marketplace or OpenVSX via URL
 
 ## 📦 Installation
 
@@ -82,7 +86,7 @@ vsix-downloader download
 
 Follow the prompts to enter:
 
-1. Marketplace URL
+1. Extension URL (Marketplace or OpenVSX)
 2. Extension version (or type `latest`)
 3. Output directory (optional; press Enter to use `./downloads`)
 
@@ -117,29 +121,28 @@ For downloading multiple extensions, create a JSON file with the extension detai
 
 #### JSON Template
 
-Create a JSON file (e.g., `extensions.json`) with the following structure:
+Create a JSON file (e.g., `extensions.json`) with the following structure (mixed sources allowed):
 
 ```json
 [
   {
-    "url": "https://marketplace.visualstudio.com/items?itemName=publisher1.awesome-extension",
-    "version": "1.2.3"
+    "url": "https://marketplace.visualstudio.com/items?itemName=ms-python.python",
+    "version": "latest"
   },
+  { "url": "https://open-vsx.org/extension/ms-python/python", "version": "2025.4.0" },
   {
-    "url": "https://marketplace.visualstudio.com/items?itemName=publisher2.cool-tool",
-    "version": "2.0.1"
-  },
-  {
-    "url": "https://marketplace.visualstudio.com/items?itemName=publisher3.dev-helper",
-    "version": "0.5.0"
+    "url": "https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode",
+    "version": "latest",
+    "source": "marketplace"
   }
 ]
 ```
 
 #### Required Fields
 
-- **`url`**: Full marketplace URL of the extension
+- **`url`**: Extension URL from either Marketplace or OpenVSX
 - **`version`**: Specific version to download (or `latest`)
+- Optional: **`source`** — `marketplace` | `open-vsx` (overrides auto-detection)
 
 The extension name is automatically extracted from the URL for display purposes in the CLI.
 
@@ -156,9 +159,9 @@ The CLI performs comprehensive validation on your JSON file before starting down
 
 ✅ **Extension Validation**:
 
-- Required `url` field (must be a marketplace URL)
-- Required `version` field (non-empty string)
-- URL format validation (must contain `marketplace.visualstudio.com`)
+- Required `url` field (Marketplace or OpenVSX URL)
+- Required `version` field (non-empty string; `latest` allowed)
+- URL format validation for both ecosystems
 
 ❌ **Error Handling**:
 
@@ -202,6 +205,8 @@ vsix-downloader --version            # Show version
 - `-u, --url <url>` - Marketplace URL of the extension
 - `-v, --version <version>` - Version of the extension to download (or `latest`)
 - `--pre-release` - Prefer pre-release when resolving `latest`
+- `--source <source>` - Source registry: `marketplace` | `open-vsx` | `auto` (default: marketplace)
+  - In interactive mode, the source defaults from the URL but you can change it
 - `-o, --output <path>` - Output directory (default: ./downloads)
 - `-f, --file <path>` - Bulk JSON file path (non-interactive)
 - `--parallel <n>` - Number of parallel downloads in bulk mode (default: 4)
@@ -216,15 +221,36 @@ vsix-downloader --version            # Show version
 
 ### Versions Command
 
-List all available versions for an extension. Useful when picking a pinned version or checking pre-releases.
+List all available versions for an extension (Marketplace or OpenVSX). Useful when picking a pinned version or checking pre-releases.
 
 ```bash
 # Prompt for URL, display human-readable list
 vsix-downloader versions
 
-# Provide URL and output JSON
+# Provide URL and output JSON (works with Marketplace or OpenVSX URLs)
 vsix-downloader versions --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" --json
+vsix-downloader versions --url "https://open-vsx.org/extension/ms-python/python" --json
 ```
+
+### OpenVSX Support
+
+You can download from OpenVSX by specifying the source or by pasting an OpenVSX URL in interactive mode (the source will be preselected as OpenVSX, but you can switch). Bulk supports mixed sources in the same list.
+
+```bash
+# Single extension from OpenVSX
+vsix-downloader download \
+  --url "https://open-vsx.org/extension/ms-python/python" \
+  --version latest \
+  --source open-vsx
+
+# Bulk with OpenVSX
+vsix-downloader download \
+  --file ./extensions.json \
+  --output ./downloads \
+  --source open-vsx
+```
+
+Note: `auto` source is reserved for future fallback behavior. Currently, set `--source` explicitly to `marketplace` or `open-vsx`.
 
 ## 📋 Examples
 
@@ -444,18 +470,22 @@ vsix-downloader/
 
 ## 🔍 How It Works
 
-1. **URL Parsing**: Extracts the `itemName` parameter from the marketplace URL
+1. **URL Parsing**: Extracts `publisher.extension` from Marketplace or OpenVSX URLs
 2. **Extension Info**: Splits the `itemName` into publisher and extension name
-3. **Download URL Construction**: Builds the VSIX download URL using the VS Code marketplace API pattern
+3. **Download URL Construction**: Builds the VSIX download URL using the selected source
 4. **File Download**: Downloads the VSIX file using axios with progress tracking
 5. **File Management**: Creates output directory and saves the file with proper naming
 
-### URL Pattern
+### URL Patterns
 
-The tool constructs download URLs using this pattern:
+The tool constructs download URLs using these patterns:
 
 ```
+# Marketplace
 https://[publisher].gallery.vsassets.io/_apis/public/gallery/publisher/[publisher]/extension/[extension]/[version]/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage
+
+# OpenVSX
+https://open-vsx.org/api/[publisher]/[extension]/[version]/file/[publisher].[extension]-[version].vsix
 ```
 
 ## ⚠️ Error Handling

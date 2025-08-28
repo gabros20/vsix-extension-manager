@@ -48,6 +48,25 @@ export async function fetchExtensionVersions(itemName: string): Promise<Extensio
   return versions.map((v) => ({ version: v.version, published: v.lastUpdated }));
 }
 
+/**
+ * Fetch available versions for an extension from OpenVSX API
+ * itemName format: "publisher.extension"
+ */
+export async function fetchOpenVsxVersions(itemName: string): Promise<ExtensionVersionInfo[]> {
+  const [publisher, extension] = itemName.split(".");
+  const url = `https://open-vsx.org/api/${publisher}/${extension}`;
+  const headers = {
+    Accept: "application/json",
+    "User-Agent": "vsix-downloader/1.0.0",
+  } as const;
+
+  const response = await axios.get(url, { headers });
+  const data = response.data ?? {};
+  const allVersions = (data.allVersions ?? {}) as Record<string, string>;
+  const versions = Object.keys(allVersions).filter((v) => v && v !== "latest");
+  return versions.sort((a, b) => compareVersionsDesc(a, b)).map((v) => ({ version: v }));
+}
+
 function parseSemver(version: string): {
   major: number;
   minor: number;
@@ -90,12 +109,25 @@ export async function resolveVersion(
   itemName: string,
   requested: string,
   preferPreRelease: boolean,
+  source: "marketplace" | "open-vsx" | "auto" = "marketplace",
 ): Promise<string> {
   if (requested.toLowerCase() !== "latest") {
     return requested;
   }
 
-  const infos = await fetchExtensionVersions(itemName);
+  let infos: ExtensionVersionInfo[] = [];
+  if (source === "open-vsx") {
+    infos = await fetchOpenVsxVersions(itemName);
+  } else if (source === "marketplace") {
+    infos = await fetchExtensionVersions(itemName);
+  } else {
+    // auto: prefer marketplace; fallback to open-vsx
+    try {
+      infos = await fetchExtensionVersions(itemName);
+    } catch {
+      infos = await fetchOpenVsxVersions(itemName);
+    }
+  }
   if (!infos.length) {
     throw new Error("No versions found for the extension");
   }
