@@ -9,6 +9,15 @@ interface BulkExtensionItem {
   version: string;
 }
 
+export interface BulkOptions {
+  parallel?: number;
+  retry?: number;
+  retryDelay?: number; // in ms
+  quiet?: boolean;
+  json?: boolean;
+  summaryPath?: string;
+}
+
 interface ValidationResult {
   isValid: boolean;
   errors: string[];
@@ -128,6 +137,7 @@ export async function readBulkJsonFile(filePath: string): Promise<ValidationResu
 export async function downloadBulkExtensions(
   filePath: string,
   outputDir: string = "./downloads",
+  options: BulkOptions = {},
 ): Promise<void> {
   // Read and validate JSON
   const validation = await readBulkJsonFile(filePath);
@@ -142,47 +152,125 @@ export async function downloadBulkExtensions(
 
   const extensions = validation.validItems;
 
-  p.log.success(`✅ JSON validation passed! Found ${extensions.length} extension(s) to download.`);
+  if (!options.quiet) {
+    p.log.success(
+      `✅ JSON validation passed! Found ${extensions.length} extension(s) to download.`,
+    );
+  }
 
   // Create output directory
   await createDownloadDirectory(outputDir);
 
-  // Download each extension
+  // Concurrency and retry settings
+  const parallel = Math.max(1, Math.floor(options.parallel ?? 4));
+  const maxRetries = Math.max(0, Math.floor(options.retry ?? 2));
+  const retryDelayMs = Math.max(0, Math.floor(options.retryDelay ?? 1000));
+
+  // Result aggregation
   let successCount = 0;
   let failureCount = 0;
   const failedDownloads: string[] = [];
+  const results: Array<{
+    index: number;
+    url: string;
+    version: string;
+    status: "success" | "failure";
+    filePath?: string;
+    filename?: string;
+    sizeBytes?: number;
+    error?: string;
+    elapsedMs: number;
+  }> = [];
 
-  for (let i = 0; i < extensions.length; i++) {
-    const ext = extensions[i];
-    const spinner = p.spinner();
+  function delay(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
 
-    try {
-      // Parse marketplace URL
-      const extensionInfo = parseMarketplaceUrl(ext.url);
-      const downloadUrl = constructDownloadUrl(extensionInfo, ext.version);
-      const filename = `${extensionInfo.itemName}-${ext.version}.vsix`;
-      const displayName = getDisplayNameFromUrl(ext.url);
+  async function downloadWithRetry(ext: BulkExtensionItem, index: number) {
+    const displayName = getDisplayNameFromUrl(ext.url);
+    const spinner = options.quiet ? null : p.spinner();
+    const startMs = Date.now();
 
-      spinner.start(`[${i + 1}/${extensions.length}] Downloading ${displayName}...`);
+    const extensionInfo = parseMarketplaceUrl(ext.url);
+    const downloadUrl = constructDownloadUrl(extensionInfo, ext.version);
+    const filename = `${extensionInfo.itemName}-${ext.version}.vsix`;
 
-      // Download the file
-      const filePath = await downloadFile(downloadUrl, outputDir, filename);
-
-      // Get file size for display
-      const stats = await fs.stat(filePath);
-      const sizeInKB = Math.round(stats.size / 1024);
-
-      spinner.stop(`[${i + 1}/${extensions.length}] ✅ Downloaded ${filename} (${sizeInKB} KB)`);
-      successCount++;
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : "Unknown error";
-      const displayName = getDisplayNameFromUrl(ext.url);
-
-      spinner.stop(`[${i + 1}/${extensions.length}] ❌ Failed: ${displayName}`, 1);
-      failureCount++;
-      failedDownloads.push(`${displayName}: ${errorMsg}`);
+    let attempt = 0;
+    while (true) {
+      attempt++;
+      try {
+        if (spinner) {
+          spinner.start(
+            `[${index + 1}/${extensions.length}] Downloading ${displayName} (attempt ${attempt})...`,
+          );
+        }
+        const pathOnDisk = await downloadFile(downloadUrl, outputDir, filename);
+        const stats = await fs.stat(pathOnDisk);
+        const elapsedMs = Date.now() - startMs;
+        if (spinner) {
+          const sizeInKB = Math.round(stats.size / 1024);
+          spinner.stop(
+            `[${index + 1}/${extensions.length}] ✅ Downloaded ${filename} (${sizeInKB} KB)`,
+          );
+        }
+        successCount++;
+        results.push({
+          index,
+          url: ext.url,
+          version: ext.version,
+          status: "success",
+          filePath: pathOnDisk,
+          filename,
+          sizeBytes: stats.size,
+          elapsedMs,
+        });
+        return;
+      } catch (e) {
+        const errorMsg = e instanceof Error ? e.message : "Unknown error";
+        if (attempt <= maxRetries) {
+          if (spinner) {
+            spinner.stop(
+              `[${index + 1}/${extensions.length}] ⚠️  ${displayName} failed (attempt ${attempt}). Retrying...`,
+              1,
+            );
+          }
+          const backoff = retryDelayMs * Math.pow(2, attempt - 1);
+          await delay(backoff);
+          continue;
+        } else {
+          const elapsedMs = Date.now() - startMs;
+          if (spinner) {
+            spinner.stop(`[${index + 1}/${extensions.length}] ❌ Failed: ${displayName}`, 1);
+          }
+          failureCount++;
+          failedDownloads.push(`${displayName}: ${errorMsg}`);
+          results.push({
+            index,
+            url: ext.url,
+            version: ext.version,
+            status: "failure",
+            error: errorMsg,
+            elapsedMs,
+          });
+          return;
+        }
+      }
     }
   }
+
+  // Simple concurrency limiter
+  let current = 0;
+  async function worker() {
+    while (true) {
+      const i = current++;
+      if (i >= extensions.length) return;
+      const ext = extensions[i];
+      await downloadWithRetry(ext, i);
+    }
+  }
+
+  const workers = Array.from({ length: parallel }, () => worker());
+  await Promise.all(workers);
 
   // Show final summary
   const summaryLines = [
@@ -199,11 +287,29 @@ export async function downloadBulkExtensions(
     });
   }
 
-  p.note(summaryLines.join("\n"), "Download Summary");
+  if (!options.quiet) {
+    p.note(summaryLines.join("\n"), "Download Summary");
+  }
 
   if (successCount > 0) {
-    p.outro(`🎉 Bulk download completed! ${successCount} extension(s) downloaded successfully.`);
+    if (!options.quiet) {
+      p.outro(`🎉 Bulk download completed! ${successCount} extension(s) downloaded successfully.`);
+    }
   } else {
-    p.outro("❌ No extensions were downloaded successfully.");
+    if (!options.quiet) {
+      p.outro("❌ No extensions were downloaded successfully.");
+    }
+  }
+
+  // Write summary JSON if requested
+  if (options.summaryPath) {
+    const summary = {
+      total: extensions.length,
+      success: successCount,
+      failed: failureCount,
+      outputDir,
+      results,
+    };
+    await fs.outputFile(options.summaryPath, JSON.stringify(summary, null, 2), "utf-8");
   }
 }

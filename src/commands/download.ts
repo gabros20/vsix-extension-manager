@@ -6,12 +6,21 @@ import {
   getDisplayNameFromUrl,
 } from "../utils/urlParser";
 import { createDownloadDirectory } from "../utils/fileManager";
-import { downloadBulkExtensions } from "../utils/bulkDownloader";
+import { downloadBulkExtensions, BulkOptions } from "../utils/bulkDownloader";
 
 interface DownloadOptions {
   url?: string;
   version?: string;
   output?: string;
+  file?: string; // bulk JSON path (non-interactive)
+  parallel?: number | string;
+  retry?: number | string;
+  retryDelay?: number | string;
+  skipExisting?: boolean;
+  overwrite?: boolean;
+  quiet?: boolean;
+  json?: boolean;
+  summary?: string;
 }
 
 export async function downloadVsix(options: DownloadOptions) {
@@ -20,7 +29,13 @@ export async function downloadVsix(options: DownloadOptions) {
   p.intro("🔽 VSIX Downloader");
 
   try {
-    // If command line options are provided, skip mode selection and go straight to single download
+    // If a bulk file is provided, run bulk mode non-interactively
+    if (options.file) {
+      await downloadBulkFromJson(options);
+      return;
+    }
+
+    // If command line options for single are provided, skip mode selection and go straight to single download
     if (options.url || options.version) {
       await downloadSingleExtension(options);
       return;
@@ -194,23 +209,27 @@ async function downloadSingleExtension(options: DownloadOptions) {
 
 async function downloadBulkFromJson(options: DownloadOptions) {
   // Get JSON file path
-  const jsonPath = await p.text({
-    message: "Enter the path to your JSON file:",
-    placeholder: "e.g., ./list.json or /path/to/extensions.json",
-    validate: (input: string) => {
-      if (!input.trim()) {
-        return "Please enter a valid file path";
-      }
-      if (!input.endsWith(".json")) {
-        return "File must have .json extension";
-      }
-      return undefined;
-    },
-  });
+  let jsonPathStr = options.file as string | undefined;
+  if (!jsonPathStr) {
+    const jsonPath = await p.text({
+      message: "Enter the path to your JSON file:",
+      placeholder: "e.g., ./list.json or /path/to/extensions.json",
+      validate: (input: string) => {
+        if (!input.trim()) {
+          return "Please enter a valid file path";
+        }
+        if (!input.endsWith(".json")) {
+          return "File must have .json extension";
+        }
+        return undefined;
+      },
+    });
 
-  if (p.isCancel(jsonPath)) {
-    p.cancel("Operation cancelled.");
-    process.exit(0);
+    if (p.isCancel(jsonPath)) {
+      p.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+    jsonPathStr = jsonPath as string;
   }
 
   // Get output directory (prompt, with fallback to ./downloads)
@@ -233,7 +252,18 @@ async function downloadBulkFromJson(options: DownloadOptions) {
   }
 
   // Start bulk download process
-  p.log.info("🔍 Reading and validating JSON file...");
+  if (!options.quiet) {
+    p.log.info("🔍 Reading and validating JSON file...");
+  }
 
-  await downloadBulkExtensions(jsonPath as string, outputDir as string);
+  const bulkOptions: BulkOptions = {
+    parallel: options.parallel ? Number(options.parallel) : undefined,
+    retry: options.retry ? Number(options.retry) : undefined,
+    retryDelay: options.retryDelay ? Number(options.retryDelay) : undefined,
+    quiet: options.quiet,
+    json: options.json,
+    summaryPath: options.summary,
+  };
+
+  await downloadBulkExtensions(jsonPathStr as string, outputDir as string, bulkOptions);
 }
