@@ -28,6 +28,8 @@ jobs:
       id-token: write
       issues: write
       pull-requests: write
+      actions: write
+      checks: write
 
     steps:
       - name: Checkout code

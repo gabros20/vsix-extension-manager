@@ -1,0 +1,57 @@
+name: Auto-Merge Bot
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    if: |
+      github.actor == 'github-actions[bot]' && 
+      (contains(github.event.pull_request.title, 'chore: sync package.json') || 
+       contains(github.event.pull_request.title, 'chore: bump version'))
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
+
+    steps:
+      - name: Check if PR is ready for auto-merge
+        id: check
+        run: |
+          echo "PR Title: ${{ github.event.pull_request.title }}"
+          echo "PR Author: ${{ github.actor }}"
+          echo "PR State: ${{ github.event.pull_request.state }}"
+          
+          # Check if this is an automated version sync PR
+          if [[ "${{ github.event.pull_request.title }}" == *"chore: sync package.json"* ]] || [[ "${{ github.event.pull_request.title }}" == *"chore: bump version"* ]]; then
+            echo "auto_merge=true" >> $GITHUB_OUTPUT
+            echo "✅ This PR is eligible for auto-merge"
+          else
+            echo "auto_merge=false" >> $GITHUB_OUTPUT
+            echo "❌ This PR is not eligible for auto-merge"
+          fi
+
+      - name: Wait for status checks
+        if: steps.check.outputs.auto_merge == 'true'
+        run: |
+          echo "⏳ Waiting for status checks to complete..."
+          sleep 30
+
+      - name: Enable auto-merge
+        if: steps.check.outputs.auto_merge == 'true'
+        run: |
+          echo "🔄 Enabling auto-merge for PR #${{ github.event.pull_request.number }}"
+          gh pr merge ${{ github.event.pull_request.number }} --auto --squash --delete-branch
+          echo "✅ Auto-merge enabled!"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add approval
+        if: steps.check.outputs.auto_merge == 'true'
+        run: |
+          echo "👍 Adding approval to automated PR"
+          gh pr review ${{ github.event.pull_request.number }} --approve --body "🤖 Automated approval for version sync PR"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
