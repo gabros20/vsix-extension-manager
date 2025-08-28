@@ -28,6 +28,8 @@ jobs:
       id-token: write
       issues: write
       pull-requests: write
+      actions: write
+      checks: write
 
     steps:
       - name: Checkout code
@@ -194,13 +196,9 @@ jobs:
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
 
-          # Commit version bump
-          git add package.json package-lock.json
-          git commit -m "chore: bump version to $NEW_VERSION [skip ci]" || echo "No changes to commit"
-
-          # Create and push tag
+          # Create and push tag only (no commit to main due to branch protection)
           git tag "$TAG_NAME"
-          git push origin main --follow-tags
+          git push origin "refs/tags/$TAG_NAME"
           echo "🏷️ Created and pushed tag $TAG_NAME"
 
       - name: Create GitHub Release
@@ -213,12 +211,13 @@ jobs:
           draft: false
           prerelease: ${{ contains(steps.bump.outputs.new_version, 'alpha') || contains(steps.bump.outputs.new_version, 'beta') || contains(steps.bump.outputs.new_version, 'rc') }}
 
-      - name: Update package.json in repository
+      - name: Publish summary
         if: steps.version.outputs.release_type != 'none'
         run: |
-          echo "✅ Version bump committed and tagged successfully"
+          echo "✅ Version ${{ steps.bump.outputs.new_version }} published successfully"
           echo "📦 Package published: https://www.npmjs.com/package/vsix-downloader"
           echo "📋 Release created: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.bump.outputs.new_version }}"
+          echo "🔄 A follow-up PR will be created to sync package.json version"
 
       - name: No release needed
         if: steps.version.outputs.release_type == 'none'

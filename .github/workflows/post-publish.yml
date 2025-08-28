@@ -1,0 +1,74 @@
+name: Post-Publish Version Update
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Extract version from release tag
+        id: version
+        run: |
+          TAG_NAME="${{ github.event.release.tag_name }}"
+          VERSION=${TAG_NAME#v}  # Remove 'v' prefix
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Update package.json version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          npm version $VERSION --no-git-tag-version
+          echo "Updated package.json to version $VERSION"
+
+      - name: Create Pull Request
+        id: create-pr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: bump version to ${{ steps.version.outputs.version }} [post-publish]"
+          title: "chore: sync package.json with published version ${{ steps.version.outputs.version }}"
+          body: |
+            ## Post-Publish Version Sync
+
+            This automated PR updates `package.json` to match the published version `${{ steps.version.outputs.version }}`.
+
+            ### Changes
+            - 📦 Updated `package.json` version to `${{ steps.version.outputs.version }}`
+            - 🏷️ Syncs with release tag `${{ github.event.release.tag_name }}`
+
+            ### Why This PR?
+            Due to branch protection rules, the publish workflow cannot directly commit to main.
+            This PR ensures the repository version stays in sync with the published NPM package.
+
+            **Auto-merge**: This PR can be safely merged as it only updates the version number.
+          branch: chore/post-publish-v${{ steps.version.outputs.version }}
+          base: main
+          delete-branch: true
+          add-paths: |
+            package.json
+            package-lock.json
+
+      - name: Enable Auto-Merge
+        if: steps.create-pr.outputs.pull-request-number
+        run: |
+          gh pr merge ${{ steps.create-pr.outputs.pull-request-number }} --auto --squash
+          echo "✅ Auto-merge enabled for PR #${{ steps.create-pr.outputs.pull-request-number }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
