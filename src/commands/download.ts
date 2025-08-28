@@ -1,12 +1,15 @@
 import * as p from "@clack/prompts";
 import { downloadFile } from "../utils/downloader";
 import {
-  parseMarketplaceUrl,
   constructDownloadUrl,
   getDisplayNameFromUrl,
+  constructOpenVsxDownloadUrl,
+  parseExtensionUrl,
+  inferSourceFromUrl,
 } from "../utils/urlParser";
 import { createDownloadDirectory } from "../utils/fileManager";
 import { downloadBulkExtensions, BulkOptions } from "../utils/bulkDownloader";
+import { resolveVersion } from "../utils/extensionRegistry";
 
 interface DownloadOptions {
   url?: string;
@@ -21,6 +24,8 @@ interface DownloadOptions {
   quiet?: boolean;
   json?: boolean;
   summary?: string;
+  preRelease?: boolean;
+  source?: string;
 }
 
 export async function downloadVsix(options: DownloadOptions) {
@@ -79,13 +84,10 @@ async function downloadSingleExtension(options: DownloadOptions) {
   let marketplaceUrl = options.url;
   if (!marketplaceUrl) {
     const urlResult = await p.text({
-      message: "Enter the VS Code extension marketplace URL:",
+      message: "Enter the extension URL (Marketplace or OpenVSX):",
       validate: (input: string) => {
         if (!input.trim()) {
           return "Please enter a valid URL";
-        }
-        if (!input.includes("marketplace.visualstudio.com")) {
-          return "Please enter a valid Visual Studio Marketplace URL";
         }
         return undefined;
       },
@@ -101,14 +103,14 @@ async function downloadSingleExtension(options: DownloadOptions) {
 
   // Parse URL to extract extension info
   const parseSpinner = p.spinner();
-  parseSpinner.start("Parsing marketplace URL...");
+  parseSpinner.start("Parsing extension URL...");
 
   let extensionInfo;
   try {
-    extensionInfo = parseMarketplaceUrl(marketplaceUrl as string);
+    extensionInfo = parseExtensionUrl(marketplaceUrl as string);
     parseSpinner.stop("Extension info extracted");
   } catch (error) {
-    parseSpinner.stop("Failed to parse marketplace URL", 1);
+    parseSpinner.stop("Failed to parse extension URL", 1);
     throw error;
   }
 
@@ -119,15 +121,17 @@ async function downloadSingleExtension(options: DownloadOptions) {
   let version = options.version;
   if (!version) {
     const versionResult = await p.text({
-      message: "Enter the extension version:",
-      placeholder: "e.g., 1.2.3",
+      message: "Enter the extension version (or 'latest'):",
+      placeholder: "e.g., 1.2.3 or latest",
       validate: (input: string) => {
         if (!input.trim()) {
           return "Please enter a version number";
         }
-        // Basic semver validation
-        if (!/^\d+\.\d+\.\d+/.test(input.trim())) {
-          return "Please enter a valid version number (e.g., 1.2.3)";
+        const v = input.trim().toLowerCase();
+        if (v === "latest") return undefined;
+        // Basic semver validation (allow optional prerelease)
+        if (!/^\d+\.\d+\.\d+(?:-.+)?$/.test(v)) {
+          return "Enter a valid version (e.g., 1.2.3) or 'latest'";
         }
         return undefined;
       },
@@ -138,12 +142,43 @@ async function downloadSingleExtension(options: DownloadOptions) {
       process.exit(0);
     }
 
-    version = versionResult as string;
+    version = (versionResult as string).trim();
   }
 
-  // Construct download URL and filename
-  const downloadUrl = constructDownloadUrl(extensionInfo, version as string);
-  const filename = `${extensionInfo.itemName}-${version}.vsix`;
+  // Source selection (interactive with default inference)
+  let effectiveSource = (
+    options.source || inferSourceFromUrl(marketplaceUrl as string)
+  ).toLowerCase();
+  if (!options.source) {
+    const pick = await p.select({
+      message: "Select source registry:",
+      options: [
+        { value: "marketplace", label: "Visual Studio Marketplace" },
+        { value: "open-vsx", label: "OpenVSX" },
+      ],
+      initialValue: effectiveSource,
+    });
+    if (p.isCancel(pick)) {
+      p.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+    effectiveSource = (pick as string).toLowerCase();
+  }
+
+  // Resolve version if 'latest'
+  const resolvedVersion = await resolveVersion(
+    extensionInfo.itemName,
+    version as string,
+    Boolean(options.preRelease),
+    effectiveSource as "marketplace" | "open-vsx" | "auto",
+  );
+
+  // Construct download URL by source
+  const downloadUrl =
+    effectiveSource === "open-vsx"
+      ? constructOpenVsxDownloadUrl(extensionInfo, resolvedVersion)
+      : constructDownloadUrl(extensionInfo, resolvedVersion);
+  const filename = `${extensionInfo.itemName}-${resolvedVersion}.vsix`;
 
   // Get output directory (prompt, with fallback to ./downloads)
   let outputDir = options.output as string | undefined;
@@ -172,7 +207,10 @@ async function downloadSingleExtension(options: DownloadOptions) {
       ? `${downloadUrl.slice(0, 30)}...${downloadUrl.slice(-10)}`
       : downloadUrl;
 
-  p.note(`Filename: ${filename}\nOutput: ${outputDir}\nURL: ${displayUrl}`, "Download Details");
+  p.note(
+    `Filename: ${filename}\nOutput: ${outputDir}\nResolved Version: ${resolvedVersion}\nURL: ${displayUrl}`,
+    "Download Details",
+  );
 
   // Confirm download
   const shouldProceed = await p.confirm({

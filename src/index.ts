@@ -27,7 +27,19 @@ program
   .option("--quiet", "Reduce output (non-interactive)", false)
   .option("--json", "Machine-readable logs (where applicable)", false)
   .option("--summary <path>", "Write bulk summary JSON to the given path")
+  .option("--pre-release", "Prefer pre-release when resolving 'latest'", false)
+  .option("--source <source>", "Source registry: marketplace|open-vsx|auto (default: marketplace)")
   .action(downloadVsix);
+
+program
+  .command("versions")
+  .description("List available versions for an extension")
+  .option("-u, --url <url>", "Marketplace URL of the extension")
+  .option("--json", "Output JSON", false)
+  .action(async (opts) => {
+    const { listVersions } = await import("./commands/versions");
+    await listVersions(opts);
+  });
 
 // Default command - interactive mode
 program.action(() => {

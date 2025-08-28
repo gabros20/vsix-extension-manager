@@ -42,6 +42,55 @@ export function parseMarketplaceUrl(url: string): ExtensionInfo {
 }
 
 /**
+ * Infer source registry from URL
+ */
+export function inferSourceFromUrl(url: string): "marketplace" | "open-vsx" {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes("open-vsx.org")) return "open-vsx";
+    return "marketplace";
+  } catch {
+    return "marketplace";
+  }
+}
+
+/**
+ * Parse either Marketplace or OpenVSX URLs to extract `publisher.extension` as itemName
+ * Supported formats:
+ * - Marketplace: https://marketplace.visualstudio.com/items?itemName=publisher.extension
+ * - OpenVSX API: https://open-vsx.org/api/publisher/extension/[...]
+ * - OpenVSX Web: https://open-vsx.org/extension/publisher/extension
+ */
+export function parseExtensionUrl(url: string): ExtensionInfo {
+  const source = inferSourceFromUrl(url);
+  if (source === "marketplace") {
+    return parseMarketplaceUrl(url);
+  }
+  // open-vsx parsing
+  try {
+    const parsedUrl = new URL(url);
+    const segments = parsedUrl.pathname.split("/").filter(Boolean);
+    // Accept both /api/publisher/extension/... and /extension/publisher/extension
+    let publisher: string | undefined;
+    let extension: string | undefined;
+    if (segments[0] === "api" && segments.length >= 3) {
+      publisher = segments[1];
+      extension = segments[2];
+    } else if (segments[0] === "extension" && segments.length >= 3) {
+      publisher = segments[1];
+      extension = segments[2];
+    }
+    if (!publisher || !extension) {
+      throw new Error("Invalid OpenVSX URL format");
+    }
+    return { itemName: `${publisher}.${extension}` };
+  } catch (error) {
+    if (error instanceof Error) throw error;
+    throw new Error("Failed to parse extension URL");
+  }
+}
+
+/**
  * Construct the download URL for VSIX file
  * Based on the pattern from the original script:
  * https://[publisher].gallery.vsassets.io/_apis/public/gallery/publisher/[publisher]/extension/[extension]/[version]/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage
@@ -50,6 +99,17 @@ export function constructDownloadUrl(extensionInfo: ExtensionInfo, version: stri
   const [publisher, extension] = extensionInfo.itemName.split(".");
 
   return `https://${publisher}.gallery.vsassets.io/_apis/public/gallery/publisher/${publisher}/extension/${extension}/${version}/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage`;
+}
+
+export type SourceRegistry = "marketplace" | "open-vsx";
+
+/**
+ * Construct download URL for OpenVSX
+ * https://open-vsx.org/api/<publisher>/<extension>/<version>/file/<publisher>.<extension>-<version>.vsix
+ */
+export function constructOpenVsxDownloadUrl(extensionInfo: ExtensionInfo, version: string): string {
+  const [publisher, extension] = extensionInfo.itemName.split(".");
+  return `https://open-vsx.org/api/${publisher}/${extension}/${version}/file/${publisher}.${extension}-${version}.vsix`;
 }
 
 /**
@@ -70,9 +130,26 @@ export function isValidMarketplaceUrl(url: string): boolean {
  */
 export function getDisplayNameFromUrl(url: string): string {
   try {
-    const itemName = new URL(url).searchParams.get("itemName");
-    if (itemName) {
-      return itemName.replace(".", " - ");
+    const parsed = new URL(url);
+    if (parsed.hostname.includes("marketplace.visualstudio.com")) {
+      const itemName = parsed.searchParams.get("itemName");
+      if (itemName) {
+        return itemName.replace(".", " - ");
+      }
+    } else if (parsed.hostname.includes("open-vsx.org")) {
+      const segments = parsed.pathname.split("/").filter(Boolean);
+      let publisher: string | undefined;
+      let extension: string | undefined;
+      if (segments[0] === "api" && segments.length >= 3) {
+        publisher = segments[1];
+        extension = segments[2];
+      } else if (segments[0] === "extension" && segments.length >= 3) {
+        publisher = segments[1];
+        extension = segments[2];
+      }
+      if (publisher && extension) {
+        return `${publisher} - ${extension}`;
+      }
     }
     return "Unknown Extension";
   } catch {
