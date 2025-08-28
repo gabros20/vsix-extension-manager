@@ -90,14 +90,27 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Bumped version to $NEW_VERSION"
 
-      - name: Publish to NPM
+      - name: Check if version exists on NPM
         if: steps.version.outputs.bump != 'none'
+        id: npm_check
+        run: |
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          if npm view vsix-downloader@$NEW_VERSION version >/dev/null 2>&1; then
+            echo "version_exists=true" >> $GITHUB_OUTPUT
+            echo "Version $NEW_VERSION already exists on NPM, skipping publish"
+          else
+            echo "version_exists=false" >> $GITHUB_OUTPUT
+            echo "Version $NEW_VERSION is available for publishing"
+          fi
+
+      - name: Publish to NPM
+        if: steps.version.outputs.bump != 'none' && steps.npm_check.outputs.version_exists == 'false'
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create Git tag
-        if: steps.version.outputs.bump != 'none'
+        if: steps.version.outputs.bump != 'none' && steps.npm_check.outputs.version_exists == 'false'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
@@ -107,7 +120,7 @@ jobs:
           git push origin main --tags
 
       - name: Create GitHub Release
-        if: steps.version.outputs.bump != 'none'
+        if: steps.version.outputs.bump != 'none' && steps.npm_check.outputs.version_exists == 'false'
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -125,8 +138,15 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Skip publish
+      - name: Skip publish - no version bump
         if: steps.version.outputs.bump == 'none'
         run: |
           echo "No version bump needed, skipping publish"
           echo "This usually means no conventional commits were found"
+
+      - name: Skip publish - version exists
+        if: steps.version.outputs.bump != 'none' && steps.npm_check.outputs.version_exists == 'true'
+        run: |
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "Version $NEW_VERSION already exists on NPM, skipping publish"
+          echo "This can happen if a previous run failed after publishing but before tagging"
