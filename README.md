@@ -32,6 +32,9 @@ Recently, Microsoft quietly blocked Cursor (an AI-powered VSCode fork) from acce
 - **Interactive Prompts**: Elegant bordered prompts with validation
 - **Bulk Download**: Download multiple extensions at once with progress tracking
 - **JSON Validation**: Comprehensive validation for bulk download files
+- **Non-Interactive Bulk Mode**: Use `--file` to run bulk downloads without prompts
+- **Concurrent Downloads**: Control concurrency with `--parallel` plus `--retry`/`--retry-delay`
+- **Summary Output**: Write machine-readable results with `--summary <path>.json`
 - **Modern Stack**: Built with TypeScript, Commander.js, and Clack
 - **Error Handling**: Comprehensive error handling and validation
 - **Progress Indicators**: Beautiful spinners and visual feedback
@@ -158,6 +161,27 @@ The CLI performs comprehensive validation on your JSON file before starting down
 - Failed downloads don't stop the bulk process
 - Detailed summary of successes and failures
 
+#### Non-Interactive Bulk Mode
+
+Skip prompts and run bulk download straight from a file. Useful for CI and scripts.
+
+```bash
+# Basic non-interactive bulk download
+vsix-downloader download \
+  --file ./extensions.json \
+  --output ./downloads
+
+# Advanced: parallel downloads, retries with backoff, quiet logs and JSON summary
+vsix-downloader download \
+  --file ./extensions.json \
+  --output ./downloads \
+  --parallel 6 \
+  --retry 3 \
+  --retry-delay 1500 \
+  --summary ./summary.json \
+  --quiet
+```
+
 ### Available Commands
 
 ```bash
@@ -171,6 +195,15 @@ vsix-downloader --version            # Show version
 - `-u, --url <url>` - Marketplace URL of the extension
 - `-v, --version <version>` - Version of the extension to download
 - `-o, --output <path>` - Output directory (default: ./downloads)
+- `-f, --file <path>` - Bulk JSON file path (non-interactive)
+- `--parallel <n>` - Number of parallel downloads in bulk mode (default: 4)
+- `--retry <n>` - Retry attempts per item in bulk mode (default: 2)
+- `--retry-delay <ms>` - Base delay between retries in ms (exponential backoff)
+- `--skip-existing` - Skip downloads if target file already exists
+- `--overwrite` - Overwrite existing files
+- `--quiet` - Reduce output (suppress interactive notes/spinners)
+- `--json` - Machine-readable logs (reserved for future)
+- `--summary <path>` - Write bulk summary JSON to the given path
 - `-h, --help` - Display help information
 
 ## 📋 Examples

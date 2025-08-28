@@ -18,6 +18,15 @@ program
   .option("-u, --url <url>", "Marketplace URL of the extension")
   .option("-v, --version <version>", "Version of the extension to download")
   .option("-o, --output <path>", "Output directory (default: ./downloads)")
+  .option("-f, --file <path>", "Bulk JSON file path (non-interactive mode)")
+  .option("--parallel <n>", "Number of parallel downloads (bulk mode)")
+  .option("--retry <n>", "Number of retry attempts per item (bulk mode)")
+  .option("--retry-delay <ms>", "Delay in ms between retries (bulk mode)")
+  .option("--skip-existing", "Skip downloads if target file already exists", false)
+  .option("--overwrite", "Overwrite existing files", false)
+  .option("--quiet", "Reduce output (non-interactive)", false)
+  .option("--json", "Machine-readable logs (where applicable)", false)
+  .option("--summary <path>", "Write bulk summary JSON to the given path")
   .action(downloadVsix);
 
 // Default command - interactive mode
