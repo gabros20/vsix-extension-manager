@@ -7,6 +7,7 @@ import {
 } from "../utils/urlParser";
 import { createDownloadDirectory } from "../utils/fileManager";
 import { downloadBulkExtensions, BulkOptions } from "../utils/bulkDownloader";
+import { resolveVersion } from "../utils/extensionRegistry";
 
 interface DownloadOptions {
   url?: string;
@@ -21,6 +22,7 @@ interface DownloadOptions {
   quiet?: boolean;
   json?: boolean;
   summary?: string;
+  preRelease?: boolean;
 }
 
 export async function downloadVsix(options: DownloadOptions) {
@@ -119,15 +121,17 @@ async function downloadSingleExtension(options: DownloadOptions) {
   let version = options.version;
   if (!version) {
     const versionResult = await p.text({
-      message: "Enter the extension version:",
-      placeholder: "e.g., 1.2.3",
+      message: "Enter the extension version (or 'latest'):",
+      placeholder: "e.g., 1.2.3 or latest",
       validate: (input: string) => {
         if (!input.trim()) {
           return "Please enter a version number";
         }
-        // Basic semver validation
-        if (!/^\d+\.\d+\.\d+/.test(input.trim())) {
-          return "Please enter a valid version number (e.g., 1.2.3)";
+        const v = input.trim().toLowerCase();
+        if (v === "latest") return undefined;
+        // Basic semver validation (allow optional prerelease)
+        if (!/^\d+\.\d+\.\d+(?:-.+)?$/.test(v)) {
+          return "Enter a valid version (e.g., 1.2.3) or 'latest'";
         }
         return undefined;
       },
@@ -138,12 +142,19 @@ async function downloadSingleExtension(options: DownloadOptions) {
       process.exit(0);
     }
 
-    version = versionResult as string;
+    version = (versionResult as string).trim();
   }
 
+  // Resolve version if 'latest'
+  const resolvedVersion = await resolveVersion(
+    extensionInfo.itemName,
+    version as string,
+    Boolean(options.preRelease),
+  );
+
   // Construct download URL and filename
-  const downloadUrl = constructDownloadUrl(extensionInfo, version as string);
-  const filename = `${extensionInfo.itemName}-${version}.vsix`;
+  const downloadUrl = constructDownloadUrl(extensionInfo, resolvedVersion);
+  const filename = `${extensionInfo.itemName}-${resolvedVersion}.vsix`;
 
   // Get output directory (prompt, with fallback to ./downloads)
   let outputDir = options.output as string | undefined;
@@ -172,7 +183,10 @@ async function downloadSingleExtension(options: DownloadOptions) {
       ? `${downloadUrl.slice(0, 30)}...${downloadUrl.slice(-10)}`
       : downloadUrl;
 
-  p.note(`Filename: ${filename}\nOutput: ${outputDir}\nURL: ${displayUrl}`, "Download Details");
+  p.note(
+    `Filename: ${filename}\nOutput: ${outputDir}\nResolved Version: ${resolvedVersion}\nURL: ${displayUrl}`,
+    "Download Details",
+  );
 
   // Confirm download
   const shouldProceed = await p.confirm({
