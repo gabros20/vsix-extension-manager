@@ -137,12 +137,22 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add package.json
-          git commit -m "chore: bump version to ${{ steps.ensure.outputs.final_version }}"
-          git tag v${{ steps.ensure.outputs.final_version }}
-          # We are on a detached HEAD (merge commit). Push the commit to main explicitly and push tags.
-          git push origin HEAD:refs/heads/main
-          git push origin --tags
+          # Tag the merge commit without pushing code to protected main
+          git tag v${{ steps.ensure.outputs.final_version }} $GITHUB_SHA
+          git push origin refs/tags/v${{ steps.ensure.outputs.final_version }}
+
+      - name: Create version bump PR
+        if: steps.version.outputs.bump != 'none'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore: bump version to ${{ steps.ensure.outputs.final_version }}"
+          branch: chore/release-v${{ steps.ensure.outputs.final_version }}
+          title: "chore: bump version to ${{ steps.ensure.outputs.final_version }}"
+          body: |
+            This automated PR bumps the package version to `${{ steps.ensure.outputs.final_version }}`
+            to reflect the published release. Merging will sync `package.json` with NPM.
+          add-paths: |
+            package.json
 
       - name: Create GitHub Release
         if: steps.version.outputs.bump != 'none'
