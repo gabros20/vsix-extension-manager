@@ -2,6 +2,7 @@ import axios from "axios";
 import fs from "fs-extra";
 import path from "path";
 import { pipeline } from "stream/promises";
+import { ProgressCallback, ProgressTracker } from "./progressTracker";
 
 /**
  * Download a file from URL to the specified directory
@@ -10,6 +11,7 @@ export async function downloadFile(
   url: string,
   outputDir: string,
   filename: string,
+  progressCallback?: ProgressCallback,
 ): Promise<string> {
   try {
     // Ensure output directory exists
@@ -33,11 +35,35 @@ export async function downloadFile(
       throw new Error(`HTTP ${response.status}: Failed to download file`);
     }
 
+    // Get content length for progress tracking
+    const contentLength = parseInt(response.headers["content-length"] || "0", 10);
+
     // Create write stream
     const writeStream = fs.createWriteStream(filePath);
 
+    // Set up progress tracking if callback provided
+    let progressTracker: ProgressTracker | undefined;
+    let downloadedBytes = 0;
+
+    if (progressCallback && contentLength > 0) {
+      progressTracker = new ProgressTracker(contentLength, progressCallback);
+    }
+
+    // Add progress tracking to the response stream
+    if (progressTracker) {
+      response.data.on("data", (chunk: Buffer) => {
+        downloadedBytes += chunk.length;
+        progressTracker!.update(downloadedBytes);
+      });
+    }
+
     // Pipe the response data to file
     await pipeline(response.data, writeStream);
+
+    // Mark progress as complete
+    if (progressTracker) {
+      progressTracker.complete();
+    }
 
     // Verify file was created and has content
     const stats = await fs.stat(filePath);

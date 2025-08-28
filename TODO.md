@@ -49,21 +49,21 @@
   - Added lint-staged for automated code formatting
   - Created cross-platform line ending consistency
 
+- [x] **Filename template, cache-dir, and skip/overwrite behavior** (`todo-filename-cache`)
+  - Added `--filename-template` option for custom naming patterns with variable substitution
+  - Added `--cache-dir` for local caching of downloaded files
+  - Implemented `--skip-existing` and `--overwrite` behavior with file existence checks
+  - Added comprehensive file handling logic for both interactive and bulk modes
+
+- [x] **Progress indicators and optional checksum output** (`todo-progress-checksum`)
+  - Added real-time download progress bars with file size and speed
+  - Added `--checksum` flag for SHA256 hash generation
+  - Added `--verify-checksum` for integrity verification against provided hashes
+  - Implemented progress callbacks for real-time updates with non-intrusive 100ms intervals
+  - Enhanced bulk downloads with clack-native spinners to eliminate layout jumps
+  - Improved TypeScript type safety with proper spinner interface definitions
+
 ## Pending Features 🔄
-
-### High Priority
-
-- [ ] **Filename template, cache-dir, and skip/overwrite behavior** (`todo-filename-cache`)
-  - Add `--filename-template` option for custom naming patterns
-  - Add `--cache-dir` for local caching of downloaded files
-  - Implement `--skip-existing` and `--overwrite` behavior
-  - Add file existence checks before download
-
-- [ ] **Progress indicators and optional checksum output** (`todo-progress-checksum`)
-  - Add download progress bars with file size and speed
-  - Add `--checksum` flag for SHA256 hash generation
-  - Add `--verify-checksum` for integrity verification
-  - Implement progress callbacks for real-time updates
 
 ### Medium Priority
 
@@ -149,5 +149,5 @@ Conventional commits, automated changelogs, code quality enforcement, and depend
 
 ---
 
-**Last Updated:** v1.4.0 release
-**Next Priority:** Filename template and cache directory features (high-value user experience improvements)
+**Last Updated:** v1.5.0 release  
+**Next Priority:** Export installed and from-list commands (VS Code integration and workflow improvements)

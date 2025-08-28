@@ -1,4 +1,5 @@
 import * as p from "@clack/prompts";
+import path from "path";
 import { downloadFile } from "../utils/downloader";
 import {
   constructDownloadUrl,
@@ -7,9 +8,26 @@ import {
   parseExtensionUrl,
   inferSourceFromUrl,
 } from "../utils/urlParser";
-import { createDownloadDirectory } from "../utils/fileManager";
+import { createDownloadDirectory, FileExistsAction, handleFileExists } from "../utils/fileManager";
 import { downloadBulkExtensions, BulkOptions } from "../utils/bulkDownloader";
 import { resolveVersion } from "../utils/extensionRegistry";
+import {
+  generateFilename,
+  DEFAULT_FILENAME_TEMPLATE,
+  validateTemplate,
+} from "../utils/filenameTemplate";
+import {
+  generateSHA256,
+  verifySHA256,
+  isValidSHA256,
+  formatHashForDisplay,
+} from "../utils/checksum";
+import {
+  ProgressInfo,
+  formatBytes,
+  formatSpeed,
+  createProgressBar,
+} from "../utils/progressTracker";
 
 interface DownloadOptions {
   url?: string;
@@ -26,6 +44,10 @@ interface DownloadOptions {
   summary?: string;
   preRelease?: boolean;
   source?: string;
+  filenameTemplate?: string;
+  cacheDir?: string;
+  checksum?: boolean;
+  verifyChecksum?: string;
 }
 
 export async function downloadVsix(options: DownloadOptions) {
@@ -178,11 +200,30 @@ async function downloadSingleExtension(options: DownloadOptions) {
     effectiveSource === "open-vsx"
       ? constructOpenVsxDownloadUrl(extensionInfo, resolvedVersion)
       : constructDownloadUrl(extensionInfo, resolvedVersion);
-  const filename = `${extensionInfo.itemName}-${resolvedVersion}.vsix`;
 
-  // Get output directory (prompt, with fallback to ./downloads)
-  let outputDir = options.output as string | undefined;
-  if (!outputDir) {
+  // Generate filename using template
+  const filenameTemplate = options.filenameTemplate || DEFAULT_FILENAME_TEMPLATE;
+
+  // Validate template
+  const templateValidation = validateTemplate(filenameTemplate);
+  if (!templateValidation.isValid) {
+    throw new Error(`Invalid filename template: ${templateValidation.error}`);
+  }
+
+  const filename = generateFilename(filenameTemplate, {
+    name: extensionInfo.itemName,
+    version: resolvedVersion,
+    source: effectiveSource,
+    publisher: extensionInfo.itemName.split(".")[0],
+  });
+
+  // Determine output directory (cache-dir takes precedence)
+  let outputDir: string;
+  if (options.cacheDir) {
+    outputDir = options.cacheDir;
+  } else if (options.output) {
+    outputDir = options.output;
+  } else {
     const outputInput = await p.text({
       message: "Enter output directory:",
       placeholder: "./downloads",
@@ -195,11 +236,42 @@ async function downloadSingleExtension(options: DownloadOptions) {
     }
 
     outputDir = (outputInput as string).trim() || "./downloads";
-  } else {
-    outputDir = outputDir.trim() || "./downloads";
   }
 
   await createDownloadDirectory(outputDir);
+
+  const filePath = path.join(outputDir, filename);
+
+  // Determine file exists action
+  let fileExistsAction: FileExistsAction;
+  if (options.skipExisting) {
+    fileExistsAction = FileExistsAction.SKIP;
+  } else if (options.overwrite) {
+    fileExistsAction = FileExistsAction.OVERWRITE;
+  } else {
+    fileExistsAction = FileExistsAction.PROMPT;
+  }
+
+  // Check if file exists and handle accordingly
+  const shouldProceedWithDownload = await handleFileExists(filePath, fileExistsAction, async () => {
+    // Prompt callback for interactive mode
+    const result = await p.confirm({
+      message: `File ${filename} already exists. Overwrite?`,
+      initialValue: false,
+    });
+
+    if (p.isCancel(result)) {
+      p.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+    return result as boolean;
+  });
+
+  if (!shouldProceedWithDownload) {
+    p.note(`Skipped existing file: ${filename}`, "Download Skipped");
+    return;
+  }
 
   // Truncate URL for display (keep first 30 chars + ... + last 10 chars)
   const displayUrl =
@@ -208,35 +280,110 @@ async function downloadSingleExtension(options: DownloadOptions) {
       : downloadUrl;
 
   p.note(
-    `Filename: ${filename}\nOutput: ${outputDir}\nResolved Version: ${resolvedVersion}\nURL: ${displayUrl}`,
+    `Filename: ${filename}\nOutput: ${outputDir}\nResolved Version: ${resolvedVersion}\nTemplate: ${filenameTemplate}\nURL: ${displayUrl}`,
     "Download Details",
   );
 
-  // Confirm download
-  const shouldProceed = await p.confirm({
-    message: `Download ${filename}?`,
-    initialValue: true,
-  });
+  // Confirm download (only if not already confirmed via overwrite prompt)
+  if (fileExistsAction !== FileExistsAction.PROMPT) {
+    const shouldProceed = await p.confirm({
+      message: `Download ${filename}?`,
+      initialValue: true,
+    });
 
-  if (p.isCancel(shouldProceed) || !shouldProceed) {
-    p.cancel("Download cancelled.");
-    return;
+    if (p.isCancel(shouldProceed) || !shouldProceed) {
+      p.cancel("Download cancelled.");
+      return;
+    }
   }
 
-  // Download the file
+  // Validate checksum format if provided
+  if (options.verifyChecksum && !isValidSHA256(options.verifyChecksum)) {
+    throw new Error("Invalid SHA256 hash format. Expected 64 hexadecimal characters.");
+  }
+
+  // Download the file with progress tracking
   const downloadSpinner = p.spinner();
+  let lastProgressUpdate = Date.now();
+
+  const progressCallback = (progress: ProgressInfo) => {
+    const now = Date.now();
+    // Update every 100ms to avoid overwhelming the terminal
+    if (now - lastProgressUpdate >= 100) {
+      const progressBar = createProgressBar(progress.percentage, 30);
+      const downloaded = formatBytes(progress.downloaded);
+      const total = formatBytes(progress.total);
+      const speed = formatSpeed(progress.speed);
+
+      downloadSpinner.message(`${progressBar} ${downloaded}/${total} @ ${speed}`);
+      lastProgressUpdate = now;
+    }
+  };
+
   downloadSpinner.start(`Downloading ${filename}...`);
 
   try {
-    const filePath = await downloadFile(downloadUrl, outputDir, filename);
+    const downloadedFilePath = await downloadFile(
+      downloadUrl,
+      outputDir,
+      filename,
+      options.quiet ? undefined : progressCallback,
+    );
     downloadSpinner.stop(`Downloaded successfully!`);
 
     // Get file size for display
     const fs = await import("fs-extra");
-    const stats = await fs.stat(filePath);
+    const stats = await fs.stat(downloadedFilePath);
     const sizeInKB = Math.round(stats.size / 1024);
 
-    p.note(`File: ${filename}\nLocation: ${filePath}\nSize: ${sizeInKB} KB`, "Download Complete");
+    let checksumInfo = "";
+    let verificationInfo = "";
+
+    // Generate checksum if requested
+    if (options.checksum) {
+      const checksumSpinner = p.spinner();
+      checksumSpinner.start("Generating SHA256 checksum...");
+
+      try {
+        const hash = await generateSHA256(downloadedFilePath);
+        checksumSpinner.stop("Checksum generated");
+        checksumInfo = `\nSHA256: ${hash}`;
+      } catch (error) {
+        checksumSpinner.stop("Checksum generation failed", 1);
+        p.log.warn(
+          `⚠️  Failed to generate checksum: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
+      }
+    }
+
+    // Verify checksum if provided
+    if (options.verifyChecksum) {
+      const verifySpinner = p.spinner();
+      verifySpinner.start("Verifying checksum...");
+
+      try {
+        const isValid = await verifySHA256(downloadedFilePath, options.verifyChecksum);
+        if (isValid) {
+          verifySpinner.stop("✅ Checksum verification passed");
+          verificationInfo = `\nVerification: ✅ PASSED (${formatHashForDisplay(options.verifyChecksum)})`;
+        } else {
+          verifySpinner.stop("❌ Checksum verification failed", 1);
+          const actualHash = await generateSHA256(downloadedFilePath);
+          verificationInfo = `\nVerification: ❌ FAILED\nExpected: ${options.verifyChecksum}\nActual: ${actualHash}`;
+          p.log.error("❌ File integrity check failed! The downloaded file may be corrupted.");
+        }
+      } catch (error) {
+        verifySpinner.stop("Checksum verification failed", 1);
+        p.log.warn(
+          `⚠️  Failed to verify checksum: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
+      }
+    }
+
+    p.note(
+      `File: ${filename}\nLocation: ${downloadedFilePath}\nSize: ${sizeInKB} KB${checksumInfo}${verificationInfo}`,
+      "Download Complete",
+    );
 
     p.outro(`🎉 Successfully downloaded VSIX extension!`);
   } catch (error) {
@@ -270,9 +417,13 @@ async function downloadBulkFromJson(options: DownloadOptions) {
     jsonPathStr = jsonPath as string;
   }
 
-  // Get output directory (prompt, with fallback to ./downloads)
-  let outputDir = options.output as string | undefined;
-  if (!outputDir) {
+  // Determine output directory (cache-dir takes precedence, then output, then prompt)
+  let outputDir: string;
+  if (options.cacheDir) {
+    outputDir = options.cacheDir;
+  } else if (options.output) {
+    outputDir = options.output;
+  } else {
     const outputInput = await p.text({
       message: "Enter output directory:",
       placeholder: "./downloads",
@@ -285,8 +436,6 @@ async function downloadBulkFromJson(options: DownloadOptions) {
     }
 
     outputDir = (outputInput as string).trim() || "./downloads";
-  } else {
-    outputDir = outputDir.trim() || "./downloads";
   }
 
   // Start bulk download process
@@ -301,6 +450,12 @@ async function downloadBulkFromJson(options: DownloadOptions) {
     quiet: options.quiet,
     json: options.json,
     summaryPath: options.summary,
+    filenameTemplate: options.filenameTemplate,
+    cacheDir: options.cacheDir,
+    skipExisting: options.skipExisting,
+    overwrite: options.overwrite,
+    checksum: options.checksum,
+    verifyChecksum: options.verifyChecksum,
   };
 
   await downloadBulkExtensions(jsonPathStr as string, outputDir as string, bulkOptions);

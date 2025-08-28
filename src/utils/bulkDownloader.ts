@@ -1,5 +1,6 @@
 import * as p from "@clack/prompts";
 import fs from "fs-extra";
+import path from "path";
 import { downloadFile } from "./downloader";
 import {
   parseExtensionUrl,
@@ -8,8 +9,22 @@ import {
   constructOpenVsxDownloadUrl,
   inferSourceFromUrl,
 } from "./urlParser";
-import { createDownloadDirectory } from "./fileManager";
+import {
+  createDownloadDirectory,
+  FileExistsAction,
+  handleFileExists,
+  resolveOutputDirectory,
+} from "./fileManager";
 import { resolveVersion } from "./extensionRegistry";
+import { generateFilename, DEFAULT_FILENAME_TEMPLATE, validateTemplate } from "./filenameTemplate";
+import { generateSHA256, isValidSHA256, verifySHA256 } from "./checksum";
+import { ProgressInfo, formatSpeed } from "./progressTracker";
+
+interface SpinnerInstance {
+  start: (message: string) => void;
+  message: (text: string) => void;
+  stop: (message?: string, code?: number) => void;
+}
 
 interface BulkExtensionItem {
   url: string;
@@ -25,6 +40,12 @@ export interface BulkOptions {
   json?: boolean;
   summaryPath?: string;
   source?: "marketplace" | "open-vsx";
+  filenameTemplate?: string;
+  cacheDir?: string;
+  skipExisting?: boolean;
+  overwrite?: boolean;
+  checksum?: boolean;
+  verifyChecksum?: string;
 }
 
 interface ValidationResult {
@@ -171,18 +192,42 @@ export async function downloadBulkExtensions(
     );
   }
 
-  // Create output directory
-  await createDownloadDirectory(outputDir);
+  // Validate filename template if provided
+  const filenameTemplate = options.filenameTemplate || DEFAULT_FILENAME_TEMPLATE;
+  const templateValidation = validateTemplate(filenameTemplate);
+  if (!templateValidation.isValid) {
+    throw new Error(`Invalid filename template: ${templateValidation.error}`);
+  }
 
-  // Concurrency and retry settings
-  const parallel = Math.max(1, Math.floor(options.parallel ?? 4));
+  // Determine effective output directory (cache-dir takes precedence)
+  const effectiveOutputDir = resolveOutputDirectory(options.cacheDir, outputDir);
+
+  // Create output directory
+  await createDownloadDirectory(effectiveOutputDir);
+
+  // Retry settings (sequential downloads for clean progress)
   const maxRetries = Math.max(0, Math.floor(options.retry ?? 2));
   const retryDelayMs = Math.max(0, Math.floor(options.retryDelay ?? 1000));
+
+  // File existence handling
+  let fileExistsAction: FileExistsAction;
+  if (options.skipExisting) {
+    fileExistsAction = FileExistsAction.SKIP;
+  } else if (options.overwrite) {
+    fileExistsAction = FileExistsAction.OVERWRITE;
+  } else {
+    fileExistsAction = FileExistsAction.OVERWRITE; // Default for bulk mode (non-interactive)
+  }
 
   // Result aggregation
   let successCount = 0;
   let failureCount = 0;
   const failedDownloads: string[] = [];
+  // Validate checksum format if provided
+  if (options.verifyChecksum && !isValidSHA256(options.verifyChecksum)) {
+    throw new Error("Invalid SHA256 hash format. Expected 64 hexadecimal characters.");
+  }
+
   const results: Array<{
     index: number;
     url: string;
@@ -191,18 +236,33 @@ export async function downloadBulkExtensions(
     filePath?: string;
     filename?: string;
     sizeBytes?: number;
+    checksum?: string;
+    verificationPassed?: boolean;
     error?: string;
     elapsedMs: number;
   }> = [];
+
+  // Single spinner for clean bulk progress display
+  let bulkSpinner: SpinnerInstance | null = null;
+  let completedCount = 0;
+
+  if (!options.quiet) {
+    bulkSpinner = p.spinner();
+    bulkSpinner.start("Starting bulk download...");
+  }
 
   function delay(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  async function downloadWithRetry(ext: BulkExtensionItem, index: number) {
+  async function downloadSingleExtension(ext: BulkExtensionItem, index: number) {
     const displayName = getDisplayNameFromUrl(ext.url);
-    const spinner = options.quiet ? null : p.spinner();
     const startMs = Date.now();
+
+    // Update spinner message
+    if (bulkSpinner) {
+      bulkSpinner.message(`[${index + 1}/${extensions.length}] Preparing ${displayName}...`);
+    }
 
     const extensionInfo = parseExtensionUrl(ext.url);
     const resolvedSource = (ext.source || options.source || inferSourceFromUrl(ext.url)) as
@@ -216,26 +276,122 @@ export async function downloadBulkExtensions(
       resolvedSource === "open-vsx"
         ? constructOpenVsxDownloadUrl(extensionInfo, versionToUse)
         : constructDownloadUrl(extensionInfo, versionToUse);
-    const filename = `${extensionInfo.itemName}-${versionToUse}.vsix`;
+
+    const filename = generateFilename(filenameTemplate, {
+      name: extensionInfo.itemName,
+      version: versionToUse,
+      source: resolvedSource,
+      publisher: extensionInfo.itemName.split(".")[0],
+    });
+
+    const filePath = path.join(effectiveOutputDir, filename);
+
+    // Check if file exists and handle accordingly
+    const shouldProceedWithDownload = await handleFileExists(filePath, fileExistsAction);
+
+    if (!shouldProceedWithDownload) {
+      const elapsedMs = Date.now() - startMs;
+      completedCount++;
+      if (bulkSpinner) {
+        bulkSpinner.message(
+          `[${completedCount}/${extensions.length}] Skipped ${displayName} (file exists)`,
+        );
+      }
+      successCount++;
+      results.push({
+        index,
+        url: ext.url,
+        version: ext.version,
+        status: "success", // Treat skip as success for stats
+        filePath,
+        filename,
+        sizeBytes: 0,
+        elapsedMs,
+      });
+      return;
+    }
 
     let attempt = 0;
     while (true) {
       attempt++;
       try {
-        if (spinner) {
-          spinner.start(
-            `[${index + 1}/${extensions.length}] Fetching ${displayName} (attempt ${attempt})...`,
-          );
+        if (bulkSpinner) {
+          bulkSpinner.message(`[${index + 1}/${extensions.length}] Downloading ${displayName}...`);
         }
-        const pathOnDisk = await downloadFile(downloadUrl, outputDir, filename);
+
+        const progressCallback = (progress: ProgressInfo) => {
+          if (bulkSpinner) {
+            const progressPercent = progress.percentage.toFixed(1);
+            const speed = formatSpeed(progress.speed);
+            bulkSpinner.message(
+              `[${index + 1}/${extensions.length}] ${displayName} - ${progressPercent}% @ ${speed}`,
+            );
+          }
+        };
+
+        const pathOnDisk = await downloadFile(
+          downloadUrl,
+          effectiveOutputDir,
+          filename,
+          progressCallback,
+        );
         const stats = await fs.stat(pathOnDisk);
         const elapsedMs = Date.now() - startMs;
-        if (spinner) {
-          const sizeInKB = Math.round(stats.size / 1024);
-          spinner.stop(
-            `[${index + 1}/${extensions.length}] Completed ${filename} (${sizeInKB} KB)`,
+
+        let checksum: string | undefined;
+        let verificationStatus = "";
+
+        // Generate checksum if requested
+        if (options.checksum) {
+          try {
+            checksum = await generateSHA256(pathOnDisk);
+          } catch {
+            // Continue without checksum rather than failing the download
+          }
+        }
+
+        // Verify checksum if provided
+        if (options.verifyChecksum) {
+          try {
+            const isValid = await verifySHA256(pathOnDisk, options.verifyChecksum);
+            if (isValid) {
+              verificationStatus = " ✅";
+            } else {
+              verificationStatus = " ❌";
+              completedCount++;
+              if (bulkSpinner) {
+                bulkSpinner.message(
+                  `[${completedCount}/${extensions.length}] ❌ ${displayName} - Checksum verification failed`,
+                );
+              }
+              failureCount++;
+              failedDownloads.push(`${displayName}: Checksum verification failed`);
+              results.push({
+                index,
+                url: ext.url,
+                version: ext.version,
+                status: "failure",
+                error: "Checksum verification failed",
+                elapsedMs,
+              });
+              throw new Error("Checksum verification failed");
+            }
+          } catch {
+            verificationStatus = " ⚠️";
+            // Continue with warning but don't fail the download
+          }
+        }
+
+        // Complete successfully
+        completedCount++;
+        const sizeInKB = Math.round(stats.size / 1024);
+        const checksumInfo = checksum ? ` - SHA256: ${checksum.slice(0, 8)}...` : "";
+        if (bulkSpinner) {
+          bulkSpinner.message(
+            `[${completedCount}/${extensions.length}] ✅ ${displayName} (${sizeInKB} KB)${checksumInfo}${verificationStatus}`,
           );
         }
+
         successCount++;
         results.push({
           index,
@@ -245,25 +401,24 @@ export async function downloadBulkExtensions(
           filePath: pathOnDisk,
           filename,
           sizeBytes: stats.size,
+          checksum,
+          verificationPassed: options.verifyChecksum ? verificationStatus === " ✅" : undefined,
           elapsedMs,
         });
         return;
       } catch (e) {
         const errorMsg = e instanceof Error ? e.message : "Unknown error";
         if (attempt <= maxRetries) {
-          if (spinner) {
-            spinner.stop(
-              `[${index + 1}/${extensions.length}] ⚠️  ${displayName} failed (attempt ${attempt}). Retrying...`,
-              1,
-            );
-          }
           const backoff = retryDelayMs * Math.pow(2, attempt - 1);
           await delay(backoff);
           continue;
         } else {
           const elapsedMs = Date.now() - startMs;
-          if (spinner) {
-            spinner.stop(`[${index + 1}/${extensions.length}] ❌ Failed: ${displayName}`, 1);
+          completedCount++;
+          if (bulkSpinner) {
+            bulkSpinner.message(
+              `[${completedCount}/${extensions.length}] ❌ ${displayName} - Failed: ${errorMsg}`,
+            );
           }
           failureCount++;
           failedDownloads.push(`${displayName}: ${errorMsg}`);
@@ -275,32 +430,35 @@ export async function downloadBulkExtensions(
             error: errorMsg,
             elapsedMs,
           });
-          return;
+          throw new Error(errorMsg);
         }
       }
     }
   }
 
-  // Simple concurrency limiter
-  let current = 0;
-  async function worker() {
-    while (true) {
-      const i = current++;
-      if (i >= extensions.length) return;
-      const ext = extensions[i];
-      await downloadWithRetry(ext, i);
+  // Execute downloads sequentially for clean progress display
+  for (let i = 0; i < extensions.length; i++) {
+    const ext = extensions[i];
+    try {
+      await downloadSingleExtension(ext, i);
+    } catch {
+      // Error already handled in downloadSingleExtension
     }
   }
 
-  const workers = Array.from({ length: parallel }, () => worker());
-  await Promise.all(workers);
+  // Stop the spinner
+  if (bulkSpinner) {
+    bulkSpinner.stop(
+      `Bulk download completed! ${successCount} successful, ${failureCount} failed.`,
+    );
+  }
 
   // Show final summary
   const summaryLines = [
     `Total extensions: ${extensions.length}`,
     `✅ Successful: ${successCount}`,
     `❌ Failed: ${failureCount}`,
-    `📁 Output directory: ${outputDir}`,
+    `📁 Output directory: ${effectiveOutputDir}`,
   ];
 
   if (failedDownloads.length > 0) {
@@ -312,14 +470,10 @@ export async function downloadBulkExtensions(
 
   if (!options.quiet) {
     p.note(summaryLines.join("\n"), "Download Summary");
-  }
 
-  if (successCount > 0) {
-    if (!options.quiet) {
+    if (successCount > 0) {
       p.outro(`🎉 Bulk download completed! ${successCount} extension(s) downloaded successfully.`);
-    }
-  } else {
-    if (!options.quiet) {
+    } else {
       p.outro("❌ No extensions were downloaded successfully.");
     }
   }
@@ -330,7 +484,7 @@ export async function downloadBulkExtensions(
       total: extensions.length,
       success: successCount,
       failed: failureCount,
-      outputDir,
+      outputDir: effectiveOutputDir,
       results,
     };
     await fs.outputFile(options.summaryPath, JSON.stringify(summary, null, 2), "utf-8");
