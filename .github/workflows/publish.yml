@@ -38,8 +38,20 @@ jobs:
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
 
-          # Get commit messages since last tag
-          COMMITS=$(git log --oneline $(git describe --tags --abbrev=0 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD)
+          # Get commit messages since last tag OR since last 5 commits if no tags
+          if git describe --tags --abbrev=0 >/dev/null 2>&1; then
+            SINCE_REF=$(git describe --tags --abbrev=0)
+          else
+            SINCE_REF=$(git rev-list --max-parents=0 HEAD)
+          fi
+          COMMITS=$(git log --oneline ${SINCE_REF}..HEAD)
+
+          # Only process if there are new commits
+          if [ -z "$COMMITS" ]; then
+            echo "bump=none" >> $GITHUB_OUTPUT
+            echo "No new commits since last tag"
+            exit 0
+          fi
 
           # Determine version bump based on conventional commits
           # Prioritize BREAKING changes first, then features, then fixes/chore/etc
