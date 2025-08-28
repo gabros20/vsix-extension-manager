@@ -83,7 +83,7 @@ jobs:
           elif echo "$COMMITS" | grep -Eq "^[a-f0-9]+ feat(\(|:| )"; then
               echo "bump=minor" >> $GITHUB_OUTPUT
               echo "New features detected, bumping minor version"
-          elif echo "$COMMITS" | grep -Eq "^[a-f0-9]+ (fix|chore|docs|style|refactor|perf|test)(\(|:| )"; then
+          elif echo "$COMMITS" | grep -Eq "^[a-f0-9]+ (fix|chore|docs|style|refactor|perf|test|ci|build)(\(|:| )"; then
               echo "bump=patch" >> $GITHUB_OUTPUT
               echo "Bug fixes or minor changes detected, bumping patch version"
           else
