@@ -140,7 +140,9 @@ jobs:
           git add package.json
           git commit -m "chore: bump version to ${{ steps.ensure.outputs.final_version }}"
           git tag v${{ steps.ensure.outputs.final_version }}
-          git push origin main --tags
+          # We are on a detached HEAD (merge commit). Push the commit to main explicitly and push tags.
+          git push origin HEAD:refs/heads/main
+          git push origin --tags
 
       - name: Create GitHub Release
         if: steps.version.outputs.bump != 'none'
