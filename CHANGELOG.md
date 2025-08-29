@@ -1,3 +1,9 @@
+# [1.8.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.7.0...v1.8.0) (2025-08-29)
+
+### Features
+
+- add minimal interactive launcher; unify outputs; improve import/export UX ([08f3446](https://github.com/gabros20/vsix-extension-manager/commit/08f34468132a3c066a9392e0e7cb63b33b497ba8))
+
 # [1.7.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.6.0...v1.7.0) (2025-08-29)
 
 ### Bug Fixes
