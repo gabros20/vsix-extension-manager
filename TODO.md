@@ -12,14 +12,9 @@
 
 ## High-priority next steps 🔜
 
-- [ ] Introduce feature-oriented modules under `src/features/`
-  - `features/download` (single + bulk)
-  - `features/export` (installed + workspace)
-  - `features/versions`
-  - Re-export public APIs via `src/index.ts`
-- [ ] Add configuration support (file + env): defaults, cache dir, concurrency, checksum
-- [ ] Improve error taxonomy and messages (typed errors, actionable suggestions)
-- [ ] Add JSON Schema validation for bulk files and list formats
+- [x] Add configuration support (file + env): defaults, cache dir, concurrency, checksum
+- [x] Improve error taxonomy and messages (typed errors, actionable suggestions)
+- [x] Add JSON Schema validation for bulk files and list formats
 
 ## Medium-term improvements 🧭
 
@@ -43,4 +38,33 @@
 
 ---
 
-Last updated: Core refactor to solidify foundation for an extensible VSIX manager CLI.
+**Major Update - High-Priority Features Completed:**
+
+**Configuration System:**
+
+- Multi-layer config loading (CLI > ENV > FILE > DEFAULTS) with Zod validation
+- Support for `.vsixrc`, `vsix.config.json/yaml` files
+- Environment variables (`VSIX_*` prefix) with automatic type conversion
+- Global `--config` option for custom config file paths
+
+**Typed Error System:**
+
+- Categorized errors (Network, FileSystem, Validation, Parsing, Registry, etc.)
+- Structured error codes and actionable suggestions for recovery
+- Rich error formatting with icons, colors, and detailed context
+- Enhanced error handling throughout the CLI with specific error types
+
+**JSON Schema Validation:**
+
+- Comprehensive schemas for bulk files, extension lists, and configuration
+- Format validation for extension IDs, URLs, versions, and checksums
+- Detailed path-specific validation errors with helpful suggestions
+- Support for multiple formats (VS Code extensions.json, arrays, objects)
+
+**CLI Integration:**
+
+- All commands now use configuration system automatically
+- Improved error messages and user experience
+- Better validation and error recovery throughout the application
+
+Last updated: Enhanced foundation with configuration, error handling, and validation systems.

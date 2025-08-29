@@ -2,7 +2,37 @@
 
 import { Command } from "commander";
 import { downloadVsix } from "./commands/download";
+import { loadConfig, convertCliToConfig, type Config } from "./config/constants";
+import { initializeErrorHandler, handleErrorAndExit } from "./core/errors";
 import packageJson from "../package.json";
+
+/**
+ * Wrap command action with configuration loading and error handling
+ */
+async function withConfigAndErrorHandling<T extends Record<string, unknown>>(
+  action: (config: Config, options: T) => Promise<void>,
+  options: T,
+): Promise<void> {
+  try {
+    // Get global config file path if set
+    const globalOpts = program.opts();
+    const configFilePath = globalOpts.config;
+
+    // Convert CLI options to config format
+    const cliConfig = convertCliToConfig(options);
+
+    // Load full configuration (CLI > ENV > FILE > DEFAULTS)
+    const config = await loadConfig(cliConfig, configFilePath);
+
+    // Update error handler with config settings
+    initializeErrorHandler(config.quiet, config.json);
+
+    // Execute command with loaded config
+    await action(config, options);
+  } catch (error) {
+    handleErrorAndExit(error instanceof Error ? error : new Error(String(error)));
+  }
+}
 
 const program = new Command();
 
@@ -11,7 +41,8 @@ program
   .description(
     "VSIX Extension Manager: download, list versions, export, and manage VS Code/Cursor extensions",
   )
-  .version(packageJson.version);
+  .version(packageJson.version)
+  .option("--config <path>", "Path to configuration file");
 
 program
   .command("download")
@@ -38,7 +69,11 @@ program
   .option("--cache-dir <path>", "Cache directory for downloads (overrides output)")
   .option("--checksum", "Generate SHA256 checksum for downloaded files", false)
   .option("--verify-checksum <hash>", "Verify downloaded file against provided SHA256 hash")
-  .action(downloadVsix);
+  .action(async (opts) => {
+    await withConfigAndErrorHandling(async (config, options) => {
+      await downloadVsix({ ...options, ...config });
+    }, opts);
+  });
 
 program
   .command("versions")
@@ -46,8 +81,10 @@ program
   .option("-u, --url <url>", "Marketplace URL of the extension")
   .option("--json", "Output JSON", false)
   .action(async (opts) => {
-    const { listVersions } = await import("./commands/versions");
-    await listVersions(opts);
+    await withConfigAndErrorHandling(async (config, options) => {
+      const { listVersions } = await import("./commands/versions");
+      await listVersions({ ...options, ...config });
+    }, opts);
   });
 
 program
@@ -60,8 +97,10 @@ program
   .option("-w, --workspace", "Export workspace extensions.json instead of installed", false)
   .option("--json", "Machine-readable output", false)
   .action(async (opts) => {
-    const { exportInstalled } = await import("./commands/exportInstalled");
-    await exportInstalled(opts);
+    await withConfigAndErrorHandling(async (config, options) => {
+      const { exportInstalled } = await import("./commands/exportInstalled");
+      await exportInstalled({ ...options, ...config });
+    }, opts);
   });
 
 program
@@ -85,13 +124,17 @@ program
   .option("--cache-dir <path>", "Cache directory for downloads")
   .option("--checksum", "Generate SHA256 checksum for downloaded files", false)
   .action(async (opts) => {
-    const { fromList } = await import("./commands/fromList");
-    await fromList(opts);
+    await withConfigAndErrorHandling(async (config, options) => {
+      const { fromList } = await import("./commands/fromList");
+      await fromList({ ...options, ...config });
+    }, opts);
   });
 
 // Default command - interactive mode
-program.action(() => {
-  downloadVsix({});
+program.action(async () => {
+  await withConfigAndErrorHandling(async (config) => {
+    await downloadVsix(config);
+  }, {});
 });
 
 program.parse();
