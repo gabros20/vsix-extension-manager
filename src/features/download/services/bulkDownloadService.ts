@@ -25,7 +25,7 @@ import {
 import { ProgressInfo, formatBytes, createProgressBar } from "../../../core/ui/progress";
 import { truncateText } from "../../../core/helpers";
 import type { BulkOptions } from "../../../core/types";
-import { validate, type ValidationContext } from "../../../core/validation";
+import { validate } from "../../../core/validation";
 import { ValidationError } from "../../../core/errors";
 
 interface SpinnerInstance {
@@ -63,14 +63,8 @@ export interface BulkDownloadResult {
 /**
  * Validate JSON structure and content for bulk downloads using JSON Schema
  */
-export function validateBulkJson(data: unknown, filePath?: string): BulkValidationResult {
-  const context: ValidationContext = {
-    source: filePath,
-    format: "json",
-    operation: "bulk download",
-  };
-
-  const result = validate.bulkExtensions(data, context);
+export function validateBulkJson(data: unknown): BulkValidationResult {
+  const result = validate.bulkExtensions(data);
 
   if (result.valid) {
     // Handle both array and object wrapper formats
@@ -119,7 +113,7 @@ export async function readBulkJsonFile(filePath: string): Promise<BulkValidation
       );
     }
 
-    return validateBulkJson(data, filePath);
+    return validateBulkJson(data);
   } catch (error) {
     if (
       error instanceof Error &&

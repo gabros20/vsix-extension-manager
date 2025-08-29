@@ -1,5 +1,5 @@
 import type { ExportFormat } from "../../../core/types";
-import { validate, type ValidationContext } from "../../../core/validation";
+import { validate } from "../../../core/validation";
 import { ParsingErrors } from "../../../core/errors";
 
 export interface VSCodeExtensionsJson {
@@ -26,19 +26,13 @@ export function parseExtensionsList(
     }
   }
 
-  const context: ValidationContext = {
-    source: filePath,
-    format,
-    operation: "extension list parsing",
-  };
-
   switch (format) {
     case "json":
       try {
         const parsed = JSON.parse(trimmedContent);
 
         // Try to validate as extension list
-        const result = validate.extensionList(parsed, context);
+        const result = validate.extensionList(parsed);
 
         if (result.valid) {
           const data = result.data!;
@@ -88,7 +82,7 @@ export function parseExtensionsList(
     case "extensions.json":
       try {
         const parsed = JSON.parse(trimmedContent);
-        const result = validate.vscodeExtensionsJson(parsed, context);
+        const result = validate.vscodeExtensionsJson(parsed);
 
         if (result.valid) {
           return result.data!.recommendations;

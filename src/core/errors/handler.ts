@@ -2,6 +2,7 @@
 
 import * as p from "@clack/prompts";
 import { VsixError, ErrorSeverity } from "./types";
+import { FileSystemErrors, NetworkErrors } from "./definitions";
 
 /**
  * Error formatting options
@@ -256,31 +257,26 @@ export function handleErrorAndExit(
 export function enhanceError(error: Error): VsixError | Error {
   // Enhance common error patterns
   if (error.message.includes("ENOENT")) {
-    const { FileSystemErrors } = await import("./definitions.js");
     const match = error.message.match(/ENOENT.*?'([^']+)'/);
     const path = match ? match[1] : "unknown";
     return FileSystemErrors.fileNotFound(path);
   }
 
   if (error.message.includes("EACCES") || error.message.includes("permission denied")) {
-    const { FileSystemErrors } = await import("./definitions.js");
     const match = error.message.match(/'([^']+)'/);
     const path = match ? match[1] : "unknown";
     return FileSystemErrors.permissionDenied(path, "access");
   }
 
   if (error.message.includes("timeout") || error.message.includes("ETIMEDOUT")) {
-    const { NetworkErrors } = await import("./definitions.js");
     return NetworkErrors.connectionTimeout();
   }
 
   if (error.message.includes("ECONNREFUSED")) {
-    const { NetworkErrors } = await import("./definitions.js");
     return NetworkErrors.connectionRefused();
   }
 
   if (error.message.includes("404") || error.message.includes("Not Found")) {
-    const { NetworkErrors } = await import("./definitions.js");
     return NetworkErrors.notFound("resource");
   }
 

@@ -84,7 +84,10 @@ Notes:
 
 - Single download uses `singleDownloadService.ts`
 - Bulk download uses `bulkDownloadService.ts` and validates input JSON structure
-- Bulk currently executes sequentially; the `parallel` option is reserved but not yet implemented
+- Bulk execution model:
+  - Interactive UI (spinners/prompts): sequential for clean UX
+  - Non-interactive (flag-based, e.g., `--file`): parallel with bounded concurrency via `--parallel` (default 3)
+  - Concurrency bounds are validated (1–20) and can be set via `VSIX_PARALLEL`
 
 ### Export Flow
 
@@ -154,7 +157,7 @@ User-facing overview in README is intentionally brief; this section contains the
 
 ## Behavior Notes and Limitations
 
-- Bulk downloads run sequentially today. The `--parallel` option is accepted but currently ignored. Future work will implement controlled concurrency.
+- Bulk downloads: interactive flows remain sequential; non-interactive bulk supports parallel downloads with bounded concurrency (`--parallel`, default 3, range 1–20).
 - `--json` output is supported for some commands and error handling, but not all interactive flows emit strict machine-readable logs yet.
 - Source inference works for both Marketplace and OpenVSX URLs; `--source` can override.
 
