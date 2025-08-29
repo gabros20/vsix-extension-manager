@@ -1,3 +1,13 @@
+# [1.7.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.6.0...v1.7.0) (2025-08-29)
+
+### Bug Fixes
+
+- clean up unused validation context and update architecture for parallel bulk ([c8940de](https://github.com/gabros20/vsix-extension-manager/commit/c8940de5ce262a127d9bf144cba62893e60a9198))
+
+### Features
+
+- **download:** add parallelism for non-interactive bulk; keep interactive sequential ([f3f43d9](https://github.com/gabros20/vsix-extension-manager/commit/f3f43d99acaf6b1cffecfb50af2076d41c9f4873))
+
 # [1.6.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.5.1...v1.6.0) (2025-08-29)
 
 ### Bug Fixes
