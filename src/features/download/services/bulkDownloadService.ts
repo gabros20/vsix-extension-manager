@@ -25,6 +25,8 @@ import {
 import { ProgressInfo, formatBytes, createProgressBar } from "../../../core/ui/progress";
 import { truncateText } from "../../../core/helpers";
 import type { BulkOptions } from "../../../core/types";
+import { validate, type ValidationContext } from "../../../core/validation";
+import { ValidationError } from "../../../core/errors";
 
 interface SpinnerInstance {
   start: (message: string) => void;
@@ -59,51 +61,38 @@ export interface BulkDownloadResult {
 }
 
 /**
- * Validate JSON structure and content for bulk downloads
+ * Validate JSON structure and content for bulk downloads using JSON Schema
  */
-export function validateBulkJson(data: unknown): BulkValidationResult {
-  const errors: string[] = [];
-  const validItems: BulkExtensionItem[] = [];
+export function validateBulkJson(data: unknown, filePath?: string): BulkValidationResult {
+  const context: ValidationContext = {
+    source: filePath,
+    format: "json",
+    operation: "bulk download",
+  };
 
-  if (!Array.isArray(data)) {
+  const result = validate.bulkExtensions(data, context);
+
+  if (result.valid) {
+    // Handle both array and object wrapper formats
+    const validItems = Array.isArray(result.data) ? result.data : result.data?.extensions || [];
+
     return {
-      isValid: false,
-      errors: ["JSON must be an array of extension objects"],
-      validItems: [],
+      isValid: true,
+      errors: [],
+      validItems,
     };
   }
-  if (data.length === 0) {
-    return { isValid: false, errors: ["JSON array cannot be empty"], validItems: [] };
-  }
 
-  data.forEach((item, index) => {
-    const itemErrors: string[] = [];
-    if (!item.url || typeof item.url !== "string") {
-      itemErrors.push(`Item ${index + 1}: Missing or invalid 'url' field`);
-    } else {
-      try {
-        parseExtensionUrl(item.url);
-      } catch (e) {
-        itemErrors.push(
-          `Item ${index + 1}: URL must be a valid Marketplace or OpenVSX URL (${e instanceof Error ? e.message : "invalid"})`,
-        );
-      }
-    }
+  // Convert validation errors to string messages
+  const errors = result.errors.map((error) =>
+    error.path ? `${error.path}: ${error.message}` : error.message,
+  );
 
-    if (!item.version || typeof item.version !== "string") {
-      itemErrors.push(`Item ${index + 1}: Missing or invalid 'version' field`);
-    } else if (item.version.trim().length === 0) {
-      itemErrors.push(`Item ${index + 1}: Version cannot be empty`);
-    }
-
-    if (itemErrors.length > 0) {
-      errors.push(...itemErrors);
-    } else {
-      validItems.push(item);
-    }
-  });
-
-  return { isValid: errors.length === 0, errors, validItems };
+  return {
+    isValid: false,
+    errors,
+    validItems: [],
+  };
 }
 
 /**
@@ -113,23 +102,36 @@ export async function readBulkJsonFile(filePath: string): Promise<BulkValidation
   try {
     const exists = await fs.pathExists(filePath);
     if (!exists) {
-      return { isValid: false, errors: [`File not found: ${filePath}`], validItems: [] };
+      const { FileSystemErrors } = await import("../../../core/errors");
+      throw FileSystemErrors.fileNotFound(filePath);
     }
+
     const content = await fs.readFile(filePath, "utf-8");
     let data;
+
     try {
       data = JSON.parse(content);
     } catch (parseError) {
+      const { ParsingErrors } = await import("../../../core/errors");
+      throw ParsingErrors.invalidJson(
+        filePath,
+        parseError instanceof Error ? parseError.message : undefined,
+      );
+    }
+
+    return validateBulkJson(data, filePath);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.name === "FileSystemError" || error.name === "ValidationError")
+    ) {
       return {
         isValid: false,
-        errors: [
-          `Invalid JSON format: ${parseError instanceof Error ? parseError.message : "Unknown error"}`,
-        ],
+        errors: [error.message],
         validItems: [],
       };
     }
-    return validateBulkJson(data);
-  } catch (error) {
+
     return {
       isValid: false,
       errors: [`Error reading file: ${error instanceof Error ? error.message : "Unknown error"}`],
@@ -181,7 +183,18 @@ export async function downloadBulkExtensions(
   let failureCount = 0;
   const failedDownloads: string[] = [];
   if (options.verifyChecksum && !isValidSHA256(options.verifyChecksum)) {
-    throw new Error("Invalid SHA256 hash format. Expected 64 hexadecimal characters.");
+    throw new ValidationError(
+      "Invalid SHA256 hash format",
+      "VAL_INVALID_CHECKSUM",
+      [
+        { action: "Check format", description: "SHA256 hash must be 64 hexadecimal characters" },
+        {
+          action: "Verify source",
+          description: "Ensure the checksum is copied correctly from source",
+        },
+      ],
+      { hash: options.verifyChecksum },
+    );
   }
 
   const results: BulkDownloadResult[] = [];
@@ -372,11 +385,32 @@ export async function downloadBulkExtensions(
     }
   }
 
-  for (let i = 0; i < extensions.length; i++) {
-    const ext = extensions[i];
-    try {
-      await downloadSingle(ext, i);
-    } catch {}
+  // Execute downloads with optional limited concurrency
+  const concurrency = Math.max(1, Math.floor(options.parallel ?? 1));
+  if (concurrency <= 1) {
+    for (let i = 0; i < extensions.length; i++) {
+      const ext = extensions[i];
+      try {
+        await downloadSingle(ext, i);
+      } catch {}
+    }
+  } else {
+    let currentIndex = 0;
+    const worker = async () => {
+      while (true) {
+        const index = currentIndex++;
+        if (index >= extensions.length) break;
+        const ext = extensions[index];
+        try {
+          await downloadSingle(ext, index);
+        } catch {}
+      }
+    };
+    const workers: Promise<void>[] = [];
+    for (let w = 0; w < concurrency; w++) {
+      workers.push(worker());
+    }
+    await Promise.all(workers);
   }
 
   if (bulkSpinner) {

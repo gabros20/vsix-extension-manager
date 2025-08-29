@@ -77,7 +77,11 @@ export async function fromList(options: FromListOptions) {
     // Parse extensions list
     let extensionIds: string[];
     try {
-      extensionIds = parseExtensionsList(content, format as "json" | "txt" | "extensions.json");
+      extensionIds = parseExtensionsList(
+        content,
+        format as "json" | "txt" | "extensions.json",
+        filePath,
+      );
     } catch (error) {
       p.log.error(
         `❌ Failed to parse file: ${error instanceof Error ? error.message : String(error)}`,

@@ -417,7 +417,12 @@ async function downloadBulkFromJson(options: DownloadOptions) {
     p.log.info("🔍 Reading and validating JSON file...");
   }
 
-  const bulkOptions: BulkOptions = buildBulkOptionsFromCli(options);
+  // Interactive bulk (no --file provided initially) should run sequentially
+  const isInteractive = !options.file;
+  const bulkOptions: BulkOptions = buildBulkOptionsFromCli(
+    options,
+    isInteractive ? { parallel: 1, retry: 2, retryDelay: 1000 } : undefined,
+  );
 
   await downloadBulkExtensions(jsonPathStr as string, outputDir as string, bulkOptions);
 }

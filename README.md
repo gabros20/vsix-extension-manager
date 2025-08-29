@@ -18,40 +18,54 @@ Recently, Microsoft quietly blocked Cursor (an AI-powered VSCode fork) from acce
 - **Bulk Setup**: Quickly set up new development environments with all your preferred extensions
 - **Backup Strategy**: Create local backups of extensions you depend on
 
-### Perfect For
-
-- Developers using Cursor who need to maintain their extension workflow
-- Teams wanting to standardize development environments
-- Offline development scenarios
-- Extension version management and rollbacks
-
 ## 🚀 Features
 
-- **Beautiful CLI**: Stunning interface powered by [Clack](https://github.com/bombshell-dev/clack)
-- **Dual Download Modes**: Choose between single extension or bulk download from JSON
-- **Interactive Prompts**: Elegant bordered prompts with validation
-- **Bulk Download**: Download multiple extensions at once with progress tracking
-- **JSON Validation**: Comprehensive validation for bulk download files
-- **Non-Interactive Bulk Mode**: Use `--file` to run bulk downloads without prompts
-- **Sequential Downloads**: Clean, readable progress with `--retry`/`--retry-delay` options
-- **Summary Output**: Write machine-readable results with `--summary <path>.json`
-- **Modern Stack**: Built with TypeScript, Commander.js, and Clack
-- **Error Handling**: Comprehensive error handling and validation
-- **Progress Indicators**: Beautiful spinners and visual feedback
-- **Flexible Output**: Customizable download directory (defaults to `./downloads` in current directory)
-- **Custom Filename Templates**: Organize downloads with variable substitution (`{name}`, `{version}`, `{source}`, `{publisher}`)
-- **Cache Directory Support**: Persistent storage with skip/overwrite behavior for efficient re-downloads
-- **Smart File Handling**: Skip existing files or overwrite with intelligent existence checking
-- **Progress Indicators**: Real-time download progress with file size, speed, and progress bars
-- **Checksum Verification**: Generate SHA256 checksums and verify file integrity
-- **Smart Parsing**: Extracts extension info from Marketplace and OpenVSX URLs
-- **Interactive Source Selection**: Auto-detects source from URL with ability to switch
-- **Mixed-Source Bulk**: Use Marketplace and OpenVSX URLs in the same JSON list
-- **Source-Aware "latest"**: Resolve `latest` for both Marketplace and OpenVSX (single and bulk)
-- **Versions Command (Both Sources)**: List versions from Marketplace or OpenVSX via URL
-- **Export Installed Extensions**: Export currently installed extensions from VS Code or Cursor in multiple formats
-- **Import from Lists**: Download extensions from text files, JSON arrays, or VS Code extensions.json
-- **Seamless Editor Integration**: Export extensions from VS Code or Cursor and import to another environment
+### Core Functionality
+
+- **Single download**: Fetch a VSIX by Marketplace or OpenVSX URL
+- **Bulk download (JSON)**: Process a list of `{ url, version, source? }` entries; sequential with retries/backoff
+- **Download from lists**: Parse `.txt`, JSON arrays, or VS Code `extensions.json` via `from-list`
+- **Version resolution**: Resolve `latest` (stable by default) or prefer pre-release with `--pre-release`
+- **Source selection**: Works with Marketplace and OpenVSX; auto-detect from URL or override with `--source`
+- **Versions command**: List available versions for an extension (`versions`)
+- **Export installed**: Export from VS Code or Cursor to `json`, `txt`, or `extensions.json`
+- **Checksums**: Generate SHA256 or verify against a provided hash
+- **Output control**: Choose output or cache directory, `--skip-existing` / `--overwrite`, custom filename templates
+- **Progress & summary**: Show progress bars and optionally write a JSON summary (`--summary`)
+
+### Configuration (optional)
+
+Save your favorite flags as defaults so you don’t repeat them on every command.
+
+- **Where to put defaults**: create a `.vsixrc.json` (or `.yaml`) in your project or home folder, or pass `--config <path>` to point to a file.
+- **Precedence**: CLI flags > environment variables (`VSIX_*`) > config file > built‑in defaults.
+- **Common defaults**: `outputDir`/`cacheDir`, `skipExisting`/`overwrite`, `filenameTemplate`, `retry`/`retryDelay`, `quiet/json`, `source`/`preRelease`, `checksum`.
+
+Quick example:
+
+```json
+{
+  "outputDir": "./downloads",
+  "skipExisting": true
+}
+```
+
+Now `vsix-extension-manager download --file ./extensions.json` will use these values unless you override them with flags. See detailed examples in the ⚙️ Configuration section below.
+
+### Registry & Source Support
+
+- **🔗 Smart Parsing**: Extracts extension info from Marketplace and OpenVSX URLs
+- **🎛️ Interactive Source Selection**: Auto-detects source from URL with ability to switch
+- **🌐 Mixed-Source Bulk**: Use Marketplace and OpenVSX URLs in the same JSON list
+- **🎯 Source-Aware "latest"**: Resolve `latest` for both Marketplace and OpenVSX (single and bulk)
+- **📋 Versions Command**: List versions from Marketplace or OpenVSX via URL
+
+### Import/Export Workflows
+
+- **📤 Export Installed Extensions**: Export currently installed extensions from VS Code or Cursor in multiple formats
+- **📥 Import from Lists**: Download extensions from text files, JSON arrays, or VS Code extensions.json
+- **🔄 Seamless Editor Integration**: Export extensions from VS Code or Cursor and import to another environment
+- **👥 Team Collaboration**: Share extension setups via standardized export formats
 
 ## 📦 Installation
 
@@ -119,6 +133,8 @@ vsix-extension-manager download --url "..." --version "1.2.3" --output "./my-ext
 ### Bulk Download from JSON
 
 For downloading multiple extensions, create a JSON file with the extension details and use bulk mode.
+
+> Note: Interactive bulk runs sequentially for a clean UI. Non-interactive bulk (`--file`) supports parallel downloads via `--parallel <n>`.
 
 #### Interactive Bulk Download
 
@@ -326,7 +342,7 @@ vsix-extension-manager --version                   # Show version
   - In interactive mode, the source defaults from the URL but you can change it
 - `-o, --output <path>` - Output directory (default: ./downloads)
 - `-f, --file <path>` - Bulk JSON file path (non-interactive)
-- `--parallel <n>` - Number of parallel downloads in bulk mode (default: 4)
+- `--parallel <n>` - Number of parallel downloads in bulk mode (reserved; currently sequential)
 - `--retry <n>` - Retry attempts per item in bulk mode (default: 2)
 - `--retry-delay <ms>` - Base delay between retries in ms (exponential backoff)
 - `--skip-existing` - Skip downloads if target file already exists
@@ -358,6 +374,7 @@ vsix-extension-manager --version                   # Show version
 
 - `-h, --help` - Display help information
 - `-V, --version` - Display version number
+- `--config <path>` - Path to configuration file (overrides auto-discovery)
 
 ### Versions Command
 
@@ -391,6 +408,218 @@ vsix-extension-manager download \
 ```
 
 Note: `auto` source is reserved for future fallback behavior. Currently, set `--source` explicitly to `marketplace` or `open-vsx`.
+
+## ⚙️ Configuration
+
+VSIX Extension Manager supports a powerful multi-layer configuration system that allows you to set defaults and customize behavior across all commands.
+
+### Configuration Priority (Highest to Lowest)
+
+1. **CLI Arguments** - Command line options always take precedence
+2. **Environment Variables** - `VSIX_*` prefixed environment variables
+3. **Configuration Files** - Auto-discovered or explicitly specified config files
+4. **Built-in Defaults** - Sensible defaults for all options
+
+### Configuration Files
+
+#### Supported Formats & Locations
+
+VSIX Extension Manager automatically searches for configuration files in this order:
+
+1. **Current directory**: `.vsixrc`, `.vsixrc.json`, `.vsixrc.yaml`, `.vsixrc.yml`
+2. **Current directory `.config/`**: `vsix.config.json`, `vsix.config.yaml`, `vsix.config.yml`
+3. **User config directory**: `~/.config/vsix-extension-manager/` (same filenames)
+4. **User home directory**: `~/.vsixrc`, `~/.vsixrc.json`, etc.
+
+#### Configuration File Example
+
+**JSON Format** (`.vsixrc.json` or `vsix.config.json`):
+
+```json
+{
+  "outputDir": "./my-extensions",
+  "cacheDir": "~/.vsix-cache",
+  "parallel": 5,
+  "retry": 3,
+  "retryDelay": 2000,
+  "skipExisting": true,
+  "filenameTemplate": "{source}/{publisher}-{name}-v{version}.vsix",
+  "quiet": false,
+  "source": "marketplace",
+  "checksum": true,
+  "editor": "cursor"
+}
+```
+
+**YAML Format** (`.vsixrc.yaml` or `vsix.config.yaml`):
+
+```yaml
+# VSIX Extension Manager Configuration
+outputDir: "./my-extensions"
+cacheDir: "~/.vsix-cache"
+parallel: 5
+retry: 3
+retryDelay: 2000
+skipExisting: true
+filenameTemplate: "{source}/{publisher}-{name}-v{version}.vsix"
+quiet: false
+source: "marketplace"
+checksum: true
+editor: "cursor"
+```
+
+#### Available Configuration Options
+
+| Option             | Type    | Default                          | Description                                       |
+| ------------------ | ------- | -------------------------------- | ------------------------------------------------- |
+| `outputDir`        | string  | `"./downloads"`                  | Default output directory for downloads            |
+| `cacheDir`         | string  | `undefined`                      | Cache directory (overrides outputDir)             |
+| `parallel`         | number  | `3`                              | Parallel workers for non-interactive bulk (1-20)  |
+| `retry`            | number  | `2`                              | Number of retry attempts (0-10)                   |
+| `retryDelay`       | number  | `1000`                           | Delay between retries in milliseconds             |
+| `skipExisting`     | boolean | `false`                          | Skip downloads if file already exists             |
+| `overwrite`        | boolean | `false`                          | Overwrite existing files                          |
+| `filenameTemplate` | string  | `"{name}-{version}.vsix"`        | Custom filename template                          |
+| `quiet`            | boolean | `false`                          | Reduce output verbosity                           |
+| `json`             | boolean | `false`                          | Output in JSON format                             |
+| `source`           | string  | `"marketplace"`                  | Default source: `marketplace`, `open-vsx`, `auto` |
+| `preRelease`       | boolean | `false`                          | Prefer pre-release versions                       |
+| `checksum`         | boolean | `false`                          | Generate checksums for downloads                  |
+| `timeout`          | number  | `30000`                          | HTTP timeout in milliseconds                      |
+| `userAgent`        | string  | `"vsix-extension-manager/1.5.0"` | HTTP User-Agent string                            |
+| `editor`           | string  | `"auto"`                         | Default editor: `vscode`, `cursor`, `auto`        |
+
+### Environment Variables
+
+Set configuration via environment variables using the `VSIX_` prefix:
+
+```bash
+# Basic settings
+export VSIX_OUTPUT_DIR="./team-extensions"
+export VSIX_CACHE_DIR="~/.shared-vsix-cache"
+export VSIX_PARALLEL=5  # applies to non-interactive bulk mode
+export VSIX_RETRY=3
+
+# File handling
+export VSIX_SKIP_EXISTING=true
+export VSIX_FILENAME_TEMPLATE="{source}/{publisher}-{name}.vsix"
+
+# Source and quality
+export VSIX_SOURCE="marketplace"
+export VSIX_CHECKSUM=true
+export VSIX_EDITOR="cursor"
+
+# Output preferences
+export VSIX_QUIET=false
+export VSIX_JSON=false
+```
+
+**Environment Variable Reference:**
+
+| Environment Variable     | Config Option      | Type    | Example                   |
+| ------------------------ | ------------------ | ------- | ------------------------- |
+| `VSIX_OUTPUT_DIR`        | `outputDir`        | string  | `"./downloads"`           |
+| `VSIX_CACHE_DIR`         | `cacheDir`         | string  | `"~/.vsix-cache"`         |
+| `VSIX_PARALLEL`          | `parallel`         | number  | `"5"`                     |
+| `VSIX_RETRY`             | `retry`            | number  | `"3"`                     |
+| `VSIX_RETRY_DELAY`       | `retryDelay`       | number  | `"2000"`                  |
+| `VSIX_SKIP_EXISTING`     | `skipExisting`     | boolean | `"true"`                  |
+| `VSIX_OVERWRITE`         | `overwrite`        | boolean | `"false"`                 |
+| `VSIX_FILENAME_TEMPLATE` | `filenameTemplate` | string  | `"{name}-{version}.vsix"` |
+| `VSIX_QUIET`             | `quiet`            | boolean | `"true"`                  |
+| `VSIX_JSON`              | `json`             | boolean | `"false"`                 |
+| `VSIX_SOURCE`            | `source`           | string  | `"marketplace"`           |
+| `VSIX_PRE_RELEASE`       | `preRelease`       | boolean | `"false"`                 |
+| `VSIX_CHECKSUM`          | `checksum`         | boolean | `"true"`                  |
+| `VSIX_EDITOR`            | `editor`           | string  | `"cursor"`                |
+
+### Configuration Examples
+
+#### Team/CI Configuration
+
+Create a shared configuration for team environments:
+
+**`.vsixrc.json` in project root:**
+
+```json
+{
+  "outputDir": "./team-extensions",
+  "parallel": 3,
+  "retry": 5,
+  "retryDelay": 2000,
+  "skipExisting": true,
+  "filenameTemplate": "{publisher}-{name}-{version}.vsix",
+  "checksum": true,
+  "quiet": true,
+  "source": "marketplace"
+}
+```
+
+#### Personal Development Setup
+
+**`~/.config/vsix-extension-manager/vsix.config.yaml`:**
+
+```yaml
+# Personal development configuration
+cacheDir: "~/.vsix-cache"
+parallel: 5
+retry: 3
+skipExisting: true
+filenameTemplate: "{source}/{name}-v{version}.vsix"
+checksum: true
+editor: "cursor"
+source: "marketplace"
+```
+
+#### Environment-Specific Configurations
+
+**Development environment:**
+
+```bash
+export VSIX_CACHE_DIR="./dev-extensions"
+export VSIX_PARALLEL=5
+export VSIX_CHECKSUM=true
+```
+
+**Production/CI environment:**
+
+```bash
+export VSIX_OUTPUT_DIR="./production-extensions"
+export VSIX_PARALLEL=3
+export VSIX_RETRY=5
+export VSIX_QUIET=true
+export VSIX_JSON=true
+```
+
+### Using Custom Configuration Files
+
+Specify a custom configuration file with the global `--config` option:
+
+```bash
+# Use specific config file
+vsix-extension-manager --config ./custom-config.json download --url "..."
+
+# Different configs for different environments
+vsix-extension-manager --config ./configs/development.yaml from-list --file ./extensions.txt
+vsix-extension-manager --config ./configs/production.json download --file ./critical-extensions.json
+```
+
+### Configuration Validation
+
+VSIX Extension Manager validates all configuration sources and provides helpful error messages:
+
+```bash
+# Invalid configuration will show specific errors
+$ vsix-extension-manager download --url "..."
+❌ Configuration Error: Invalid configuration in ~/.vsixrc.json:
+   parallel: Expected number between 1 and 20, received 25
+   source: Expected 'marketplace' | 'open-vsx' | 'auto', received 'invalid'
+
+💡 Suggested actions:
+   1. Fix configuration: Correct the configuration errors
+   2. Use default config: Remove the config file to use defaults
+   3. Generate sample: Generate a sample configuration file
+```
 
 ### Custom Filename Templates
 
@@ -740,7 +969,7 @@ cursor --install-extension your-extension.vsix
    vsix-extension-manager export-installed --editor vscode -o backend-setup.txt -f txt
    vsix-extension-manager export-installed --editor auto -o datascience-setup.txt -f txt
 
-   # Quick setup on new machines
+   # Quick setup on new machines (non-interactive bulk with parallelism)
    vsix-extension-manager from-list --file frontend-setup.txt --parallel 5
    ```
 
@@ -812,7 +1041,7 @@ cursor --install-extension your-extension.vsix
      --version "1.2.3" \
      --verify-checksum "a1b2c3d4e5f6..."
 
-   # Verify all files in bulk download against same hash
+   # Verify all files in bulk download against same hash (parallel supported)
    vsix-extension-manager download \
      --file ./extensions.json \
      --verify-checksum "a1b2c3d4e5f6..." \
@@ -870,88 +1099,15 @@ npm run dev
 - `npm run prepack` - Build before packaging
 - `npm run prepublishOnly` - Build before publishing
 
-## 📁 Project Structure
+## 🧱 Architecture & Internals (for developers)
 
-The codebase is organized into a clean, feature-based architecture with a clear separation of concerns. This makes it highly maintainable, scalable, and easy for new contributors to understand.
+This README focuses on how to use the CLI. If you're interested in the internal design, module layout, and architectural decisions, see the developer documentation:
 
-```
-src/
-├─ commands/                    # CLI command handlers (UI/Orchestration layer)
-│  ├─ download.ts              # Download command logic
-│  ├─ exportInstalled.ts       # Export installed extensions command
-│  ├─ fromList.ts              # Download from list command
-│  └─ versions.ts              # List versions command
-├─ config/                     # App-wide constants
-│  └─ constants.ts             # Default values and configuration
-├─ core/                       # Foundational, domain-specific modules
-│  ├─ filesystem/              # File I/O, checksums, templates
-│  │  ├─ checksum.ts          # SHA256 checksum utilities
-│  │  ├─ fileManager.ts       # File operations and validation
-│  │  ├─ filenameTemplate.ts  # Template-based filename generation
-│  │  └─ index.ts             # Filesystem module exports
-│  ├─ http/                    # Low-level HTTP downloader
-│  │  └─ downloader.ts        # HTTP download with progress tracking
-│  ├─ registry/                # Marketplace/OpenVSX API logic
-│  │  ├─ extensionVersions.ts # Version resolution and fetching
-│  │  ├─ index.ts             # Registry module exports
-│  │  └─ urlParser.ts         # URL parsing and validation
-│  ├─ ui/                      # UI helpers (progress bars, etc.)
-│  │  └─ progress.ts          # Progress indicators and formatting
-│  ├─ helpers.ts               # Core shared helpers
-│  └─ types.ts                 # Core TypeScript types
-├─ features/                   # High-level business logic features
-│  ├─ download/                # Download orchestration services
-│  │  ├─ index.ts             # Download feature exports
-│  │  └─ services/            # Download business logic
-│  │     ├─ bulkDownloadService.ts    # Bulk download orchestration
-│  │     └─ singleDownloadService.ts  # Single download orchestration
-│  ├─ export/                  # Export-from-editor services
-│  │  ├─ index.ts             # Export feature exports
-│  │  └─ services/            # Export business logic
-│  │     └─ installedExtensionsService.ts  # Extension scanning and export
-│  └─ import/                  # Import-to-editor services
-│     ├─ index.ts             # Import feature exports
-│     └─ services/            # Import business logic
-│        └─ extensionListParserService.ts  # List parsing and validation
-└─ index.ts                    # CLI entry point and command registration
-```
+- See Architecture: [architecture.md](architecture.md)
 
-## 🔍 How It Works
+## URL Patterns
 
-### Architectural Layers
-
-The VSIX Extension Manager CLI follows a clean, layered architecture that separates concerns and promotes maintainability:
-
-1.  **`commands/` (Interface Layer)**: Handles all user interaction, command-line argument parsing (using `commander.js`), and orchestrates calls to the feature layer. Each command file (`download.ts`, `exportInstalled.ts`, `fromList.ts`, `versions.ts`) is responsible for the "how" users interact with specific functionality.
-
-2.  **`features/` (Business Logic Layer)**: Contains high-level business logic organized by feature domain. Each feature has its own services that implement the core business workflows:
-    - `download/` - Single and bulk download orchestration
-    - `export/` - Extension scanning and export formatting
-    - `import/` - Extension list parsing and processing
-
-3.  **`core/` (Foundational Layer)**: Provides low-level, reusable services used across multiple features:
-    - `filesystem/` - File operations, checksums, and template-based naming
-    - `http/` - HTTP downloading with progress tracking
-    - `registry/` - Marketplace and OpenVSX API integration
-    - `ui/` - Progress indicators and user interface helpers
-
-### Core Flows
-
-- **Download Flow**:
-  - `download` command → `download` feature services → `core/registry` (version resolution) → `core/http` (downloading) → `core/filesystem` (file management)
-
-- **Export Flow**:
-  - `export-installed` command → `export` feature service → scans VS Code/Cursor directories → `core/filesystem` (file operations) → formats output
-
-- **Import Flow**:
-  - `from-list` command → `import` feature service (list parsing and validation) → `download` feature service (bulk download execution)
-
-- **Versions Flow**:
-  - `versions` command → `core/registry` (API calls) → formats version information for display
-
-### URL Patterns
-
-VSIX Extension Manager constructs download URLs using these patterns:
+Constructed download URLs:
 
 ```
 # Marketplace
@@ -961,15 +1117,9 @@ https://[publisher].gallery.vsassets.io/_apis/public/gallery/publisher/[publishe
 https://open-vsx.org/api/[publisher]/[extension]/[version]/file/[publisher].[extension]-[version].vsix
 ```
 
-## ⚠️ Error Handling
+## Error Handling (quick overview)
 
-VSIX Extension Manager handles various error scenarios:
-
-- **Invalid URLs**: Validates marketplace URL format
-- **Missing Versions**: Validates version number format
-- **Network Errors**: Handles timeouts and connection issues
-- **File System Errors**: Manages directory creation and permissions
-- **404 Errors**: Clear messages for non-existent extensions/versions
+Errors are shown with clear messages and suggestions. Bulk operations continue across failures and report a summary. For the full taxonomy, typed errors and developer details, see [architecture.md](architecture.md).
 
 ## 🤝 Contributing
 
