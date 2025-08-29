@@ -151,9 +151,7 @@ export async function downloadBulkExtensions(
 
   const extensions = validation.validItems;
   if (!options.quiet) {
-    p.log.success(
-      `✅ JSON validation passed! Found ${extensions.length} extension(s) to download.`,
-    );
+    p.log.success(`✅ Validation passed! Found ${extensions.length} extension(s) to download.`);
   }
 
   const filenameTemplate = options.filenameTemplate || DEFAULT_FILENAME_TEMPLATE;
@@ -424,9 +422,7 @@ export async function downloadBulkExtensions(
     }
     p.note(summaryContent, "Download Complete");
     if (successCount > 0)
-      p.outro(
-        `🎉 VSIX Extension Manager: Bulk download completed! ${successCount} extension(s) downloaded successfully.`,
-      );
+      p.outro(`🎉 Bulk download completed! ${successCount} extension(s) downloaded successfully.`);
     else p.outro("❌ No extensions were downloaded successfully.");
   }
 

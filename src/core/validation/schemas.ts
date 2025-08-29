@@ -102,8 +102,9 @@ export const vscodeExtensionsJsonSchema: JSONSchemaType<VSCodeExtensionsJson> = 
       type: "array",
       items: {
         type: "string",
-        pattern: "^[a-zA-Z0-9][a-zA-Z0-9\\-]*\\.[a-zA-Z0-9][a-zA-Z0-9\\-]*$",
-        description: "Extension ID in publisher.extension format",
+        pattern: "^[a-zA-Z0-9][a-zA-Z0-9\\-]*\\.[a-zA-Z0-9][a-zA-Z0-9\\-.]*$",
+        description:
+          "Extension ID in publisher.extension format (extension can include dots and hyphens)",
       },
       minItems: 0,
       maxItems: 1000,
@@ -113,7 +114,7 @@ export const vscodeExtensionsJsonSchema: JSONSchemaType<VSCodeExtensionsJson> = 
       type: "array",
       items: {
         type: "string",
-        pattern: "^[a-zA-Z0-9][a-zA-Z0-9\\-]*\\.[a-zA-Z0-9][a-zA-Z0-9\\-]*$",
+        pattern: "^[a-zA-Z0-9][a-zA-Z0-9\\-]*\\.[a-zA-Z0-9][a-zA-Z0-9\\-.]*$",
       },
       minItems: 0,
       maxItems: 1000,
@@ -133,8 +134,9 @@ export const extensionListArraySchema: JSONSchemaType<string[]> = {
   type: "array",
   items: {
     type: "string",
-    pattern: "^[a-zA-Z0-9][a-zA-Z0-9\\-]*\\.[a-zA-Z0-9][a-zA-Z0-9\\-]*$",
-    description: "Extension ID in publisher.extension format",
+    pattern: "^[a-zA-Z0-9][a-zA-Z0-9\\-]*\\.[a-zA-Z0-9][a-zA-Z0-9\\-.]*$",
+    description:
+      "Extension ID in publisher.extension format (extension can include dots and hyphens)",
   },
   minItems: 1,
   maxItems: 1000,

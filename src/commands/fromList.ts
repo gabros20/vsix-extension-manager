@@ -131,7 +131,26 @@ export async function fromList(options: FromListOptions) {
         retryDelay: 1000,
       });
 
-      const outputDir = options.output || DEFAULT_OUTPUT_DIR;
+      // Determine output directory (cache-dir takes precedence, then output, then prompt)
+      let outputDir: string;
+      if (options.cacheDir) {
+        outputDir = options.cacheDir;
+      } else if (options.output) {
+        outputDir = options.output;
+      } else {
+        const outputInput = await p.text({
+          message: "Enter output directory:",
+          placeholder: "./downloads",
+          initialValue: DEFAULT_OUTPUT_DIR,
+        });
+
+        if (p.isCancel(outputInput)) {
+          p.cancel("Operation cancelled.");
+          process.exit(0);
+        }
+
+        outputDir = (outputInput as string).trim() || DEFAULT_OUTPUT_DIR;
+      }
 
       // Show preview in interactive mode
       if (!options.quiet && !options.json) {

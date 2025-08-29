@@ -68,3 +68,20 @@
 - Better validation and error recovery throughout the application
 
 Last updated: Enhanced foundation with configuration, error handling, and validation systems.
+
+## Interactive Launcher - Minimal UI Plan 🎛️
+
+Goal: Add a lightweight top-level interactive menu that routes to existing minimal flows. Keep advanced flags CLI-only.
+
+- [ ] Expose `runSingleDownloadUI` and `runBulkJsonDownloadUI` from `src/commands/download.ts` (no new prompts)
+- [ ] Create `src/commands/interactive.ts` with top-level menu:
+  - Single download
+  - Bulk download (JSON file)
+  - Download from list (txt/json/extensions.json)
+  - Export installed extensions
+  - List available versions
+  - Quit
+- [ ] Wire default CLI action in `src/index.ts` to call `runInteractive` instead of `downloadVsix`
+- [ ] Build and lint to ensure no type/lint errors
+- [ ] Smoke-check explicit commands still work (download, from-list, export-installed, versions)
+- [ ] Document the interactive launcher briefly in README (optional)

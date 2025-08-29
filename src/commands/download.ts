@@ -426,3 +426,12 @@ async function downloadBulkFromJson(options: DownloadOptions) {
 
   await downloadBulkExtensions(jsonPathStr as string, outputDir as string, bulkOptions);
 }
+
+// Lightweight UI entrypoints for interactive launcher
+export async function runSingleDownloadUI(options: DownloadOptions) {
+  await downloadSingleExtension(options);
+}
+
+export async function runBulkJsonDownloadUI(options: DownloadOptions) {
+  await downloadBulkFromJson(options);
+}

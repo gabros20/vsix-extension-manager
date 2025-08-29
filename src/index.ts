@@ -130,10 +130,11 @@ program
     }, opts);
   });
 
-// Default command - interactive mode
+// Default command - interactive launcher
 program.action(async () => {
   await withConfigAndErrorHandling(async (config) => {
-    await downloadVsix(config);
+    const { runInteractive } = await import("./commands/interactive");
+    await runInteractive(config);
   }, {});
 });
 

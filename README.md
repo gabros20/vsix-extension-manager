@@ -91,10 +91,16 @@ Simply run the command and choose your download mode:
 vsix-extension-manager
 ```
 
-You'll be prompted to choose between:
+You'll see a lightweight menu with the most common actions:
 
-- **📦 Single Extension**: Download one extension interactively
-- **📚 Bulk Download**: Download multiple extensions from JSON file
+- **📦 Single download**: Download one extension interactively
+- **📚 Bulk download (JSON file)**: Download multiple extensions from a JSON file
+- **📥 Download from list**: Use a txt/json/extensions.json list file
+- **📤 Export installed extensions**: Export from VS Code or Cursor
+- **🔢 List available versions**: Show versions for an extension URL
+- **Quit**
+
+Note: Interactive mode stays minimal by design. Advanced options (checksums, retries, parallelism, templates, etc.) are available via command-line flags.
 
 Or use the download command directly:
 
