@@ -7,8 +7,10 @@ import packageJson from "../package.json";
 const program = new Command();
 
 program
-  .name("vsix-downloader")
-  .description("Download VS Code extensions as VSIX files from the Visual Studio Marketplace")
+  .name("vsix-extension-manager")
+  .description(
+    "VSIX Extension Manager: download, list versions, export, and manage VS Code/Cursor extensions",
+  )
   .version(packageJson.version);
 
 program

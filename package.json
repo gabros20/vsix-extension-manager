@@ -1,13 +1,14 @@
 {
-  "name": "vsix-downloader",
+  "name": "vsix-extension-manager",
   "version": "1.5.0",
-  "description": "A CLI tool to download VS Code extensions as VSIX files from the Visual Studio Marketplace",
+  "description": "VSIX Extension Manager: A comprehensive CLI tool to download, export, import, and manage VS Code/Cursor extensions as VSIX files",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "commonjs",
   "bin": {
-    "vsix-downloader": "./dist/index.js",
-    "download-vsix": "./dist/index.js"
+    "vsix-extension-manager": "./dist/index.js",
+    "extension-manager": "./dist/index.js",
+    "vsix-downloader": "./dist/index.js"
   },
   "files": [
     "dist/**",
@@ -117,12 +118,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/gabros20/vsix-downloader"
+    "url": "https://github.com/gabros20/vsix-extension-manager"
   },
   "bugs": {
-    "url": "https://github.com/gabros20/vsix-downloader/issues"
+    "url": "https://github.com/gabros20/vsix-extension-manager/issues"
   },
-  "homepage": "https://github.com/gabros20/vsix-downloader#readme",
+  "homepage": "https://github.com/gabros20/vsix-extension-manager#readme",
   "lint-staged": {
     "*.{ts,js}": [
       "prettier --write",

@@ -2,7 +2,8 @@ import axios from "axios";
 import fs from "fs-extra";
 import path from "path";
 import { pipeline } from "stream/promises";
-import { ProgressCallback, ProgressTracker } from "./progressTracker";
+import { ProgressCallback, ProgressTracker } from "../ui/progress";
+import { DEFAULT_HTTP_TIMEOUT_MS, DEFAULT_USER_AGENT } from "../../config/constants";
 
 /**
  * Download a file from URL to the specified directory
@@ -24,9 +25,9 @@ export async function downloadFile(
       method: "GET",
       url: url,
       responseType: "stream",
-      timeout: 30000, // 30 second timeout
+      timeout: DEFAULT_HTTP_TIMEOUT_MS,
       headers: {
-        "User-Agent": "vsix-downloader/1.0.0",
+        "User-Agent": DEFAULT_USER_AGENT,
       },
     });
 
@@ -112,7 +113,7 @@ export async function validateUrl(url: string): Promise<boolean> {
     const response = await axios.head(url, {
       timeout: 5000,
       headers: {
-        "User-Agent": "vsix-downloader/1.0.0",
+        "User-Agent": DEFAULT_USER_AGENT,
       },
     });
     return response.status === 200;

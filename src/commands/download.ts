@@ -1,36 +1,30 @@
 import * as p from "@clack/prompts";
 import path from "path";
-import { downloadFile } from "../utils/downloader";
 import {
   constructDownloadUrl,
   getDisplayNameFromUrl,
   constructOpenVsxDownloadUrl,
   parseExtensionUrl,
   inferSourceFromUrl,
-} from "../utils/urlParser";
-import { createDownloadDirectory, FileExistsAction, handleFileExists } from "../utils/fileManager";
-import { downloadBulkExtensions, BulkOptions } from "../utils/bulkDownloader";
-import { resolveVersion } from "../utils/extensionRegistry";
+  resolveVersion,
+} from "../core/registry";
+import { FileExistsAction, generateFilename, DEFAULT_FILENAME_TEMPLATE } from "../core/filesystem";
 import {
-  generateFilename,
-  DEFAULT_FILENAME_TEMPLATE,
-  validateTemplate,
-} from "../utils/filenameTemplate";
+  downloadBulkExtensions,
+  downloadSingleExtension as performSingleDownload,
+} from "../features/download";
+import type { BulkOptions, SingleDownloadRequest } from "../features/download";
 import {
   generateSHA256,
   verifySHA256,
   isValidSHA256,
   formatHashForDisplay,
-} from "../utils/checksum";
-import { ProgressInfo, formatBytes, createProgressBar } from "../utils/progressTracker";
+} from "../core/filesystem";
+import { ProgressInfo, formatBytes, createProgressBar } from "../core/ui/progress";
+import { truncateText, buildBulkOptionsFromCli, shouldUpdateProgress } from "../core/helpers";
+import { DEFAULT_OUTPUT_DIR } from "../config/constants";
 
-/**
- * Truncate display name to avoid overly long progress messages
- */
-function truncateDisplayName(name: string, maxLength: number = 30): string {
-  if (name.length <= maxLength) return name;
-  return name.slice(0, maxLength - 3) + "...";
-}
+// duplicated helper removed in favor of core/helpers
 
 interface DownloadOptions {
   url?: string;
@@ -56,7 +50,7 @@ interface DownloadOptions {
 export async function downloadVsix(options: DownloadOptions) {
   console.clear();
 
-  p.intro("🔽 VSIX Downloader");
+  p.intro("🔽 VSIX Extension Manager");
 
   try {
     // If a bulk file is provided, run bulk mode non-interactively
@@ -126,10 +120,9 @@ async function downloadSingleExtension(options: DownloadOptions) {
     marketplaceUrl = urlResult as string;
   }
 
-  // Parse URL to extract extension info
+  // Parse URL to extract extension info (for display only)
   const parseSpinner = p.spinner();
   parseSpinner.start("Parsing extension URL...");
-
   let extensionInfo;
   try {
     extensionInfo = parseExtensionUrl(marketplaceUrl as string);
@@ -191,100 +184,84 @@ async function downloadSingleExtension(options: DownloadOptions) {
     effectiveSource = (pick as string).toLowerCase();
   }
 
-  // Resolve version if 'latest'
+  // Determine file exists behavior
+  let fileExistsAction: FileExistsAction;
+  if (options.skipExisting) fileExistsAction = FileExistsAction.SKIP;
+  else if (options.overwrite) fileExistsAction = FileExistsAction.OVERWRITE;
+  else fileExistsAction = FileExistsAction.PROMPT;
+
+  // Prepare params for core single download
+  const filenameTemplate = options.filenameTemplate || DEFAULT_FILENAME_TEMPLATE;
+  const outputDirInput = options.cacheDir
+    ? options.cacheDir
+    : options.output
+      ? options.output
+      : ((await p.text({
+          message: "Enter output directory:",
+          placeholder: DEFAULT_OUTPUT_DIR,
+          initialValue: DEFAULT_OUTPUT_DIR,
+        })) as string);
+
+  if (p.isCancel(outputDirInput)) {
+    p.cancel("Operation cancelled.");
+    process.exit(0);
+  }
+
+  const resolvedOutput = (outputDirInput as string).trim() || DEFAULT_OUTPUT_DIR;
+
+  const progressWrapper = (progress: ProgressInfo) => {
+    const now = Date.now();
+    if (shouldUpdateProgress(lastProgressUpdate, now)) {
+      const progressBar = createProgressBar(progress.percentage, 30);
+      const downloaded = formatBytes(progress.downloaded);
+      const total = formatBytes(progress.total);
+      downloadSpinner.message(`${progressBar} ${downloaded}/${total}`);
+      lastProgressUpdate = now;
+    }
+  };
+
+  const confirmOverwrite = async () => {
+    const result = await p.confirm({
+      message: `File already exists. Overwrite?`,
+      initialValue: false,
+    });
+    if (p.isCancel(result)) {
+      p.cancel("Operation cancelled.");
+      process.exit(0);
+    }
+    return Boolean(result);
+  };
+
+  // Start spinner and perform download via core service
+  const downloadSpinner = p.spinner();
+  let lastProgressUpdate = Date.now();
+  downloadSpinner.start(`Downloading ${truncateText("pending...")}`);
+
+  // First resolve final file details for pretty note
+  // We repeat minimal parse here to build display URL post-download
   const resolvedVersion = await resolveVersion(
     extensionInfo.itemName,
     version as string,
     Boolean(options.preRelease),
     effectiveSource as "marketplace" | "open-vsx" | "auto",
   );
-
-  // Construct download URL by source
   const downloadUrl =
     effectiveSource === "open-vsx"
       ? constructOpenVsxDownloadUrl(extensionInfo, resolvedVersion)
       : constructDownloadUrl(extensionInfo, resolvedVersion);
-
-  // Generate filename using template
-  const filenameTemplate = options.filenameTemplate || DEFAULT_FILENAME_TEMPLATE;
-
-  // Validate template
-  const templateValidation = validateTemplate(filenameTemplate);
-  if (!templateValidation.isValid) {
-    throw new Error(`Invalid filename template: ${templateValidation.error}`);
-  }
-
   const filename = generateFilename(filenameTemplate, {
     name: extensionInfo.itemName,
     version: resolvedVersion,
     source: effectiveSource,
     publisher: extensionInfo.itemName.split(".")[0],
   });
-
-  // Determine output directory (cache-dir takes precedence)
-  let outputDir: string;
-  if (options.cacheDir) {
-    outputDir = options.cacheDir;
-  } else if (options.output) {
-    outputDir = options.output;
-  } else {
-    const outputInput = await p.text({
-      message: "Enter output directory:",
-      placeholder: "./downloads",
-      initialValue: "./downloads",
-    });
-
-    if (p.isCancel(outputInput)) {
-      p.cancel("Operation cancelled.");
-      process.exit(0);
-    }
-
-    outputDir = (outputInput as string).trim() || "./downloads";
-  }
-
-  await createDownloadDirectory(outputDir);
-
-  const filePath = path.join(outputDir, filename);
-
-  // Determine file exists action
-  let fileExistsAction: FileExistsAction;
-  if (options.skipExisting) {
-    fileExistsAction = FileExistsAction.SKIP;
-  } else if (options.overwrite) {
-    fileExistsAction = FileExistsAction.OVERWRITE;
-  } else {
-    fileExistsAction = FileExistsAction.PROMPT;
-  }
-
-  // Check if file exists and handle accordingly
-  const shouldProceedWithDownload = await handleFileExists(filePath, fileExistsAction, async () => {
-    // Prompt callback for interactive mode
-    const result = await p.confirm({
-      message: `File ${filename} already exists. Overwrite?`,
-      initialValue: false,
-    });
-
-    if (p.isCancel(result)) {
-      p.cancel("Operation cancelled.");
-      process.exit(0);
-    }
-
-    return result as boolean;
-  });
-
-  if (!shouldProceedWithDownload) {
-    p.note(`Skipped existing file: ${filename}`, "Download Skipped");
-    return;
-  }
-
-  // Truncate URL for display (keep first 30 chars + ... + last 10 chars)
   const displayUrl =
     downloadUrl.length > 50
       ? `${downloadUrl.slice(0, 30)}...${downloadUrl.slice(-10)}`
       : downloadUrl;
 
   p.note(
-    `Filename: ${filename}\nOutput: ${outputDir}\nResolved Version: ${resolvedVersion}\nTemplate: ${filenameTemplate}\nURL: ${displayUrl}`,
+    `Filename: ${filename}\nOutput: ${resolvedOutput}\nResolved Version: ${resolvedVersion}\nTemplate: ${filenameTemplate}\nURL: ${displayUrl}`,
     "Download Details",
   );
 
@@ -306,32 +283,26 @@ async function downloadSingleExtension(options: DownloadOptions) {
     throw new Error("Invalid SHA256 hash format. Expected 64 hexadecimal characters.");
   }
 
-  // Download the file with progress tracking
-  const downloadSpinner = p.spinner();
-  let lastProgressUpdate = Date.now();
-
-  const progressCallback = (progress: ProgressInfo) => {
-    const now = Date.now();
-    // Update every 100ms to avoid overwhelming the terminal
-    if (now - lastProgressUpdate >= 100) {
-      const progressBar = createProgressBar(progress.percentage, 30);
-      const downloaded = formatBytes(progress.downloaded);
-      const total = formatBytes(progress.total);
-
-      downloadSpinner.message(`${progressBar} ${downloaded}/${total}`);
-      lastProgressUpdate = now;
-    }
-  };
-
-  downloadSpinner.start(`Downloading ${truncateDisplayName(filename)}...`);
+  // Update spinner to actual filename now that details are known
+  downloadSpinner.message(`Downloading ${truncateText(filename)}...`);
 
   try {
-    const downloadedFilePath = await downloadFile(
-      downloadUrl,
-      outputDir,
-      filename,
-      options.quiet ? undefined : progressCallback,
-    );
+    const downloadRequest: SingleDownloadRequest = {
+      url: marketplaceUrl as string,
+      requestedVersion: version as string,
+      preferPreRelease: Boolean(options.preRelease),
+      source: effectiveSource as "marketplace" | "open-vsx" | "auto",
+      filenameTemplate,
+      cacheDir: options.cacheDir,
+      outputDir: resolvedOutput,
+      fileExistsAction,
+      promptOverwrite: fileExistsAction === FileExistsAction.PROMPT ? confirmOverwrite : undefined,
+      quiet: options.quiet,
+      progressCallback: options.quiet ? undefined : progressWrapper,
+    };
+
+    const result = await performSingleDownload(downloadRequest);
+    const downloadedFilePath = result.filePath || path.join(resolvedOutput, filename);
     downloadSpinner.stop(`Downloaded successfully!`);
 
     // Get file size for display
@@ -430,7 +401,7 @@ async function downloadBulkFromJson(options: DownloadOptions) {
     const outputInput = await p.text({
       message: "Enter output directory:",
       placeholder: "./downloads",
-      initialValue: "./downloads",
+      initialValue: DEFAULT_OUTPUT_DIR,
     });
 
     if (p.isCancel(outputInput)) {
@@ -438,7 +409,7 @@ async function downloadBulkFromJson(options: DownloadOptions) {
       process.exit(0);
     }
 
-    outputDir = (outputInput as string).trim() || "./downloads";
+    outputDir = (outputInput as string).trim() || DEFAULT_OUTPUT_DIR;
   }
 
   // Start bulk download process
@@ -446,20 +417,7 @@ async function downloadBulkFromJson(options: DownloadOptions) {
     p.log.info("🔍 Reading and validating JSON file...");
   }
 
-  const bulkOptions: BulkOptions = {
-    parallel: options.parallel ? Number(options.parallel) : undefined,
-    retry: options.retry ? Number(options.retry) : undefined,
-    retryDelay: options.retryDelay ? Number(options.retryDelay) : undefined,
-    quiet: options.quiet,
-    json: options.json,
-    summaryPath: options.summary,
-    filenameTemplate: options.filenameTemplate,
-    cacheDir: options.cacheDir,
-    skipExisting: options.skipExisting,
-    overwrite: options.overwrite,
-    checksum: options.checksum,
-    verifyChecksum: options.verifyChecksum,
-  };
+  const bulkOptions: BulkOptions = buildBulkOptionsFromCli(options);
 
   await downloadBulkExtensions(jsonPathStr as string, outputDir as string, bulkOptions);
 }

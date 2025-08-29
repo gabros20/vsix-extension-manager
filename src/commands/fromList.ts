@@ -1,8 +1,11 @@
 import * as p from "@clack/prompts";
 import fs from "fs";
 import path from "path";
-import { parseExtensionsList } from "../utils/extensionExporter";
-import { downloadBulkExtensions, BulkOptions } from "../utils/bulkDownloader";
+import { parseExtensionsList } from "../features/import";
+import { downloadBulkExtensions } from "../features/download";
+import type { BulkOptions } from "../core/types";
+import { buildBulkOptionsFromCli } from "../core/helpers";
+import { DEFAULT_OUTPUT_DIR } from "../config/constants";
 
 interface FromListOptions {
   file?: string;
@@ -118,22 +121,13 @@ export async function fromList(options: FromListOptions) {
       fs.writeFileSync(tempJsonPath, JSON.stringify(bulkItems, null, 2));
 
       // Prepare bulk download options
-      const bulkOptions: BulkOptions = {
-        parallel: options.parallel ? Number(options.parallel) : 3,
-        retry: options.retry ? Number(options.retry) : 3,
-        retryDelay: options.retryDelay ? Number(options.retryDelay) : 1000,
-        skipExisting: options.skipExisting || false,
-        overwrite: options.overwrite || false,
-        quiet: options.quiet || false,
-        json: options.json || false,
-        summaryPath: options.summary,
-        source: (options.source as "marketplace" | "open-vsx") || "marketplace",
-        filenameTemplate: options.filenameTemplate,
-        cacheDir: options.cacheDir,
-        checksum: options.checksum || false,
-      };
+      const bulkOptions: BulkOptions = buildBulkOptionsFromCli(options, {
+        parallel: 3,
+        retry: 3,
+        retryDelay: 1000,
+      });
 
-      const outputDir = options.output || "./downloads";
+      const outputDir = options.output || DEFAULT_OUTPUT_DIR;
 
       // Show preview in interactive mode
       if (!options.quiet && !options.json) {

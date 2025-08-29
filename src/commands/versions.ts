@@ -1,6 +1,11 @@
 import * as p from "@clack/prompts";
-import { parseExtensionUrl, getDisplayNameFromUrl, inferSourceFromUrl } from "../utils/urlParser";
-import { fetchExtensionVersions, fetchOpenVsxVersions } from "../utils/extensionRegistry";
+import {
+  parseExtensionUrl,
+  getDisplayNameFromUrl,
+  inferSourceFromUrl,
+  fetchExtensionVersions,
+  fetchOpenVsxVersions,
+} from "../core/registry";
 
 interface VersionsOptions {
   url?: string;
