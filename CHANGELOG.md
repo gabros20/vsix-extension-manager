@@ -1,3 +1,13 @@
+# [1.6.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.5.1...v1.6.0) (2025-08-29)
+
+### Bug Fixes
+
+- resolve merge conflicts with main branch ([7e9e9db](https://github.com/gabros20/vsix-extension-manager/commit/7e9e9dbdf2365d080d9e38edba4991cf052ff870))
+
+### Features
+
+- complete rebrand to VSIX Extension Manager with architectural refactor ([6f9424d](https://github.com/gabros20/vsix-extension-manager/commit/6f9424d258161889c31d423034c33b61df162825))
+
 ## [1.5.1](https://github.com/gabros20/vsix-downloader/compare/v1.5.0...v1.5.1) (2025-08-29)
 
 ### Bug Fixes
