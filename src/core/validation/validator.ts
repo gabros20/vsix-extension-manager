@@ -79,7 +79,7 @@ export class SchemaValidator {
     this.ajv.addFormat("extension-id", {
       type: "string",
       validate: (data: string) =>
-        /^[a-zA-Z0-9][a-zA-Z0-9\-]*\.[a-zA-Z0-9][a-zA-Z0-9\-]*$/.test(data),
+        /^[a-zA-Z0-9][a-zA-Z0-9\-]*\.[a-zA-Z0-9][a-zA-Z0-9\-.]*$/.test(data),
     });
 
     // Semantic version format

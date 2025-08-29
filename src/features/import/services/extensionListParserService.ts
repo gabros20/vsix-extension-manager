@@ -30,25 +30,36 @@ export function parseExtensionsList(
     case "json":
       try {
         const parsed = JSON.parse(trimmedContent);
+        // Accept 3 JSON shapes:
+        // 1) VS Code workspace: { recommendations: string[] }
+        // 2) Array<string>: ["publisher.extension", ...]
+        // 3) Array<object> with { id: string, ... } (our detailed export)
 
-        // Try to validate as extension list
+        // 3) Array<object> with id
+        if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === "object") {
+          const ids = (parsed as Array<Record<string, unknown>>)
+            .map((o) => (typeof o.id === "string" ? (o.id as string) : undefined))
+            .filter((v): v is string => typeof v === "string");
+          if (ids.length > 0) {
+            const check = validate.extensionList(ids);
+            if (check.valid && Array.isArray(check.data)) {
+              return check.data as string[];
+            }
+          }
+        }
+
+        // Validate as extension list or workspace
         const result = validate.extensionList(parsed);
-
         if (result.valid) {
           const data = result.data!;
-
-          // Handle VS Code extensions.json format
           if (typeof data === "object" && "recommendations" in data) {
             return (data as VSCodeExtensionsJson).recommendations;
           }
-
-          // Handle simple array of extension IDs
           if (Array.isArray(data)) {
             return data;
           }
         }
 
-        // If validation failed, throw appropriate error
         const errorDetails = result.errors.map((err) => err.message).join(", ");
         throw ParsingErrors.invalidJson(filePath || "input", errorDetails);
       } catch (error) {
@@ -67,9 +78,9 @@ export function parseExtensionsList(
         .map((line) => line.trim())
         .filter((line) => line && !line.startsWith("#")); // Support comments
 
-      // Validate each extension ID
+      // Validate each extension ID (allow dots in extension segment)
       const invalidIds = lines.filter(
-        (id) => !/^[a-zA-Z0-9][a-zA-Z0-9\-]*\.[a-zA-Z0-9][a-zA-Z0-9\-]*$/.test(id),
+        (id) => !/^[a-zA-Z0-9][a-zA-Z0-9\-]*\.[a-zA-Z0-9][a-zA-Z0-9\-.]*$/.test(id),
       );
       if (invalidIds.length > 0) {
         throw ParsingErrors.missingFields(filePath || "input", [

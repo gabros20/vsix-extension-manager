@@ -7,6 +7,7 @@ import {
   findWorkspaceExtensionsJson,
 } from "../features/export";
 import type { ExportFormat, EditorType } from "../features/export";
+import { validate } from "../core/validation";
 
 interface ExportInstalledOptions {
   output?: string;
@@ -74,6 +75,39 @@ export async function exportInstalled(options: ExportInstalledOptions) {
       format = formatChoice as ExportFormat;
     }
 
+    // Ask for output destination (interactive, minimal; skip if --json provided)
+    let requestedOutputPath: string | undefined;
+    if (!options.output && !options.json) {
+      if (options.workspace) {
+        const defaultWorkspacePath = path.join(process.cwd(), ".vscode", "extensions.json");
+        const res = await p.text({
+          message: "Enter output file path (press Enter to print instead):",
+          placeholder: defaultWorkspacePath,
+          initialValue: defaultWorkspacePath,
+        });
+        if (p.isCancel(res)) {
+          p.cancel("Operation cancelled.");
+          process.exit(0);
+        }
+        requestedOutputPath = (res as string).trim() || undefined;
+      } else {
+        const defaultFilename =
+          format === ("extensions.json" as ExportFormat)
+            ? "extensions.json"
+            : `extensions-${new Date().toISOString().split("T")[0]}.${format}`;
+        const res = await p.text({
+          message: "Enter output file path (press Enter to print instead):",
+          placeholder: defaultFilename,
+          initialValue: defaultFilename,
+        });
+        if (p.isCancel(res)) {
+          p.cancel("Operation cancelled.");
+          process.exit(0);
+        }
+        requestedOutputPath = (res as string).trim() || undefined;
+      }
+    }
+
     // Check if workspace mode is requested
     if (options.workspace) {
       const workspaceExtensionsJson = findWorkspaceExtensionsJson();
@@ -82,11 +116,39 @@ export async function exportInstalled(options: ExportInstalledOptions) {
 
         const content = fs.readFileSync(workspaceExtensionsJson, "utf-8");
 
-        if (options.output) {
-          fs.writeFileSync(options.output, content);
-          p.log.success(`✅ Workspace extensions exported to: ${options.output}`);
+        const targetPath = options.output || requestedOutputPath;
+        if (targetPath) {
+          const dir = path.dirname(targetPath);
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+          }
+          fs.writeFileSync(targetPath, content);
+          p.log.success(`✅ Workspace extensions exported to: ${targetPath}`);
         } else {
           console.log(content);
+        }
+        // Show exported list (workspace)
+        if (!options.json) {
+          try {
+            const parsed = JSON.parse(content);
+            const recs = Array.isArray(parsed?.recommendations) ? parsed.recommendations : [];
+            if (recs.length > 0) {
+              p.note(recs.join("\n"), "Exported Extensions");
+            }
+          } catch {}
+        }
+        if (!options.json) {
+          // Summarize export (workspace always VS Code workspace format)
+          let count = 0;
+          let valid = false;
+          try {
+            const parsed = JSON.parse(content);
+            const result = validate.vscodeExtensionsJson(parsed);
+            valid = result.valid;
+            if (result.valid) count = result.data!.recommendations.length;
+          } catch {}
+          const summary = `Total: ${count} extension(s)\nFormat: workspace format\nOutput: ${targetPath || "stdout"}\nValidation: ${valid ? "✅" : "❌"}`;
+          p.note(summary, "Export Complete");
         }
         return;
       } else {
@@ -123,15 +185,29 @@ export async function exportInstalled(options: ExportInstalledOptions) {
     const output = formatExtensions(extensions, format);
 
     // Handle output destination
-    if (options.output) {
+    const finalOutputPath = options.output || requestedOutputPath;
+    if (finalOutputPath) {
       // Ensure output directory exists
-      const outputDir = path.dirname(options.output);
+      const outputDir = path.dirname(finalOutputPath);
       if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
       }
 
-      fs.writeFileSync(options.output, output);
-      p.log.success(`✅ Extensions exported to: ${options.output}`);
+      fs.writeFileSync(finalOutputPath, output);
+      p.log.success(`✅ Extensions exported to: ${finalOutputPath}`);
+      // Show exported list (non-workspace, file output)
+      if (!options.json) {
+        let lines: string[] = [];
+        if (format === ("json" as ExportFormat)) {
+          lines = extensions.map((ext) => `${ext.id} (${ext.version}) - ${ext.displayName}`);
+        } else {
+          // txt or extensions.json list of IDs
+          lines = extensions.map((ext) => ext.id);
+        }
+        if (lines.length > 0) {
+          p.note(lines.join("\n"), "Exported Extensions");
+        }
+      }
     } else if (options.json || format !== "json") {
       // Machine-readable output or non-JSON format
       console.log(output);
@@ -169,6 +245,47 @@ export async function exportInstalled(options: ExportInstalledOptions) {
           p.log.success(`✅ Extensions exported to: ${filename}`);
         }
       }
+    }
+
+    // Post-export summary (skip when --json to keep machine-readable)
+    if (!options.json) {
+      let count = 0;
+      let valid = true;
+      try {
+        if (format === ("extensions.json" as ExportFormat)) {
+          const parsed = JSON.parse(output);
+          const result = validate.vscodeExtensionsJson(parsed);
+          valid = result.valid;
+          count = result.valid ? result.data!.recommendations.length : 0;
+        } else if (format === ("txt" as ExportFormat)) {
+          count = output
+            .split("\n")
+            .map((l) => l.trim())
+            .filter((l) => l && !l.startsWith("#")).length;
+          // Validate IDs
+          const ids = output
+            .split("\n")
+            .map((l) => l.trim())
+            .filter((l) => l && !l.startsWith("#"));
+          const result = validate.extensionList(ids);
+          valid = result.valid;
+        } else {
+          // json detailed export
+          const parsed = JSON.parse(output);
+          count = Array.isArray(parsed) ? parsed.length : 0;
+        }
+      } catch {
+        valid = false;
+      }
+      const displayFormat =
+        format === ("extensions.json" as ExportFormat) ? "workspace format" : format;
+      const summaryLines = [
+        `Total: ${count} extension(s)`,
+        `Format: ${displayFormat}`,
+        `Output: ${finalOutputPath ? finalOutputPath : "stdout"}`,
+        `Validation: ${valid ? "✅" : "❌"}`,
+      ].join("\n");
+      p.note(summaryLines, "Export Complete");
     }
 
     p.outro("✨ Export completed!");
