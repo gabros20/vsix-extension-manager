@@ -21,6 +21,7 @@
     "dev": "ts-node src/index.ts",
     "prepack": "npm run build",
     "prepublishOnly": "npm run build",
+    "release": "semantic-release",
     "test": "echo \"No tests specified\"",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -50,6 +51,11 @@
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/npm": "^12.0.2",
+    "@semantic-release/release-notes-generator": "^14.0.3",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^20.10.5",
     "@typescript-eslint/eslint-plugin": "^8.41.0",
@@ -60,8 +66,47 @@
     "husky": "^9.1.7",
     "lint-staged": "^15.5.2",
     "prettier": "^3.6.2",
+    "semantic-release": "^24.2.7",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
+  },
+  "release": {
+    "branches": [
+      "main",
+      {
+        "name": "beta",
+        "prerelease": true
+      },
+      {
+        "name": "alpha",
+        "prerelease": true
+      }
+    ],
+    "plugins": [
+      [
+        "@semantic-release/commit-analyzer"
+      ],
+      [
+        "@semantic-release/release-notes-generator"
+      ],
+      [
+        "@semantic-release/changelog"
+      ],
+      [
+        "@semantic-release/npm"
+      ],
+      [
+        "@semantic-release/git",
+        {
+          "assets": [
+            "CHANGELOG.md",
+            "package.json",
+            "package-lock.json"
+          ],
+          "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+        }
+      ]
+    ]
   },
   "engines": {
     "node": ">=16.0.0"
