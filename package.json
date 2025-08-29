@@ -1,6 +1,6 @@
 {
   "name": "vsix-extension-manager",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "VSIX Extension Manager: A comprehensive CLI tool to download, export, import, and manage VS Code/Cursor extensions as VSIX files",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
