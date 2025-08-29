@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# VSIX Downloader Git Sync Script
+# VSIX Extension Manager Git Sync Script
 # Usage: ./scripts/sync.sh [commit_message]
 
 set -e

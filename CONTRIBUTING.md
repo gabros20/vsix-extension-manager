@@ -1,10 +1,10 @@
-# Contributing to VSIX Downloader
+# Contributing to VSIX Extension Manager
 
-Thank you for your interest in contributing to VSIX Downloader! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to VSIX Extension Manager! This document provides guidelines and information for contributors.
 
 ## 🎯 Project Goals
 
-VSIX Downloader aims to provide a reliable, user-friendly CLI tool for downloading VS Code extensions as VSIX files. We focus on:
+VSIX Extension Manager aims to provide a reliable, user-friendly CLI tool for comprehensive extension management including downloading, exporting, and importing VS Code/Cursor extensions. We focus on:
 
 - **Simplicity**: Easy-to-use interface with clear, helpful prompts
 - **Reliability**: Robust error handling and validation
@@ -25,8 +25,8 @@ VSIX Downloader aims to provide a reliable, user-friendly CLI tool for downloadi
 1. **Fork and clone the repository**:
 
    ```bash
-   git clone https://github.com/your-username/vsix-downloader.git
-   cd vsix-downloader
+   git clone https://github.com/YOUR_USERNAME/vsix-extension-manager.git
+   cd vsix-extension-manager
    ```
 
 2. **Install dependencies**:
@@ -140,7 +140,7 @@ npm run dev
 npm install -g .
 
 # Test the installed version
-vsix-downloader --help
+vsix-extension-manager --help
 ```
 
 ## 🔄 Pull Request Process
@@ -181,7 +181,7 @@ Before creating an issue, please:
 
 1. **Search existing issues** to avoid duplicates
 2. **Check the documentation** for solutions
-3. **Try the latest version** of the tool
+3. **Try the latest version** of VSIX Extension Manager
 
 When creating an issue, include:
 
@@ -218,4 +218,4 @@ This project uses [semantic-release](https://semantic-release.gitbook.io/) for a
 - **GitHub Discussions** - For questions and general discussion
 - **Code of Conduct** - For community guidelines
 
-Thank you for contributing to VSIX Downloader! 🎉
+Thank you for contributing to VSIX Extension Manager! 🎉

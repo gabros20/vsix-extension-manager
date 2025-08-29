@@ -4,10 +4,9 @@ import path from "path";
 import {
   getInstalledExtensions,
   formatExtensions,
-  ExportFormat,
-  EditorType,
   findWorkspaceExtensionsJson,
-} from "../utils/extensionExporter";
+} from "../features/export";
+import type { ExportFormat, EditorType } from "../features/export";
 
 interface ExportInstalledOptions {
   output?: string;

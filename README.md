@@ -1,6 +1,6 @@
-# VSIX Downloader
+# VSIX Extension Manager
 
-A modern CLI tool to download VS Code extensions as VSIX files directly from the Visual Studio Marketplace. Supports both single extension downloads and bulk downloads from JSON configuration files.
+A modern, feature-rich CLI tool to download, export, import, and manage VS Code/Cursor extensions as VSIX files. Supports both Visual Studio Marketplace and OpenVSX registries with comprehensive extension management capabilities.
 
 ## 🎯 What This Tool Solves
 
@@ -10,7 +10,7 @@ Recently, Microsoft quietly blocked Cursor (an AI-powered VSCode fork) from acce
 
 ### Why You Need This Tool
 
-**VSIX Downloader** provides a workaround by downloading extensions as `.vsix` files that can be manually installed in Cursor. This is particularly valuable for:
+**VSIX Extension Manager** provides a comprehensive solution for managing extensions by downloading them as `.vsix` files, exporting your current setup, and importing configurations across environments. This is particularly valuable for:
 
 - **Cursor Users**: Bypass Microsoft's marketplace restrictions and continue using your favorite extensions
 - **Offline Development**: Download extensions once and install them on machines without internet access
@@ -58,13 +58,13 @@ Recently, Microsoft quietly blocked Cursor (an AI-powered VSCode fork) from acce
 ### Global Installation (Recommended)
 
 ```bash
-npm install -g vsix-downloader
+npm install -g vsix-extension-manager
 ```
 
 ### Local Installation
 
 ```bash
-npm install vsix-downloader
+npm install vsix-extension-manager
 ```
 
 ## 🛠️ Usage
@@ -74,7 +74,7 @@ npm install vsix-downloader
 Simply run the command and choose your download mode:
 
 ```bash
-vsix-downloader
+vsix-extension-manager
 ```
 
 You'll be prompted to choose between:
@@ -85,7 +85,7 @@ You'll be prompted to choose between:
 Or use the download command directly:
 
 ```bash
-vsix-downloader download
+vsix-extension-manager download
 ```
 
 ### Single Extension Download
@@ -104,16 +104,16 @@ You can also provide arguments directly for single downloads:
 
 ```bash
 # Download with URL and version
-vsix-downloader download --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" --version "2023.20.0"
+vsix-extension-manager download --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" --version "2023.20.0"
 
 # Resolve and download the latest version (stable by default)
-vsix-downloader download --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" --version latest
+vsix-extension-manager download --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" --version latest
 
 # Prefer pre-release when resolving 'latest'
-vsix-downloader download --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" --version latest --pre-release
+vsix-extension-manager download --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" --version latest --pre-release
 
 # Specify custom output directory
-vsix-downloader download --url "..." --version "1.2.3" --output "./my-extensions"
+vsix-extension-manager download --url "..." --version "1.2.3" --output "./my-extensions"
 ```
 
 ### Bulk Download from JSON
@@ -184,12 +184,12 @@ Skip prompts and run bulk download straight from a file. Useful for CI and scrip
 
 ```bash
 # Basic non-interactive bulk download
-vsix-downloader download \
+vsix-extension-manager download \
   --file ./extensions.json \
   --output ./downloads
 
 # Advanced: sequential downloads with retries, backoff, quiet logs and JSON summary
-vsix-downloader download \
+vsix-extension-manager download \
   --file ./extensions.json \
   --output ./downloads \
   --retry 3 \
@@ -198,21 +198,21 @@ vsix-downloader download \
   --quiet
 
 # Bulk download with custom naming and cache directory
-vsix-downloader download \
+vsix-extension-manager download \
   --file ./extensions.json \
   --cache-dir ~/.vsix-cache \
   --filename-template "{source}/{publisher}-{name}-v{version}.vsix" \
   --skip-existing
 
 # Bulk download with progress and checksums
-vsix-downloader download \
+vsix-extension-manager download \
   --file ./extensions.json \
   --checksum \
   --cache-dir ~/.extensions \
   --quiet
 
 # Bulk download with verification against known checksums
-vsix-downloader download \
+vsix-extension-manager download \
   --file ./extensions.json \
   --verify-checksum "a1b2c3d4e5f6..." \
   --retry 3
@@ -224,23 +224,23 @@ Export your currently installed extensions from VS Code or Cursor to share acros
 
 ```bash
 # Interactive export - choose editor, format and output
-vsix-downloader export-installed
+vsix-extension-manager export-installed
 
 # Export from specific editor
-vsix-downloader export-installed --editor cursor -o my-extensions.txt -f txt
-vsix-downloader export-installed --editor vscode -o my-extensions.txt -f txt
-vsix-downloader export-installed --editor auto -o my-extensions.txt -f txt
+vsix-extension-manager export-installed --editor cursor -o my-extensions.txt -f txt
+vsix-extension-manager export-installed --editor vscode -o my-extensions.txt -f txt
+vsix-extension-manager export-installed --editor auto -o my-extensions.txt -f txt
 
 # Export to specific file and format (auto-detects editor)
-vsix-downloader export-installed -o my-extensions.json -f json
-vsix-downloader export-installed -o my-extensions.txt -f txt
-vsix-downloader export-installed -o extensions.json -f extensions.json
+vsix-extension-manager export-installed -o my-extensions.json -f json
+vsix-extension-manager export-installed -o my-extensions.txt -f txt
+vsix-extension-manager export-installed -o extensions.json -f extensions.json
 
 # Export workspace extensions.json (if it exists)
-vsix-downloader export-installed --workspace
+vsix-extension-manager export-installed --workspace
 
 # Machine-readable output (no prompts)
-vsix-downloader export-installed --json --editor cursor
+vsix-extension-manager export-installed --json --editor cursor
 ```
 
 **Export Formats:**
@@ -255,16 +255,16 @@ Download extensions from various list formats:
 
 ```bash
 # Interactive mode - select file and proceed
-vsix-downloader from-list
+vsix-extension-manager from-list
 
 # From text file (extension IDs, one per line)
-vsix-downloader from-list --file extensions.txt
+vsix-extension-manager from-list --file extensions.txt
 
 # From VS Code extensions.json
-vsix-downloader from-list --file .vscode/extensions.json
+vsix-extension-manager from-list --file .vscode/extensions.json
 
 # With all bulk download options
-vsix-downloader from-list \
+vsix-extension-manager from-list \
   --file extensions.txt \
   --output ./downloads \
   --parallel 5 \
@@ -286,14 +286,14 @@ vsix-downloader from-list \
 
    ```bash
    # Export your installed extensions
-   vsix-downloader export-installed -o my-setup.txt -f txt
+   vsix-extension-manager export-installed -o my-setup.txt -f txt
    ```
 
 2. **Transfer to new environment and download:**
 
    ```bash
    # Download all extensions from the list
-   vsix-downloader from-list --file my-setup.txt --output ./extensions
+   vsix-extension-manager from-list --file my-setup.txt --output ./extensions
    ```
 
 3. **Install manually in Cursor/VS Code:**
@@ -305,13 +305,15 @@ vsix-downloader from-list \
 ### Available Commands
 
 ```bash
-vsix-downloader download [options]           # Download a VSIX file
-vsix-downloader versions [options]           # List available versions for an extension
-vsix-downloader export-installed [options]   # Export currently installed extensions
-vsix-downloader from-list [options]          # Download extensions from a list file
-vsix-downloader --help                      # Show help
-vsix-downloader --version                   # Show version
+vsix-extension-manager download [options]           # Download a VSIX file (alias: dl)
+vsix-extension-manager versions [options]           # List available versions for an extension
+vsix-extension-manager export-installed [options]   # Export currently installed extensions (alias: export)
+vsix-extension-manager from-list [options]          # Download extensions from a list file (alias: install)
+vsix-extension-manager --help                      # Show help
+vsix-extension-manager --version                   # Show version
 ```
+
+**Alternative Binary Names**: VSIX Extension Manager is also available as `extension-manager` and legacy `vsix-downloader` for convenience.
 
 ### Options
 
@@ -363,11 +365,11 @@ List all available versions for an extension (Marketplace or OpenVSX). Useful wh
 
 ```bash
 # Prompt for URL, display human-readable list
-vsix-downloader versions
+vsix-extension-manager versions
 
 # Provide URL and output JSON (works with Marketplace or OpenVSX URLs)
-vsix-downloader versions --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" --json
-vsix-downloader versions --url "https://open-vsx.org/extension/ms-python/python" --json
+vsix-extension-manager versions --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" --json
+vsix-extension-manager versions --url "https://open-vsx.org/extension/ms-python/python" --json
 ```
 
 ### OpenVSX Support
@@ -376,13 +378,13 @@ You can download from OpenVSX by specifying the source or by pasting an OpenVSX 
 
 ```bash
 # Single extension from OpenVSX
-vsix-downloader download \
+vsix-extension-manager download \
   --url "https://open-vsx.org/extension/ms-python/python" \
   --version latest \
   --source open-vsx
 
 # Bulk with OpenVSX
-vsix-downloader download \
+vsix-extension-manager download \
   --file ./extensions.json \
   --output ./downloads \
   --source open-vsx
@@ -396,21 +398,21 @@ Customize how downloaded files are named using the `--filename-template` option 
 
 ```bash
 # Use a custom filename template
-vsix-downloader download \
+vsix-extension-manager download \
   --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" \
   --version "2023.20.0" \
   --filename-template "{publisher}_{name}_v{version}.vsix"
 # Results in: ms-python_ms-python.python_v2023.20.0.vsix
 
 # Include source in filename
-vsix-downloader download \
+vsix-extension-manager download \
   --url "..." \
   --version "1.2.3" \
   --filename-template "{source}-{name}-{version}.vsix"
 # Results in: marketplace-publisher.extension-1.2.3.vsix
 
 # Bulk download with custom template
-vsix-downloader download \
+vsix-extension-manager download \
   --file ./extensions.json \
   --filename-template "{publisher}/{name}-{version}.vsix"
 ```
@@ -436,19 +438,19 @@ Use a dedicated cache directory for downloads that persists across sessions:
 
 ```bash
 # Use cache directory (overrides --output)
-vsix-downloader download \
+vsix-extension-manager download \
   --url "..." \
   --version "1.2.3" \
   --cache-dir ~/.vsix-cache
 
 # Skip existing files in cache
-vsix-downloader download \
+vsix-extension-manager download \
   --file ./extensions.json \
   --cache-dir ~/.vsix-cache \
   --skip-existing
 
 # Bulk download to cache with custom naming
-vsix-downloader download \
+vsix-extension-manager download \
   --file ./extensions.json \
   --cache-dir ~/.vsix-cache \
   --filename-template "{source}/{publisher}/{name}-{version}.vsix" \
@@ -468,19 +470,19 @@ Monitor download progress and verify file integrity:
 
 ```bash
 # Generate checksum after download
-vsix-downloader download \
+vsix-extension-manager download \
   --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" \
   --version "2023.20.0" \
   --checksum
 
 # Verify downloaded file against known checksum
-vsix-downloader download \
+vsix-extension-manager download \
   --url "..." \
   --version "1.2.3" \
   --verify-checksum "a1b2c3d4e5f6...your-sha256-hash-here"
 
 # Bulk download with progress and checksums
-vsix-downloader download \
+vsix-extension-manager download \
   --file ./extensions.json \
   --checksum \
   --cache-dir ~/.extensions
@@ -508,14 +510,14 @@ vsix-downloader download \
 ### Example 1: Single Extension (Command Line)
 
 ```bash
-vsix-downloader download --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" --version "2023.20.0"
+vsix-extension-manager download --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" --version "2023.20.0"
 ```
 
 ### Example 2: Export → Import Workflow (Cursor to new environment)
 
 ```bash
 # Step 1: Export your current Cursor extensions
-$ vsix-downloader export-installed --editor cursor -o my-cursor-extensions.txt -f txt
+$ vsix-extension-manager export-installed --editor cursor -o my-cursor-extensions.txt -f txt
 
 # Step 2: Review the exported list
 $ cat my-cursor-extensions.txt
@@ -526,7 +528,7 @@ $ cat my-cursor-extensions.txt
 # Prisma.prisma
 
 # Step 3: Download all extensions on new machine
-$ vsix-downloader from-list --file my-cursor-extensions.txt --output ./downloads
+$ vsix-extension-manager from-list --file my-cursor-extensions.txt --output ./downloads
 
 # Step 4: Install in Cursor
 $ cursor --install-extension ./downloads/*.vsix
@@ -536,23 +538,23 @@ $ cursor --install-extension ./downloads/*.vsix
 
 ```bash
 # Step 1: Export your VS Code extensions
-$ vsix-downloader export-installed --editor vscode -o vscode-extensions.txt -f txt
+$ vsix-extension-manager export-installed --editor vscode -o vscode-extensions.txt -f txt
 
 # Step 2: Download extensions for Cursor installation
-$ vsix-downloader from-list --file vscode-extensions.txt --output ./cursor-migration
+$ vsix-extension-manager from-list --file vscode-extensions.txt --output ./cursor-migration
 
 # Step 3: Install in Cursor
 $ cursor --install-extension ./cursor-migration/*.vsix
 
 # Step 4: Verify Cursor now has the extensions
-$ vsix-downloader export-installed --editor cursor --json | grep -c '"id"'
+$ vsix-extension-manager export-installed --editor cursor --json | grep -c '"id"'
 ```
 
 ### Example 4: VS Code Workspace Integration
 
 ```bash
 # Export to VS Code workspace format
-$ vsix-downloader export-installed -o .vscode/extensions.json -f extensions.json
+$ vsix-extension-manager export-installed -o .vscode/extensions.json -f extensions.json
 
 # Contents of .vscode/extensions.json:
 {
@@ -564,15 +566,15 @@ $ vsix-downloader export-installed -o .vscode/extensions.json -f extensions.json
 }
 
 # Download from workspace extensions.json
-$ vsix-downloader from-list --file .vscode/extensions.json --output ./team-extensions
+$ vsix-extension-manager from-list --file .vscode/extensions.json --output ./team-extensions
 ```
 
 ### Example 5: Single Extension (Interactive)
 
 ```bash
-$ vsix-downloader
+$ vsix-extension-manager
 
-┌  🔽 VSIX Downloader
+┌  🔽 VSIX Extension Manager
 │
 ◇  Choose download mode:
 │  📦 Single Extension
@@ -624,9 +626,9 @@ $ vsix-downloader
 ### Example 6: Bulk Download
 
 ```bash
-$ vsix-downloader
+$ vsix-extension-manager
 
-┌  🔽 VSIX Downloader
+┌  🔽 VSIX Extension Manager
 │
 ◇  Choose download mode:
 │  📚 Bulk Download
@@ -671,7 +673,7 @@ $ vsix-downloader
 
 ### 1. Command Line (.vsix)
 
-- Use the `.vsix` you downloaded with this tool (default in `./downloads/`).
+- Use the `.vsix` you downloaded with VSIX Extension Manager (default in `./downloads/`).
 - Open your terminal and navigate to the directory with the `.vsix` file.
 - Run:
 
@@ -706,14 +708,14 @@ cursor --install-extension your-extension.vsix
 
    ```bash
    # On source machine: export current extensions (auto-detects editor)
-   vsix-downloader export-installed -o dev-setup.txt -f txt
+   vsix-extension-manager export-installed -o dev-setup.txt -f txt
 
    # Or export from specific editor
-   vsix-downloader export-installed --editor cursor -o cursor-setup.txt -f txt
-   vsix-downloader export-installed --editor vscode -o vscode-setup.txt -f txt
+   vsix-extension-manager export-installed --editor cursor -o cursor-setup.txt -f txt
+   vsix-extension-manager export-installed --editor vscode -o vscode-setup.txt -f txt
 
    # On target machine: download all extensions
-   vsix-downloader from-list --file dev-setup.txt --cache-dir ~/.extensions
+   vsix-extension-manager from-list --file dev-setup.txt --cache-dir ~/.extensions
 
    # Install all at once (Cursor or VS Code)
    cursor --install-extension ~/.extensions/*.vsix
@@ -724,33 +726,33 @@ cursor --install-extension your-extension.vsix
 
    ```bash
    # Create team extension recommendations
-   vsix-downloader export-installed -o .vscode/extensions.json -f extensions.json
+   vsix-extension-manager export-installed -o .vscode/extensions.json -f extensions.json
 
    # Team members can download recommended extensions
-   vsix-downloader from-list --file .vscode/extensions.json
+   vsix-extension-manager from-list --file .vscode/extensions.json
    ```
 
 3. **Multiple Environment Support**: Maintain different extension sets for different purposes:
 
    ```bash
    # Export different setups from specific editors
-   vsix-downloader export-installed --editor cursor -o frontend-setup.txt -f txt
-   vsix-downloader export-installed --editor vscode -o backend-setup.txt -f txt
-   vsix-downloader export-installed --editor auto -o datascience-setup.txt -f txt
+   vsix-extension-manager export-installed --editor cursor -o frontend-setup.txt -f txt
+   vsix-extension-manager export-installed --editor vscode -o backend-setup.txt -f txt
+   vsix-extension-manager export-installed --editor auto -o datascience-setup.txt -f txt
 
    # Quick setup on new machines
-   vsix-downloader from-list --file frontend-setup.txt --parallel 5
+   vsix-extension-manager from-list --file frontend-setup.txt --parallel 5
    ```
 
-4. **Editor Auto-Detection**: The tool intelligently detects available editors:
+4. **Editor Auto-Detection**: VSIX Extension Manager intelligently detects available editors:
 
    ```bash
    # Auto mode prefers Cursor if both editors have extensions
-   vsix-downloader export-installed --editor auto
+   vsix-extension-manager export-installed --editor auto
 
    # Explicit editor selection when you need specific one
-   vsix-downloader export-installed --editor cursor  # Force Cursor
-   vsix-downloader export-installed --editor vscode  # Force VS Code
+   vsix-extension-manager export-installed --editor cursor  # Force Cursor
+   vsix-extension-manager export-installed --editor vscode  # Force VS Code
    ```
 
 ### Bulk Download Tips
@@ -789,7 +791,7 @@ cursor --install-extension your-extension.vsix
 
    ```bash
    # Only download new or updated extensions
-   vsix-downloader download \
+   vsix-extension-manager download \
      --file ./extensions.json \
      --cache-dir ~/.extensions \
      --skip-existing
@@ -799,19 +801,19 @@ cursor --install-extension your-extension.vsix
 
    ```bash
    # Generate checksums for verification
-   vsix-downloader download \
+   vsix-extension-manager download \
      --file ./extensions.json \
      --checksum \
      --summary ./results.json
 
    # Verify single extension against known hash
-   vsix-downloader download \
+   vsix-extension-manager download \
      --url "..." \
      --version "1.2.3" \
      --verify-checksum "a1b2c3d4e5f6..."
 
    # Verify all files in bulk download against same hash
-   vsix-downloader download \
+   vsix-extension-manager download \
      --file ./extensions.json \
      --verify-checksum "a1b2c3d4e5f6..." \
      --parallel 4
@@ -835,8 +837,8 @@ cursor --install-extension your-extension.vsix
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/vsix-downloader.git
-cd vsix-downloader
+git clone https://github.com/gabros20/vsix-extension-manager.git
+cd vsix-extension-manager
 ```
 
 2. Install dependencies:
@@ -862,59 +864,94 @@ npm run dev
 - `npm run build` - Compile TypeScript to JavaScript
 - `npm run dev` - Run in development mode with ts-node
 - `npm start` - Run the compiled version
-- `npm run prepare` - Build before publishing
+- `npm run lint` - Run ESLint for code quality
+- `npm run format` - Format code with Prettier
+- `npm run lint:fix` - Auto-fix ESLint issues
+- `npm run prepack` - Build before packaging
+- `npm run prepublishOnly` - Build before publishing
 
 ## 📁 Project Structure
 
+The codebase is organized into a clean, feature-based architecture with a clear separation of concerns. This makes it highly maintainable, scalable, and easy for new contributors to understand.
+
 ```
-vsix-downloader/
-├── src/
-│   ├── commands/
-│   │   ├── download.ts          # Main download command logic
-│   │   ├── versions.ts          # List extension versions
-│   │   ├── exportInstalled.ts   # Export installed extensions
-│   │   └── fromList.ts          # Download from extension lists
-│   ├── utils/
-│   │   ├── urlParser.ts         # URL parsing utilities
-│   │   ├── downloader.ts        # File download utilities
-│   │   ├── fileManager.ts       # File system utilities
-│   │   ├── bulkDownloader.ts    # Bulk download functionality
-│   │   ├── extensionRegistry.ts # Extension version resolution
-│   │   ├── extensionExporter.ts # Export/import functionality
-│   │   ├── filenameTemplate.ts  # Custom filename templates
-│   │   ├── checksum.ts          # SHA256 checksum utilities
-│   │   └── progressTracker.ts   # Progress bar utilities
-│   └── index.ts                 # CLI entry point
-├── dist/                        # Compiled JavaScript (generated)
-├── package.json
-├── tsconfig.json
-└── README.md
+src/
+├─ commands/                    # CLI command handlers (UI/Orchestration layer)
+│  ├─ download.ts              # Download command logic
+│  ├─ exportInstalled.ts       # Export installed extensions command
+│  ├─ fromList.ts              # Download from list command
+│  └─ versions.ts              # List versions command
+├─ config/                     # App-wide constants
+│  └─ constants.ts             # Default values and configuration
+├─ core/                       # Foundational, domain-specific modules
+│  ├─ filesystem/              # File I/O, checksums, templates
+│  │  ├─ checksum.ts          # SHA256 checksum utilities
+│  │  ├─ fileManager.ts       # File operations and validation
+│  │  ├─ filenameTemplate.ts  # Template-based filename generation
+│  │  └─ index.ts             # Filesystem module exports
+│  ├─ http/                    # Low-level HTTP downloader
+│  │  └─ downloader.ts        # HTTP download with progress tracking
+│  ├─ registry/                # Marketplace/OpenVSX API logic
+│  │  ├─ extensionVersions.ts # Version resolution and fetching
+│  │  ├─ index.ts             # Registry module exports
+│  │  └─ urlParser.ts         # URL parsing and validation
+│  ├─ ui/                      # UI helpers (progress bars, etc.)
+│  │  └─ progress.ts          # Progress indicators and formatting
+│  ├─ helpers.ts               # Core shared helpers
+│  └─ types.ts                 # Core TypeScript types
+├─ features/                   # High-level business logic features
+│  ├─ download/                # Download orchestration services
+│  │  ├─ index.ts             # Download feature exports
+│  │  └─ services/            # Download business logic
+│  │     ├─ bulkDownloadService.ts    # Bulk download orchestration
+│  │     └─ singleDownloadService.ts  # Single download orchestration
+│  ├─ export/                  # Export-from-editor services
+│  │  ├─ index.ts             # Export feature exports
+│  │  └─ services/            # Export business logic
+│  │     └─ installedExtensionsService.ts  # Extension scanning and export
+│  └─ import/                  # Import-to-editor services
+│     ├─ index.ts             # Import feature exports
+│     └─ services/            # Import business logic
+│        └─ extensionListParserService.ts  # List parsing and validation
+└─ index.ts                    # CLI entry point and command registration
 ```
 
 ## 🔍 How It Works
 
-### Core Download Process
+### Architectural Layers
 
-1. **URL Parsing**: Extracts `publisher.extension` from Marketplace or OpenVSX URLs
-2. **Extension Info**: Splits the `itemName` into publisher and extension name
-3. **Download URL Construction**: Builds the VSIX download URL using the selected source
-4. **File Download**: Downloads the VSIX file using axios with progress tracking
-5. **File Management**: Creates output directory and saves the file with proper naming
+The VSIX Extension Manager CLI follows a clean, layered architecture that separates concerns and promotes maintainability:
 
-### Export/Import Process
+1.  **`commands/` (Interface Layer)**: Handles all user interaction, command-line argument parsing (using `commander.js`), and orchestrates calls to the feature layer. Each command file (`download.ts`, `exportInstalled.ts`, `fromList.ts`, `versions.ts`) is responsible for the "how" users interact with specific functionality.
 
-1. **Extension Discovery**: Scans editor extensions directory:
-   - VS Code: `~/.vscode/extensions/`
-   - Cursor: `~/.cursor/extensions/`
-   - Auto-detection prefers Cursor if both exist
-2. **Metadata Extraction**: Reads `package.json` from each extension directory
-3. **Format Conversion**: Converts to requested format (JSON, text, or extensions.json)
-4. **List Processing**: Parses extension lists and converts IDs to marketplace URLs
-5. **Bulk Download**: Uses existing bulk download infrastructure for efficient processing
+2.  **`features/` (Business Logic Layer)**: Contains high-level business logic organized by feature domain. Each feature has its own services that implement the core business workflows:
+    - `download/` - Single and bulk download orchestration
+    - `export/` - Extension scanning and export formatting
+    - `import/` - Extension list parsing and processing
+
+3.  **`core/` (Foundational Layer)**: Provides low-level, reusable services used across multiple features:
+    - `filesystem/` - File operations, checksums, and template-based naming
+    - `http/` - HTTP downloading with progress tracking
+    - `registry/` - Marketplace and OpenVSX API integration
+    - `ui/` - Progress indicators and user interface helpers
+
+### Core Flows
+
+- **Download Flow**:
+  - `download` command → `download` feature services → `core/registry` (version resolution) → `core/http` (downloading) → `core/filesystem` (file management)
+
+- **Export Flow**:
+  - `export-installed` command → `export` feature service → scans VS Code/Cursor directories → `core/filesystem` (file operations) → formats output
+
+- **Import Flow**:
+  - `from-list` command → `import` feature service (list parsing and validation) → `download` feature service (bulk download execution)
+
+- **Versions Flow**:
+  - `versions` command → `core/registry` (API calls) → formats version information for display
 
 ### URL Patterns
 
-The tool constructs download URLs using these patterns:
+VSIX Extension Manager constructs download URLs using these patterns:
 
 ```
 # Marketplace
@@ -926,7 +963,7 @@ https://open-vsx.org/api/[publisher]/[extension]/[version]/file/[publisher].[ext
 
 ## ⚠️ Error Handling
 
-The tool handles various error scenarios:
+VSIX Extension Manager handles various error scenarios:
 
 - **Invalid URLs**: Validates marketplace URL format
 - **Missing Versions**: Validates version number format
@@ -943,8 +980,8 @@ We welcome contributions! This project uses a protected main branch workflow to 
 1. **Fork the repository** on GitHub
 2. **Clone your fork** locally:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/vsix-downloader.git
-   cd vsix-downloader
+   git clone https://github.com/YOUR_USERNAME/vsix-extension-manager.git
+   cd vsix-extension-manager
    ```
 3. **Create a feature branch**:
    ```bash
@@ -1016,13 +1053,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - Original inspiration from [mjmirza/download-vsix-from-visual-studio-market-place](https://github.com/mjmirza/download-vsix-from-visual-studio-market-place)
-- Built with modern CLI tools: Commander.js, Inquirer.js, Chalk, and Ora
+- Built with modern CLI tools: [Commander.js](https://github.com/tj/commander.js) and [@clack/prompts](https://github.com/natemoo-re/clack).
 
 ## 📞 Support
 
 If you encounter any issues or have questions:
 
-1. Check the [Issues](https://github.com/yourusername/vsix-downloader/issues) page
+1. Check the [Issues](https://github.com/gabros20/vsix-extension-manager/issues) page
 2. Create a new issue with detailed description
 3. Include the marketplace URL and version you're trying to download
 

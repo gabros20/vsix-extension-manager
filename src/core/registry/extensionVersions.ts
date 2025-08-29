@@ -1,9 +1,6 @@
 import axios from "axios";
-
-export interface ExtensionVersionInfo {
-  version: string;
-  published?: string;
-}
+import { DEFAULT_USER_AGENT } from "../../config/constants";
+import type { ExtensionVersionInfo } from "../types";
 
 /**
  * Fetch available versions for an extension using the Marketplace Gallery API
@@ -33,7 +30,7 @@ export async function fetchExtensionVersions(itemName: string): Promise<Extensio
   const headers = {
     "Content-Type": "application/json",
     Accept: "application/json;api-version=3.0-preview.1",
-    "User-Agent": "vsix-downloader/1.0.0",
+    "User-Agent": DEFAULT_USER_AGENT,
   } as const;
 
   const response = await axios.post(url, body, { headers });
@@ -57,7 +54,7 @@ export async function fetchOpenVsxVersions(itemName: string): Promise<ExtensionV
   const url = `https://open-vsx.org/api/${publisher}/${extension}`;
   const headers = {
     Accept: "application/json",
-    "User-Agent": "vsix-downloader/1.0.0",
+    "User-Agent": DEFAULT_USER_AGENT,
   } as const;
 
   const response = await axios.get(url, { headers });
