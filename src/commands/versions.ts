@@ -18,7 +18,7 @@ export async function listVersions(options: VersionsOptions) {
     let url = options.url as string | undefined;
     if (!url) {
       const res = await p.text({
-        message: "Enter the VS Code extension marketplace URL:",
+        message: "Enter the extension URL (Marketplace or OpenVSX):",
         validate: (input: string) => (!input.trim() ? "Please enter a valid URL" : undefined),
       });
       if (p.isCancel(res)) {

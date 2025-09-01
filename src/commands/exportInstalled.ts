@@ -49,10 +49,10 @@ export async function exportInstalled(options: ExportInstalledOptions) {
     }
 
     // Determine output format
-    let format: ExportFormat = "json";
+    let format: ExportFormat = "txt";
     if (options.format) {
-      if (!["json", "txt", "extensions.json"].includes(options.format)) {
-        p.log.error("❌ Invalid format. Supported formats: json, txt, extensions.json");
+      if (!["txt", "extensions.json"].includes(options.format)) {
+        p.log.error("❌ Invalid format. Supported formats: txt, extensions.json");
         process.exit(1);
       }
       format = options.format as ExportFormat;
@@ -61,7 +61,6 @@ export async function exportInstalled(options: ExportInstalledOptions) {
       const formatChoice = await p.select({
         message: "Choose output format:",
         options: [
-          { value: "json", label: "JSON (detailed extension info)" },
           { value: "extensions.json", label: "VS Code extensions.json (workspace format)" },
           { value: "txt", label: "Plain text (extension IDs only)" },
         ],
@@ -208,13 +207,13 @@ export async function exportInstalled(options: ExportInstalledOptions) {
           p.note(lines.join("\n"), "Exported Extensions");
         }
       }
-    } else if (options.json || format !== "json") {
+    } else if (options.json || format !== "txt") {
       // Machine-readable output or non-JSON format
       console.log(output);
     } else {
       // Interactive mode - pretty display
       p.note(
-        extensions.map((ext) => `${ext.id} (${ext.version}) - ${ext.displayName}`).join("\n"),
+        extensions.map((ext) => ext.id).join("\n"),
         `${extensions.length} Installed Extensions`,
       );
 

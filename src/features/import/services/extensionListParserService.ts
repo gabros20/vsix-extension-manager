@@ -17,61 +17,24 @@ export function parseExtensionsList(
 ): string[] {
   const trimmedContent = content.trim();
 
-  // Auto-detect format if not specified
+  // Disallow JSON arrays of IDs; only txt or VS Code extensions.json are supported
+  if (!format && trimmedContent.startsWith("[")) {
+    throw ParsingErrors.invalidJson(
+      filePath || "input",
+      "JSON arrays of IDs are no longer supported; use txt or extensions.json",
+    );
+  }
+
+  // Auto-detect format if not specified (json arrays no longer supported)
   if (!format) {
-    if (trimmedContent.startsWith("{") || trimmedContent.startsWith("[")) {
-      format = "json";
+    if (trimmedContent.startsWith("{") && trimmedContent.includes("recommendations")) {
+      format = "extensions.json";
     } else {
       format = "txt";
     }
   }
 
   switch (format) {
-    case "json":
-      try {
-        const parsed = JSON.parse(trimmedContent);
-        // Accept 3 JSON shapes:
-        // 1) VS Code workspace: { recommendations: string[] }
-        // 2) Array<string>: ["publisher.extension", ...]
-        // 3) Array<object> with { id: string, ... } (our detailed export)
-
-        // 3) Array<object> with id
-        if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === "object") {
-          const ids = (parsed as Array<Record<string, unknown>>)
-            .map((o) => (typeof o.id === "string" ? (o.id as string) : undefined))
-            .filter((v): v is string => typeof v === "string");
-          if (ids.length > 0) {
-            const check = validate.extensionList(ids);
-            if (check.valid && Array.isArray(check.data)) {
-              return check.data as string[];
-            }
-          }
-        }
-
-        // Validate as extension list or workspace
-        const result = validate.extensionList(parsed);
-        if (result.valid) {
-          const data = result.data!;
-          if (typeof data === "object" && "recommendations" in data) {
-            return (data as VSCodeExtensionsJson).recommendations;
-          }
-          if (Array.isArray(data)) {
-            return data;
-          }
-        }
-
-        const errorDetails = result.errors.map((err) => err.message).join(", ");
-        throw ParsingErrors.invalidJson(filePath || "input", errorDetails);
-      } catch (error) {
-        if (error instanceof Error && error.name === "ParsingError") {
-          throw error;
-        }
-        throw ParsingErrors.invalidJson(
-          filePath || "input",
-          error instanceof Error ? error.message : String(error),
-        );
-      }
-
     case "txt":
       const lines = trimmedContent
         .split("\n")
