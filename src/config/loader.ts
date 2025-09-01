@@ -173,6 +173,17 @@ export function convertCliToConfig(cliArgs: Record<string, unknown>): PartialCon
     preRelease: "preRelease",
     checksum: "checksum",
     editor: "editor",
+
+    // Install options
+    installParallel: "installParallel",
+    installRetry: "installRetry",
+    installRetryDelay: "installRetryDelay",
+    skipInstalled: "skipInstalled",
+    forceReinstall: "forceReinstall",
+    dryRun: "dryRun",
+    allowMismatchedBinary: "allowMismatchedBinary",
+    codeBin: "codeBin",
+    cursorBin: "cursorBin",
   };
 
   for (const [cliKey, configKey] of Object.entries(cliMap)) {

@@ -69,6 +69,7 @@ program
   .option("--cache-dir <path>", "Cache directory for downloads (overrides output)")
   .option("--checksum", "Generate SHA256 checksum for downloaded files", false)
   .option("--verify-checksum <hash>", "Verify downloaded file against provided SHA256 hash")
+  .option("--install-after", "Install downloaded extensions after successful downloads", false)
   .action(async (opts) => {
     await withConfigAndErrorHandling(async (config, options) => {
       await downloadVsix({ ...options, ...config });
@@ -105,7 +106,6 @@ program
 
 program
   .command("from-list")
-  .alias("install")
   .description("Download extensions from a list file")
   .option("-f, --file <path>", "Path to extensions list file")
   .option("-o, --output <path>", "Output directory (default: ./downloads)")
@@ -123,10 +123,47 @@ program
   .option("--filename-template <template>", "Custom filename template")
   .option("--cache-dir <path>", "Cache directory for downloads")
   .option("--checksum", "Generate SHA256 checksum for downloaded files", false)
+  .option(
+    "--install",
+    "Install extensions after downloading (requires --download-missing behavior)",
+    false,
+  )
+  .option("--download-only", "Download only, do not install (default behavior)", false)
   .action(async (opts) => {
     await withConfigAndErrorHandling(async (config, options) => {
       const { fromList } = await import("./commands/fromList");
       await fromList({ ...options, ...config });
+    }, opts);
+  });
+
+program
+  .command("install")
+  .description("Install VSIX files or extensions from lists into VS Code/Cursor")
+  .option("--vsix <path>", "Single VSIX file to install")
+  .option("--vsix-dir <paths...>", "Directories to scan for VSIX files (recursive)")
+  .option("-f, --file <path>", "Extension list file (.txt or extensions.json) to install from")
+  .option("--download-missing", "Download missing extensions when installing from list", false)
+  .option("-e, --editor <editor>", "Target editor: vscode|cursor|auto (default: auto)")
+  .option("--code-bin <path>", "Explicit path to VS Code binary")
+  .option("--cursor-bin <path>", "Explicit path to Cursor binary")
+  .option("--skip-installed", "Skip if same version already installed", false)
+  .option("--force-reinstall", "Force reinstall even if same version", false)
+  .option("--dry-run", "Show what would be installed without making changes", false)
+  .option("--parallel <n>", "Number of parallel installs (default: 1)")
+  .option("--retry <n>", "Number of retry attempts per install")
+  .option("--retry-delay <ms>", "Delay in ms between retries")
+  .option("--quiet", "Reduce output", false)
+  .option("--json", "Machine-readable logs", false)
+  .option("--summary <path>", "Write install summary JSON to the given path")
+  .option(
+    "--allow-mismatched-binary",
+    "Allow proceeding when resolved binary identity mismatches the requested editor",
+    false,
+  )
+  .action(async (opts) => {
+    await withConfigAndErrorHandling(async (config, options) => {
+      const { installExtensions } = await import("./commands/install");
+      await installExtensions({ ...options, ...config });
     }, opts);
   });
 

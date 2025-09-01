@@ -24,6 +24,8 @@ interface FromListOptions {
   cacheDir?: string;
   checksum?: boolean;
   format?: string;
+  install?: boolean;
+  downloadOnly?: boolean;
 }
 
 export async function fromList(options: FromListOptions) {
@@ -175,6 +177,62 @@ export async function fromList(options: FromListOptions) {
 
       // Perform bulk download using temporary file
       await downloadBulkExtensions(tempJsonPath, outputDir, bulkOptions);
+
+      // Install after download if requested
+      if (options.install && !options.downloadOnly) {
+        if (!options.quiet) {
+          p.log.info("🔧 Installing downloaded extensions...");
+        }
+
+        const { getInstallFromListService } = await import("../features/install");
+        const installService = getInstallFromListService();
+
+        // Resolve editor for installation
+        const { getEditorService } = await import("../features/install");
+        const editorService = getEditorService();
+        const availableEditors = editorService.getAvailableEditors();
+
+        if (availableEditors.length === 0) {
+          p.log.warn(
+            "⚠️ No editors found for installation. Extensions downloaded but not installed.",
+          );
+          return;
+        }
+
+        // Auto-select editor (prefer Cursor)
+        const editor = availableEditors.find((e) => e.name === "cursor") || availableEditors[0];
+        const binPath = editor.binaryPath;
+
+        // Use the same list file for installation
+        const installResult = await installService.installFromList(
+          binPath,
+          filePath,
+          [outputDir], // Search in the download directory
+          {
+            downloadMissing: false, // Already downloaded
+            installOptions: {
+              dryRun: false,
+              skipInstalled: true, // Skip already installed by default
+              parallel: 1, // Conservative for post-download install
+              retry: Number(options.retry) || 2,
+              retryDelay: Number(options.retryDelay) || 1000,
+              quiet: options.quiet,
+            },
+          },
+          (message) => {
+            if (!options.quiet) {
+              p.log.info(`🔧 ${message}`);
+            }
+          },
+        );
+
+        if (!options.quiet) {
+          p.note(
+            `Downloaded: ${extensionIds.length}\nInstalled: ${installResult.installedExtensions}\nSkipped: ${installResult.skippedExtensions}\nFailed: ${installResult.failedExtensions}`,
+            "Download & Install Summary",
+          );
+        }
+      }
     } finally {
       // Clean up temporary file
       if (fs.existsSync(tempJsonPath)) {
@@ -183,7 +241,11 @@ export async function fromList(options: FromListOptions) {
     }
 
     if (!options.quiet) {
-      p.outro("✨ Download completed!");
+      if (options.install && !options.downloadOnly) {
+        p.outro("✨ Download and install completed!");
+      } else {
+        p.outro("✨ Download completed!");
+      }
     }
   } catch (error) {
     p.log.error("❌ Error: " + (error instanceof Error ? error.message : String(error)));

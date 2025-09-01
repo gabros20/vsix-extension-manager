@@ -17,6 +17,7 @@ A modern CLI for downloading, exporting, importing, and managing VS Code/Cursor 
   - [Bulk Download from JSON](#bulk-download-from-json)
   - [Export Installed Extensions](#export-installed-extensions)
   - [Download from Lists](#download-from-lists)
+  - [Install Extensions](#install-extensions)
   - [Versions Command](#versions-command)
   - [Manual Installation Methods](#manual-installation-methods)
 - [Configuration / Options](#configuration--options)
@@ -36,7 +37,7 @@ A modern CLI for downloading, exporting, importing, and managing VS Code/Cursor 
 
 Microsoft added an environment check that blocks Cursor (a VS Code fork) from accessing the official marketplace, resulting in “This extension is not available in your environment” errors. That also hurts workflows that require offline installs, version pinning, and bulk setup.
 
-VSIX Extension Manager solves this with a fast, reliable CLI for downloading VSIX files, exporting installed extensions, importing lists, and managing versions across both the Visual Studio Marketplace and OpenVSX.
+VSIX Extension Manager solves this with a fast, reliable CLI for downloading VSIX files, exporting installed extensions, importing lists, managing versions, and installing extensions directly into VS Code and Cursor across both the Visual Studio Marketplace and OpenVSX.
 
 ### Features / Highlights
 
@@ -44,6 +45,8 @@ VSIX Extension Manager solves this with a fast, reliable CLI for downloading VSI
 - ✅ Single and bulk downloads, including mixed-source lists
 - ✅ Resolve latest version (stable by default) or prefer pre-release
 - ✅ Export installed extensions from VS Code or Cursor (txt/extensions.json)
+- ✅ Install VSIX files directly into VS Code or Cursor
+- ✅ Install from exported lists with automatic downloading
 - ✅ Input lists: .txt or VS Code `extensions.json`
 - ✅ Checksums: generate SHA256 or verify against a known hash
 - ✅ Configurable output/cache directories and filename templates
@@ -75,6 +78,29 @@ npm run build
 
 ### Usage / Examples
 
+#### Quick Start - Install Extensions
+
+```bash
+# Install a single VSIX file
+vsix-extension-manager install --vsix ./extension.vsix
+
+# Install all VSIX files from downloads folder
+vsix-extension-manager install --vsix-dir ./downloads
+
+# Install from exported extension list (with auto-download)
+vsix-extension-manager install --file extensions.txt --download-missing
+
+# Download and install in one command
+vsix-extension-manager download \
+  --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" \
+  --version latest \
+  --install-after
+
+# Export from one machine, install on another
+vsix-extension-manager export-installed -o my-extensions.txt
+vsix-extension-manager install --file my-extensions.txt --download-missing
+```
+
 #### Interactive Mode
 
 ```bash
@@ -86,6 +112,9 @@ Interactive Mode Menu:
 - Download single extension from marketplace URL
 - Download multiple extensions from JSON collection (URLs + versions)
 - Download from exported list (txt / extensions.json)
+- Install single VSIX file into VS Code/Cursor
+- Install all VSIX files from directory
+- Install extensions from list into VS Code/Cursor
 - Export installed extensions to (txt / extensions.json)
 - Show extension versions for extension URL
 
@@ -125,6 +154,12 @@ vsix-extension-manager download \
 # Generate checksum or verify against a known hash
 vsix-extension-manager download --url "..." --version "1.2.3" --checksum
 vsix-extension-manager download --url "..." --version "1.2.3" --verify-checksum "<sha256>"
+
+# Download and install in one command
+vsix-extension-manager download \
+  --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" \
+  --version "2023.20.0" \
+  --install-after
 ```
 
 #### Bulk from JSON collection (URLs + versions)
@@ -151,6 +186,12 @@ vsix-extension-manager download \
   --retry-delay 1500 \
   --summary ./summary.json \
   --quiet
+
+# Download and install bulk extensions
+vsix-extension-manager download \
+  --file ./extensions.json \
+  --output ./downloads \
+  --install-after
 ```
 
 #### Export Installed Extensions
@@ -196,6 +237,246 @@ vsix-extension-manager from-list \
   --retry 3 \
   --checksum \
   --quiet
+
+# Download and install in one command
+vsix-extension-manager from-list --file extensions.txt --install
+
+# Download only (explicit, default behavior)
+vsix-extension-manager from-list --file extensions.txt --download-only
+```
+
+#### Install Extensions
+
+Install VSIX files directly into VS Code or Cursor editors. The install feature automatically detects available editors and provides robust error handling with retry logic.
+
+##### Install single VSIX file
+
+```bash
+# Interactive mode - prompts for file and editor selection
+vsix-extension-manager install
+
+# Install specific VSIX file with auto-detected editor
+vsix-extension-manager install --vsix ./downloads/ms-python.python-2023.1.0.vsix
+
+# Specify target editor explicitly
+vsix-extension-manager install --vsix ./extension.vsix --editor cursor
+vsix-extension-manager install --vsix ./extension.vsix --editor vscode
+vsix-extension-manager install --vsix ./extension.vsix --editor auto
+
+# Use explicit binary paths (useful when editors not in PATH)
+vsix-extension-manager install --vsix ./extension.vsix \
+  --cursor-bin "/Applications/Cursor.app/Contents/Resources/app/bin/cursor"
+
+vsix-extension-manager install --vsix ./extension.vsix \
+  --code-bin "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+
+# Dry run to see what would be installed
+vsix-extension-manager install --vsix ./extension.vsix --dry-run
+
+# Generate installation summary
+vsix-extension-manager install --vsix ./extension.vsix --summary install-log.json
+```
+
+##### Install all VSIX files from directory
+
+```bash
+# Install all VSIX files from downloads directory
+vsix-extension-manager install --vsix-dir ./downloads
+
+# Install from multiple directories (searches all)
+vsix-extension-manager install --vsix-dir ./downloads --vsix-dir ./cache
+
+# Install with retry and parallel processing
+vsix-extension-manager install --vsix-dir ./downloads --parallel 3 --retry 2
+
+# Skip already installed extensions (version-aware)
+vsix-extension-manager install --vsix-dir ./downloads --skip-installed
+
+# Force reinstall (ignore version checks)
+vsix-extension-manager install --vsix-dir ./downloads --force-reinstall
+
+# Dry run (show what would be installed without changes)
+vsix-extension-manager install --vsix-dir ./downloads --dry-run
+
+# Quiet operation for scripts
+vsix-extension-manager install --vsix-dir ./downloads --quiet
+
+# Machine-readable JSON output
+vsix-extension-manager install --vsix-dir ./downloads --json
+```
+
+##### Install from extension list
+
+```bash
+# Install from text file (downloads missing extensions automatically)
+vsix-extension-manager install --file extensions.txt --download-missing
+
+# Install from VS Code extensions.json format
+vsix-extension-manager install --file .vscode/extensions.json --download-missing
+
+# Install only if VSIX files already exist (no auto-download)
+vsix-extension-manager install --file extensions.txt
+
+# Specify search directories for existing VSIX files
+vsix-extension-manager install --file extensions.txt \
+  --vsix-dir ./downloads \
+  --vsix-dir ./cache
+
+# Complete workflow: download missing then install all
+vsix-extension-manager install --file extensions.txt \
+  --download-missing \
+  --skip-installed \
+  --parallel 2
+
+# Dry run to preview installation plan
+vsix-extension-manager install --file extensions.txt \
+  --download-missing \
+  --dry-run
+```
+
+##### Advanced configuration and workflows
+
+```bash
+# Generate detailed JSON summary of installation
+vsix-extension-manager install --vsix-dir ./downloads \
+  --summary install-results.json \
+  --skip-installed
+
+# Quiet mode with JSON output for CI/automation
+vsix-extension-manager install --vsix-dir ./downloads \
+  --quiet \
+  --json \
+  --skip-installed
+
+# Full configuration example
+vsix-extension-manager install \
+  --file extensions.txt \
+  --download-missing \
+  --vsix-dir ./downloads \
+  --vsix-dir ./cache \
+  --editor auto \
+  --parallel 2 \
+  --retry 3 \
+  --retry-delay 2000 \
+  --skip-installed \
+  --summary results.json \
+  --quiet
+
+# Install with explicit editor binary (useful in containers/CI)
+vsix-extension-manager install --vsix-dir ./downloads \
+  --code-bin "/usr/bin/code" \
+  --skip-installed \
+  --quiet
+```
+
+##### Integration with download commands
+
+```bash
+# Download and install single extension in one command
+vsix-extension-manager download \
+  --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" \
+  --version latest \
+  --install-after
+
+# Download from list and install automatically
+vsix-extension-manager from-list --file extensions.txt --install
+
+# Download only (explicit default behavior)
+vsix-extension-manager from-list --file extensions.txt --download-only
+```
+
+#### Editor Detection and Setup
+
+The install feature automatically detects VS Code and Cursor installations across platforms:
+
+##### Automatic Detection
+
+```bash
+# Auto-detect available editors (prefers Cursor if both installed)
+vsix-extension-manager install --editor auto
+
+# The tool searches these locations automatically:
+# macOS:
+#   /Applications/Visual Studio Code.app/Contents/Resources/app/bin/code
+#   /Applications/Cursor.app/Contents/Resources/app/bin/cursor
+#   /usr/local/bin/code, /usr/local/bin/cursor (Homebrew)
+#
+# Windows:
+#   %PROGRAMFILES%\Microsoft VS Code\bin\code.cmd
+#   %LOCALAPPDATA%\Programs\cursor\resources\app\bin\cursor.cmd
+#
+# Linux:
+#   /usr/bin/code, /usr/bin/cursor
+#   /snap/bin/code, /snap/bin/cursor
+#   ~/.local/bin/code, ~/.local/bin/cursor
+```
+
+When multiple editors are detected, the selection labels show identity status: "— OK" when the binary matches the chosen editor or "— MISMATCH" when it doesn’t. Mismatches are blocked unless you pass `--allow-mismatched-binary` or provide an explicit `--code-bin`/`--cursor-bin`.
+
+##### Manual Configuration
+
+```bash
+# Specify editor binary explicitly
+vsix-extension-manager install --vsix extension.vsix \
+  --cursor-bin "/custom/path/to/cursor"
+
+# Use environment variables for persistent configuration
+export VSIX_CODE_BIN="/usr/local/bin/code"
+export VSIX_CURSOR_BIN="/opt/cursor/bin/cursor"
+vsix-extension-manager install --vsix extension.vsix
+
+# Configuration file example (.vsixrc.json)
+{
+  "editor": "cursor",
+  "codeBin": "/usr/local/bin/code",
+  "cursorBin": "/Applications/Cursor.app/Contents/Resources/app/bin/cursor",
+  "installParallel": 2,
+  "skipInstalled": true
+}
+```
+
+##### Troubleshooting Editor Detection
+
+```bash
+# Check which editors are detected
+vsix-extension-manager install --vsix ./extension.vsix --dry-run
+
+# If no editors found:
+# 1. Install VS Code: https://code.visualstudio.com/
+# 2. Install Cursor: https://cursor.sh/
+# 3. Ensure binaries are in PATH or use explicit paths
+
+# Test editor binary manually
+code --version     # Should show VS Code version
+cursor --version   # Should show Cursor version
+```
+
+##### Binary mismatch: `code` launches Cursor (or vice versa)
+
+Symptoms: installation appears successful but the extension isn’t visible in the expected editor. Often `code` in PATH is a symlink to Cursor.
+
+Fix:
+
+- Option A (recommended): In Visual Studio Code, open Command Palette → Shell Command: Install "code" command in PATH
+- Option B (terminal):
+
+```bash
+sudo ln -sf "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" /usr/local/bin/code
+```
+
+Verify:
+
+```bash
+ls -l /usr/local/bin/code
+code --version
+```
+
+You can also bypass the check (not recommended):
+
+```bash
+vsix-extension-manager install --vsix ./ext.vsix --editor vscode --allow-mismatched-binary
+# Or set env var
+export VSIX_ALLOW_MISMATCHED_BINARY=true
 ```
 
 #### Show extension versions (URL)
@@ -225,11 +506,19 @@ code   --install-extension ./downloads/<file>.vsix
 
 ### Which mode should I use?
 
-| Mode                        | Input                                     | Version resolution                       | Parallel                                | Best for                          |
-| --------------------------- | ----------------------------------------- | ---------------------------------------- | --------------------------------------- | --------------------------------- |
-| Single extension (URL)      | Marketplace/OpenVSX URL                   | Exact or `latest` (pre-release optional) | N/A                                     | One-off downloads                 |
-| Bulk from JSON collection   | JSON array of `{ url, version, source? }` | Exact or `latest` per entry              | Yes (CLI `--parallel`, non-interactive) | Mixed sources, pinned versions    |
-| Download from exported list | `txt` of IDs or `extensions.json`         | Resolves `latest` automatically          | Yes (CLI)                               | Migrating/export-import workflows |
+| Mode                        | Input                                     | Version resolution                       | Parallel                                | Best for                           |
+| --------------------------- | ----------------------------------------- | ---------------------------------------- | --------------------------------------- | ---------------------------------- |
+| **Download Modes**          |                                           |                                          |                                         |                                    |
+| Single extension (URL)      | Marketplace/OpenVSX URL                   | Exact or `latest` (pre-release optional) | N/A                                     | One-off downloads                  |
+| Bulk from JSON collection   | JSON array of `{ url, version, source? }` | Exact or `latest` per entry              | Yes (CLI `--parallel`, non-interactive) | Mixed sources, pinned versions     |
+| Download from exported list | `txt` of IDs or `extensions.json`         | Resolves `latest` automatically          | Yes (CLI)                               | Migrating/export-import workflows  |
+| **Install Modes**           |                                           |                                          |                                         |                                    |
+| Install single VSIX         | Single `.vsix` file path                  | N/A (version in filename)                | N/A                                     | Testing individual extensions      |
+| Install from directory      | Directory path (scans for `.vsix`)        | N/A (version in filename)                | Yes (CLI `--parallel`)                  | Bulk setup from downloads          |
+| Install from list           | `txt` or `extensions.json`                | Resolves `latest` (or uses existing)     | Yes (CLI `--parallel`)                  | Complete environment setup         |
+| **Integrated Workflows**    |                                           |                                          |                                         |                                    |
+| Download + Install          | URL + `--install-after`                   | Exact or `latest`                        | N/A                                     | One-step download and install      |
+| List Download + Install     | `txt`/JSON + `--install`                  | Resolves `latest` automatically          | Yes (download and install)              | Complete setup from exported lists |
 
 ### Configuration / Options
 
@@ -297,6 +586,19 @@ export VSIX_SOURCE="marketplace"   # or open-vsx
 export VSIX_PRE_RELEASE=false
 export VSIX_CHECKSUM=true
 export VSIX_EDITOR="auto"           # vscode | cursor | auto
+
+# Install settings
+export VSIX_INSTALL_PARALLEL=1      # Number of parallel installs
+export VSIX_INSTALL_RETRY=2         # Number of retry attempts per install
+export VSIX_INSTALL_RETRY_DELAY=1000 # Delay between retries in ms
+export VSIX_SKIP_INSTALLED=false    # Skip if same version already installed
+export VSIX_FORCE_REINSTALL=false   # Force reinstall even if same version
+export VSIX_DRY_RUN=false           # Show what would be installed without changes
+
+# Editor binary paths
+export VSIX_CODE_BIN=""             # Explicit path to VS Code binary
+export VSIX_CURSOR_BIN=""           # Explicit path to Cursor binary
+export VSIX_ALLOW_MISMATCHED_BINARY=false # Allow proceeding when binary identity mismatches editor
 ```
 
 #### Options Overview
@@ -315,6 +617,7 @@ export VSIX_EDITOR="auto"           # vscode | cursor | auto
   - `--checksum` / `--verify-checksum <sha256>`
   - `--quiet` / `--json` (machine-readable)
   - `--summary <path>`: write bulk summary JSON
+  - `--install-after`: install downloaded extensions
 
 - Export-Installed:
   - `--output <path>`
@@ -327,7 +630,28 @@ export VSIX_EDITOR="auto"           # vscode | cursor | auto
   - `--file <path>`
   - `--output <path>`
   - `--format <txt|extensions.json|auto>`
+  - `--install`: Install after downloading
+  - `--download-only`: Download only (default)
   - Inherits bulk options from download
+
+- Install:
+  - `--vsix <path>`: Single VSIX file to install
+  - `--vsix-dir <path>`: Directory to scan for VSIX files (recursive). Repeat flag to add multiple directories.
+  - `--file <path>`: Extension list file (.txt or extensions.json)
+  - `--download-missing`: Download missing extensions when installing from list
+  - `--editor <vscode|cursor|auto>`: Target editor (default: auto)
+  - `--code-bin <path>`: Explicit VS Code binary path
+  - `--cursor-bin <path>`: Explicit Cursor binary path
+  - `--skip-installed`: Skip if same version already installed
+  - `--force-reinstall`: Force reinstall even if same version
+  - `--dry-run`: Show what would be installed without changes
+  - `--parallel <n>`: Number of parallel installs (default: 1)
+  - `--retry <n>`: Number of retry attempts per install
+  - `--retry-delay <ms>`: Delay between retries
+  - `--quiet`: Reduce output
+  - `--json`: Machine-readable logs
+  - `--summary <path>`: Write install summary JSON
+  - `--allow-mismatched-binary`: Proceed even if `code` points to Cursor or vice versa (not recommended)
 
 - Global:
   - `--config <path>`
@@ -377,7 +701,55 @@ See [`TODO.md`](TODO.md) for upcoming features and ideas. Feedback and PRs are a
 
 ### FAQ / Troubleshooting
 
-- Why can’t I install some Microsoft extensions in Cursor?
+- How do I install VS Code/Cursor if they're not found?
+  - Install VS Code from https://code.visualstudio.com/ or Cursor from https://cursor.sh/
+  - Or use explicit binary paths: `--code-bin "/path/to/code"` or `--cursor-bin "/path/to/cursor"`
+
+- Why does installation fail with "Extension is not available in your environment"?
+  - Some Microsoft extensions have additional license/compatibility checks. Try OpenVSX instead: `--source open-vsx`
+  - Or use `--force-reinstall` to bypass version checks
+
+- Can I install extensions without downloading them first?
+  - Yes! Use `install --file extensions.txt --download-missing` to download and install in one step
+
+- How do I know which extensions are already installed?
+  - The install command automatically checks installed extensions when using `--skip-installed`
+  - Use `--dry-run` to see what would be installed without making changes
+
+- Why can't the installer find my editor binary?
+  - Ensure VS Code/Cursor is installed and the binary is in your PATH
+  - Or specify explicit paths: `--code-bin` or `--cursor-bin`
+  - On macOS, check `/Applications/` for the `.app` bundles
+
+- What happens if an installation fails?
+  - Failed installations are retried automatically (configurable with `--retry`)
+  - Use `--summary results.json` to get detailed failure information
+  - Check the error message for specific troubleshooting steps
+
+- Can I download and install in one command?
+  - Yes! Use `download --install-after` for single extensions
+  - Or use `from-list --install` for bulk operations from exported lists
+
+- How do I set up a complete development environment?
+  - Export from existing setup: `vsix-extension-manager export-installed -o my-setup.txt`
+  - Install on new machine: `vsix-extension-manager install --file my-setup.txt --download-missing`
+
+- What's the difference between install modes?
+  - `install --vsix`: Install single VSIX file you already have
+  - `install --vsix-dir`: Install all VSIX files from directory/directories
+  - `install --file`: Install from extension list (with optional auto-download)
+
+- How do I handle permission errors during installation?
+  - Ensure your user has permission to run the editor CLI
+  - On macOS/Linux, you may need to run with appropriate permissions
+  - Check that the editor binary is executable: `ls -la $(which code)`
+
+- Can I install different extensions to different editors?
+  - Yes, run separate commands with `--editor vscode` and `--editor cursor`
+  - Or use explicit binary paths to target specific installations
+  - Binary mismatch detection: if `code` actually points to Cursor (or vice‑versa), the tool warns and blocks by default. Fix PATH via VS Code’s Command Palette (Shell Command: Install 'code' command in PATH) or pass explicit `--code-bin`/`--cursor-bin`. Use `--allow-mismatched-binary` to override.
+
+- Why can't I install some Microsoft extensions in Cursor?
   - Some official Microsoft extensions enforce license or compatibility checks. Downloading the VSIX may still be restricted by the extension’s policies.
 
 - Does it support OpenVSX?
@@ -401,12 +773,12 @@ See [`TODO.md`](TODO.md) for upcoming features and ideas. Feedback and PRs are a
 
 ### License
 
-MIT — see [`LICENSE`](LICENSE).
+MIT — see [LICENSE](LICENSE).
 
 ### Acknowledgments
 
-- Inspired by [`mjmirza/download-vsix-from-visual-studio-market-place`](https://github.com/mjmirza/download-vsix-from-visual-studio-market-place)
-- Built with modern CLI tooling: [`Commander.js`](https://github.com/tj/commander.js) and [`@clack/prompts`](https://github.com/natemooe/clack)
+- Inspired by [mjmirza/download-vsix-from-visual-studio-market-place](https://github.com/mjmirza/download-vsix-from-visual-studio-market-place)
+- Built with modern CLI tooling: [Commander.js](https://github.com/tj/commander.js) and [@clack/prompts](https://github.com/natemooe/clack)
 
 <div align="left" style="padding-top: 20px; display: flex; flex-direction: row; align-items: center; gap: 10px;">
   <img src="assets/cursor-inside.png" alt="Built with Cursor" width="100" />

@@ -2,6 +2,7 @@
 
 // Core error types and base classes
 export * from "./types";
+export { InstallError } from "./types";
 
 // Predefined error definitions and factory functions
 export * from "./definitions";

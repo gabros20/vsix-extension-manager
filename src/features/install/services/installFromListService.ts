@@ -1,0 +1,371 @@
+import path from "path";
+import fs from "fs-extra";
+import { parseExtensionsList } from "../../import";
+import { downloadBulkExtensions } from "../../download";
+import { resolveVersion } from "../../../core/registry";
+import { getInstallService, InstallTask, BulkInstallResult } from "./installService";
+import { getVsixScanner, VsixFile } from "./vsixScannerService";
+import { InstallError } from "../../../core/errors";
+
+export interface InstallFromListOptions {
+  downloadMissing?: boolean;
+  downloadOptions?: {
+    outputDir?: string;
+    cacheDir?: string;
+    source?: "marketplace" | "open-vsx" | "auto";
+    preRelease?: boolean;
+    quiet?: boolean;
+    parallel?: number | string;
+    retry?: number | string;
+    retryDelay?: number | string;
+  };
+  installOptions?: {
+    dryRun?: boolean;
+    forceReinstall?: boolean;
+    skipInstalled?: boolean;
+    parallel?: number;
+    retry?: number;
+    retryDelay?: number;
+    timeout?: number;
+    quiet?: boolean;
+  };
+}
+
+export interface InstallFromListResult {
+  totalExtensions: number;
+  foundVsixFiles: number;
+  downloadedExtensions: number;
+  installedExtensions: number;
+  skippedExtensions: number;
+  failedExtensions: number;
+  downloadResult?: {
+    total: number;
+    successful: number;
+    failed: number;
+  };
+  installResult: BulkInstallResult;
+  errors: string[];
+}
+
+/**
+ * Service for installing extensions from lists (with optional download)
+ */
+export class InstallFromListService {
+  private installService = getInstallService();
+  private vsixScanner = getVsixScanner();
+
+  /**
+   * Install extensions from a list file
+   */
+  async installFromList(
+    binaryPath: string,
+    listPath: string,
+    vsixSearchDirs: string[],
+    options: InstallFromListOptions = {},
+    progressCallback?: (message: string) => void,
+  ): Promise<InstallFromListResult> {
+    // const startTime = Date.now(); // currently unused; kept for future duration metrics
+    const result: InstallFromListResult = {
+      totalExtensions: 0,
+      foundVsixFiles: 0,
+      downloadedExtensions: 0,
+      installedExtensions: 0,
+      skippedExtensions: 0,
+      failedExtensions: 0,
+      installResult: {
+        total: 0,
+        successful: 0,
+        skipped: 0,
+        failed: 0,
+        results: [],
+        elapsedMs: 0,
+      },
+      errors: [],
+    };
+
+    try {
+      // Parse the extension list
+      progressCallback?.("Parsing extension list...");
+      const content = await fs.readFile(listPath, "utf-8");
+      const format = this.detectListFormat(listPath, content);
+      const extensionIds = parseExtensionsList(content, format, listPath);
+
+      result.totalExtensions = extensionIds.length;
+
+      if (extensionIds.length === 0) {
+        return result;
+      }
+
+      // Scan for existing VSIX files
+      progressCallback?.("Scanning for existing VSIX files...");
+      const existingVsixFiles = await this.scanForVsixFiles(vsixSearchDirs);
+      result.foundVsixFiles = existingVsixFiles.length;
+
+      // Create install tasks
+      const installTasks = await this.createInstallTasks(
+        extensionIds,
+        existingVsixFiles,
+        options.downloadMissing || false,
+        options.installOptions?.dryRun || false,
+      );
+
+      // Download missing extensions if requested
+      if (options.downloadMissing) {
+        progressCallback?.("Downloading missing extensions...");
+        const downloadResult = await this.downloadMissingExtensions(
+          installTasks.missing,
+          options.downloadOptions || {},
+        );
+
+        result.downloadedExtensions = downloadResult.successful;
+        result.downloadResult = {
+          total: downloadResult.total,
+          successful: downloadResult.successful,
+          failed: downloadResult.failed,
+        };
+
+        if (downloadResult.failed > 0) {
+          result.errors.push(`${downloadResult.failed} extensions failed to download`);
+        }
+
+        // Re-scan for newly downloaded VSIX files
+        const updatedVsixFiles = await this.scanForVsixFiles(vsixSearchDirs);
+        const updatedTasks = await this.createInstallTasks(
+          extensionIds,
+          updatedVsixFiles,
+          false, // Don't download again
+          options.installOptions?.dryRun || false,
+        );
+        installTasks.found = updatedTasks.found;
+      }
+
+      // Install found extensions
+      progressCallback?.("Installing extensions...");
+      const installResult = await this.installService.installBulkVsix(
+        binaryPath,
+        installTasks.found,
+        options.installOptions || {},
+      );
+
+      result.installResult = installResult;
+      result.installedExtensions = installResult.successful;
+      result.skippedExtensions = installResult.skipped;
+      result.failedExtensions = installResult.failed;
+    } catch (error) {
+      result.errors.push(
+        `Install from list failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    return result;
+  }
+
+  /**
+   * Detect the format of the list file
+   */
+  private detectListFormat(
+    filePath: string,
+    content: string,
+  ): "txt" | "extensions.json" | undefined {
+    const ext = path.extname(filePath).toLowerCase();
+
+    if (ext === ".json") {
+      try {
+        const parsed = JSON.parse(content);
+        return parsed.recommendations ? "extensions.json" : "txt";
+      } catch {
+        return "txt";
+      }
+    }
+
+    return "txt";
+  }
+
+  /**
+   * Scan directories for VSIX files
+   */
+  private async scanForVsixFiles(searchDirs: string[]): Promise<VsixFile[]> {
+    const allVsixFiles: VsixFile[] = [];
+
+    for (const dir of searchDirs) {
+      if (await fs.pathExists(dir)) {
+        try {
+          const scanResult = await this.vsixScanner.scanDirectory(dir);
+          allVsixFiles.push(...scanResult.validVsixFiles);
+        } catch (error) {
+          // Continue with other directories if one fails
+          console.warn(
+            `Warning: Failed to scan directory ${dir}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+    }
+
+    return allVsixFiles;
+  }
+
+  /**
+   * Create install tasks by matching extension IDs to VSIX files
+   */
+  private async createInstallTasks(
+    extensionIds: string[],
+    vsixFiles: VsixFile[],
+    shouldDownloadMissing: boolean,
+    dryRun: boolean = false,
+  ): Promise<{ found: InstallTask[]; missing: string[] }> {
+    const found: InstallTask[] = [];
+    const missing: string[] = [];
+
+    // Group VSIX files by extension ID for efficient lookup
+    const vsixGroups = this.vsixScanner.groupByExtensionId(vsixFiles);
+
+    for (const extensionId of extensionIds) {
+      const availableVsixFiles = vsixGroups.get(extensionId) || [];
+
+      if (availableVsixFiles.length > 0) {
+        // Find the best match (latest version, most recent file)
+        const bestMatch = availableVsixFiles.sort((a, b) => {
+          // Prefer files with version info
+          if (a.version && !b.version) return -1;
+          if (!a.version && b.version) return 1;
+
+          // Then by modification time (newer first)
+          return b.modified.getTime() - a.modified.getTime();
+        })[0];
+
+        found.push({
+          vsixFile: bestMatch,
+          extensionId,
+          targetVersion: bestMatch.version,
+        });
+      } else if (shouldDownloadMissing) {
+        missing.push(extensionId);
+      } else {
+        if (dryRun) {
+          // Tolerate missing in dry-run, report via caller
+          missing.push(extensionId);
+        } else {
+          // No VSIX found and not downloading - this is an error
+          throw new InstallError(
+            `No VSIX file found for extension: ${extensionId}`,
+            "INSTALL_NO_VSIX_FOUND",
+            [
+              {
+                action: "Check directories",
+                description: "Ensure VSIX files are in the search directories",
+              },
+              {
+                action: "Use --download-missing",
+                description: "Use --download-missing to download missing extensions",
+              },
+              {
+                action: "Specify directories",
+                description: "Use --vsix-dir to specify additional search directories",
+              },
+            ],
+            { extensionId },
+          );
+        }
+      }
+    }
+
+    return { found, missing };
+  }
+
+  /**
+   * Download missing extensions
+   */
+  private async downloadMissingExtensions(
+    missingIds: string[],
+    downloadOptions: InstallFromListOptions["downloadOptions"],
+  ): Promise<{ total: number; successful: number; failed: number }> {
+    if (missingIds.length === 0) {
+      return { total: 0, successful: 0, failed: 0 };
+    }
+
+    // Create a temporary directory for downloads
+    const tempDir = path.join(process.cwd(), ".vsix-temp-install");
+    await fs.ensureDir(tempDir);
+
+    try {
+      // Create bulk download items
+      const bulkItems = [];
+      for (const id of missingIds) {
+        // Resolve latest version for each extension
+        try {
+          const version = await resolveVersion(
+            id,
+            "latest",
+            downloadOptions?.preRelease || false,
+            downloadOptions?.source || "marketplace",
+          );
+
+          bulkItems.push({
+            url: `https://marketplace.visualstudio.com/items?itemName=${id}`,
+            version,
+            name: id,
+          });
+        } catch (error) {
+          console.warn(
+            `Warning: Failed to resolve version for ${id}: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          // Use latest as fallback
+          bulkItems.push({
+            url: `https://marketplace.visualstudio.com/items?itemName=${id}`,
+            version: "latest",
+            name: id,
+          });
+        }
+      }
+
+      // Create temporary JSON file
+      const tempJsonPath = path.join(tempDir, "extensions.json");
+      await fs.writeJson(tempJsonPath, bulkItems);
+
+      // Download the extensions
+      const source = downloadOptions?.source === "auto" ? undefined : downloadOptions?.source;
+      const bulkOptions = {
+        parallel: downloadOptions?.parallel ? Number(downloadOptions.parallel) : 3,
+        retry: downloadOptions?.retry ? Number(downloadOptions.retry) : 2,
+        retryDelay: downloadOptions?.retryDelay ? Number(downloadOptions.retryDelay) : 1000,
+        quiet: downloadOptions?.quiet ?? true,
+        source: source as "marketplace" | "open-vsx" | undefined,
+        filenameTemplate: "{publisher}.{name}-{version}.vsix",
+      };
+
+      const outputDir = downloadOptions?.cacheDir || downloadOptions?.outputDir || tempDir;
+      await downloadBulkExtensions(tempJsonPath, outputDir, bulkOptions);
+
+      // Count successful downloads (rough estimate)
+      const downloadedFiles = await fs.readdir(outputDir);
+      const vsixFiles = downloadedFiles.filter((file) => file.endsWith(".vsix"));
+
+      return {
+        total: missingIds.length,
+        successful: vsixFiles.length,
+        failed: missingIds.length - vsixFiles.length,
+      };
+    } finally {
+      // Clean up temp directory (keep downloads if they were saved elsewhere)
+      if (downloadOptions?.outputDir !== tempDir) {
+        try {
+          await fs.remove(tempDir);
+        } catch (error) {
+          console.warn(
+            `Warning: Failed to clean up temp directory: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+    }
+  }
+}
+
+// Global instance
+let globalInstallFromListService: InstallFromListService | null = null;
+
+export function getInstallFromListService(): InstallFromListService {
+  if (!globalInstallFromListService) {
+    globalInstallFromListService = new InstallFromListService();
+  }
+  return globalInstallFromListService;
+}
