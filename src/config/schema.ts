@@ -40,6 +40,19 @@ export const ConfigSchema = z.object({
 
   // Workspace settings
   editor: z.enum(["vscode", "cursor", "auto"]).default("auto"),
+
+  // Install settings
+  installParallel: z.number().int().min(1).max(20).default(1),
+  installRetry: z.number().int().min(0).max(10).default(2),
+  installRetryDelay: z.number().int().min(0).max(30000).default(1000), // ms
+  skipInstalled: z.boolean().default(false),
+  forceReinstall: z.boolean().default(false),
+  dryRun: z.boolean().default(false),
+  allowMismatchedBinary: z.boolean().default(false),
+
+  // Editor binary paths
+  codeBin: z.string().optional(),
+  cursorBin: z.string().optional(),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
@@ -70,6 +83,19 @@ export const ENV_VAR_MAP = {
   VSIX_USER_AGENT: "userAgent",
   VSIX_PROGRESS_INTERVAL: "progressUpdateInterval",
   VSIX_EDITOR: "editor",
+
+  // Install settings
+  VSIX_INSTALL_PARALLEL: "installParallel",
+  VSIX_INSTALL_RETRY: "installRetry",
+  VSIX_INSTALL_RETRY_DELAY: "installRetryDelay",
+  VSIX_SKIP_INSTALLED: "skipInstalled",
+  VSIX_FORCE_REINSTALL: "forceReinstall",
+  VSIX_DRY_RUN: "dryRun",
+  VSIX_ALLOW_MISMATCHED_BINARY: "allowMismatchedBinary",
+
+  // Editor binary paths
+  VSIX_CODE_BIN: "codeBin",
+  VSIX_CURSOR_BIN: "cursorBin",
 } as const;
 
 /**

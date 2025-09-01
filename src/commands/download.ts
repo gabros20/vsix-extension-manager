@@ -45,6 +45,7 @@ interface DownloadOptions {
   cacheDir?: string;
   checksum?: boolean;
   verifyChecksum?: string;
+  installAfter?: boolean;
 }
 
 export async function downloadVsix(options: DownloadOptions) {
@@ -359,7 +360,56 @@ async function downloadSingleExtension(options: DownloadOptions) {
       "Download Complete",
     );
 
-    p.outro(`🎉 Successfully downloaded VSIX extension!`);
+    // Install after download if requested
+    if (options.installAfter) {
+      if (!options.quiet) {
+        p.log.info("🔧 Installing downloaded extension...");
+      }
+
+      try {
+        const { getInstallService, getEditorService } = await import("../features/install");
+        const installService = getInstallService();
+        const editorService = getEditorService();
+
+        // Auto-detect editor
+        const availableEditors = editorService.getAvailableEditors();
+        if (availableEditors.length === 0) {
+          p.log.warn(
+            "⚠️ No editors found for installation. Extension downloaded but not installed.",
+          );
+        } else {
+          // Prefer Cursor, fallback to VS Code
+          const editor = availableEditors.find((e) => e.name === "cursor") || availableEditors[0];
+          const binPath = editor.binaryPath;
+
+          const installResult = await installService.installSingleVsix(
+            binPath,
+            downloadedFilePath,
+            {
+              dryRun: false,
+              forceReinstall: false,
+              timeout: 30000,
+            },
+          );
+
+          if (installResult.success) {
+            p.log.success(`✅ Extension installed successfully into ${editor.displayName}!`);
+          } else {
+            p.log.warn(`⚠️ Installation failed: ${installResult.error || "Unknown error"}`);
+          }
+        }
+      } catch (error) {
+        p.log.warn(
+          `⚠️ Installation failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }
+
+    p.outro(
+      options.installAfter
+        ? `🎉 Download and install completed!`
+        : `🎉 Successfully downloaded VSIX extension!`,
+    );
   } catch (error) {
     downloadSpinner.stop("Download failed", 1);
     throw error;
@@ -425,6 +475,67 @@ async function downloadBulkFromJson(options: DownloadOptions) {
   );
 
   await downloadBulkExtensions(jsonPathStr as string, outputDir as string, bulkOptions);
+
+  // Install after bulk download if requested
+  if (options.installAfter) {
+    if (!options.quiet) {
+      p.log.info("🔧 Installing downloaded extensions...");
+    }
+
+    try {
+      const { getInstallService, getEditorService, getVsixScanner } = await import(
+        "../features/install"
+      );
+      const installService = getInstallService();
+      const editorService = getEditorService();
+
+      // Auto-detect editor
+      const availableEditors = editorService.getAvailableEditors();
+      if (availableEditors.length === 0) {
+        p.log.warn(
+          "⚠️ No editors found for installation. Extensions downloaded but not installed.",
+        );
+      } else {
+        // Prefer Cursor, fallback to VS Code
+        const editor = availableEditors.find((e) => e.name === "cursor") || availableEditors[0];
+        const binPath = editor.binaryPath;
+
+        // Install all VSIX files from the output directory
+        const vsixScanner = getVsixScanner();
+        const scanResult = await vsixScanner.scanDirectory(outputDir);
+
+        if (scanResult.validVsixFiles.length > 0) {
+          const installTasks = scanResult.validVsixFiles.map((vsixFile) => ({
+            vsixFile,
+            extensionId: vsixFile.extensionId,
+            targetVersion: vsixFile.version,
+          }));
+
+          const installResult = await installService.installBulkVsix(binPath, installTasks, {
+            dryRun: false,
+            skipInstalled: true,
+            parallel: 1,
+            retry: Number(options.retry) || 2,
+            retryDelay: Number(options.retryDelay) || 1000,
+            quiet: options.quiet,
+          });
+
+          if (!options.quiet) {
+            p.note(
+              `Downloaded: ${scanResult.validVsixFiles.length}\nInstalled: ${installResult.successful}\nSkipped: ${installResult.skipped}\nFailed: ${installResult.failed}`,
+              "Download & Install Summary",
+            );
+          }
+        } else {
+          p.log.warn("⚠️ No valid VSIX files found for installation.");
+        }
+      }
+    } catch (error) {
+      p.log.warn(
+        `⚠️ Installation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
 }
 
 // Lightweight UI entrypoints for interactive launcher

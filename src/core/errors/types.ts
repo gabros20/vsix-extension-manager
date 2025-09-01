@@ -268,6 +268,28 @@ export class DownloadError extends VsixError {
 }
 
 /**
+ * Install-specific errors
+ */
+export class InstallError extends VsixError {
+  constructor(
+    message: string,
+    code: string,
+    suggestions: ErrorSuggestion[] = [],
+    metadata?: Record<string, unknown>,
+  ) {
+    super({
+      code,
+      category: ErrorCategory.SYSTEM,
+      severity: ErrorSeverity.HIGH,
+      title: "Install Error",
+      message,
+      suggestions,
+      metadata,
+    });
+  }
+}
+
+/**
  * User input errors
  */
 export class UserInputError extends VsixError {
