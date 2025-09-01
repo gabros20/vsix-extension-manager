@@ -1,3 +1,9 @@
+# [1.9.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.8.0...v1.9.0) (2025-09-01)
+
+### Features
+
+- improve interactive labels and remove JSON export format ([fb7bdcf](https://github.com/gabros20/vsix-extension-manager/commit/fb7bdcfea6c40abe0855057dd7bfe0bd2beceb34))
+
 # [1.8.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.7.0...v1.8.0) (2025-08-29)
 
 ### Features
