@@ -62,26 +62,29 @@ export async function fromList(options: FromListOptions) {
     if (!format) {
       const ext = path.extname(filePath).toLowerCase();
       if (ext === ".json") {
-        // Check if it's extensions.json format
+        // Only accept VS Code extensions.json
         try {
           const parsed = JSON.parse(content);
-          format = parsed.recommendations ? "extensions.json" : "json";
+          format = parsed.recommendations ? "extensions.json" : undefined;
         } catch {
-          format = "json";
+          format = undefined;
         }
       } else {
         format = "txt";
       }
     }
 
+    if (format === "json") {
+      p.log.error(
+        "❌ JSON arrays of IDs are no longer supported. Use txt (one ID per line) or VS Code extensions.json.",
+      );
+      process.exit(1);
+    }
+
     // Parse extensions list
     let extensionIds: string[];
     try {
-      extensionIds = parseExtensionsList(
-        content,
-        format as "json" | "txt" | "extensions.json",
-        filePath,
-      );
+      extensionIds = parseExtensionsList(content, format as "txt" | "extensions.json", filePath);
     } catch (error) {
       p.log.error(
         `❌ Failed to parse file: ${error instanceof Error ? error.message : String(error)}`,

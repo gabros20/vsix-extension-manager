@@ -71,13 +71,13 @@ export async function downloadVsix(options: DownloadOptions) {
       options: [
         {
           value: "single",
-          label: "📦 Single Extension",
-          hint: "Download one extension interactively",
+          label: "Download single extension from marketplace URL",
+          hint: "Provide extension URL and version (or latest)",
         },
         {
           value: "bulk",
-          label: "📚 Bulk Download",
-          hint: "Download multiple extensions from JSON file",
+          label: "Download multiple extensions from JSON collection (URLs + versions)",
+          hint: "Provide a JSON file of { url, version, source? } entries",
         },
       ],
     });

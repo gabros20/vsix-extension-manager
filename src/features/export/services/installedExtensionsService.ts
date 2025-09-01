@@ -140,9 +140,6 @@ export async function getInstalledExtensions(
  */
 export function formatExtensions(extensions: InstalledExtension[], format: ExportFormat): string {
   switch (format) {
-    case "json":
-      return JSON.stringify(extensions, null, 2);
-
     case "txt":
       return extensions.map((ext) => ext.id).join("\n");
 

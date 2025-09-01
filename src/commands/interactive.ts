@@ -8,11 +8,14 @@ export async function runInteractive(config: Config) {
   const choice = await p.select({
     message: "What do you want to do?",
     options: [
-      { value: "single", label: "📦 Single download" },
-      { value: "bulk", label: "📚 Bulk download (JSON file)" },
-      { value: "from-list", label: "📥 Download from list (txt/json/extensions.json)" },
-      { value: "export", label: "📤 Export installed extensions" },
-      { value: "versions", label: "🔢 List available versions" },
+      { value: "single", label: "Download single extension from marketplace URL" },
+      {
+        value: "bulk",
+        label: "Download multiple extensions from JSON collection (URLs + versions)",
+      },
+      { value: "from-list", label: "Download from exported list (txt / extensions.json)" },
+      { value: "export", label: "Export installed extensions to (txt / extensions.json)" },
+      { value: "versions", label: "Show extension versions for extension URL" },
       { value: "quit", label: "Quit" },
     ],
   });
