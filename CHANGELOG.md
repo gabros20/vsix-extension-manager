@@ -1,3 +1,9 @@
+# [1.10.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.9.1...v1.10.0) (2025-09-01)
+
+### Features
+
+- add bulk VSIX install flow, mismatch safeguards, and docs ([3e8c4a0](https://github.com/gabros20/vsix-extension-manager/commit/3e8c4a07364563de8f2f21153d5ea54de9ea0c70))
+
 # [1.9.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.8.0...v1.9.0) (2025-09-01)
 
 ### Features
