@@ -20,6 +20,18 @@ When a user mentions **"@ai-create-commit.md"**, execute this workflow:
    Proceed with commit? (yes/no/edit)
    ```
 
+   Also present a compact PR body to fill quickly:
+
+   ```
+   - What:
+   - Why:
+   - How:
+   - Test:
+   - Impact: none | minor | breaking
+   - Issue: #___
+   - Notes/Screenshots:
+   ```
+
 3. Branching logic (before committing):
    - If current branch is `main` or `master`, create a new feature or fix branch based on chat history/context:
      - Prefer `feat/` for enhancements or new behavior
@@ -30,8 +42,9 @@ When a user mentions **"@ai-create-commit.md"**, execute this workflow:
    - Echo the chosen branch to the user.
 4. If user agrees, stage and commit: `git add [files] && git commit -m "[message]"`
 5. Push the branch: `git push -u origin $(git branch --show-current)`
-6. Create a PR with GitHub CLI including a clear title and descriptive body:
-   - Command: `gh pr create --title "[title]" --body "[body]"`
+6. Create a PR with GitHub CLI using the compact PR template body:
+   - Command builds body from the template fields collected above.
+   - Command: `gh pr create --title "[title]" --body "- What: [one-liner]\n- Why: [goal]\n- How: [key changes]\n- Test: [steps]\n- Impact: [none|min|breaking]\n- Issue: #[id]\n- Notes/Screenshots: [optional]"`
    - Print the PR URL.
 
 ---
@@ -110,10 +123,12 @@ When a user mentions **"@ai-create-commit.md"**, execute this workflow:
    ```bash
    git push -u origin $(git branch --show-current)
 
-   # Use the commit title as PR title and expand body with a concise description of changes/impact
+   # Use the commit title as PR title; body follows compact PR template
+   COMMIT_TITLE="feat: implement authentication flow"
+
    gh pr create \
-     --title "feat: implement authentication flow" \
-     --body "- Summary of changes\n- Motivation / Context\n- Notes on compatibility / risks (if any)"
+     --title "$COMMIT_TITLE" \
+     --body "- What: Adds login and logout with JWT support\n- Why: Provide authentication for protected routes\n- How: New auth service, JWT middleware, login/logout commands\n- Test: npm test && manual login/logout in app\n- Impact: minor\n- Issue: #___\n- Notes/Screenshots: "
    ```
 
 ### Best Practices

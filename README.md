@@ -5,6 +5,10 @@ A modern CLI for downloading, exporting, importing, and managing VS Code/Cursor 
 [![npm version](https://img.shields.io/npm/v/vsix-extension-manager.svg)](https://www.npmjs.com/package/vsix-extension-manager)
 [![npm downloads](https://img.shields.io/npm/dm/vsix-extension-manager.svg)](https://www.npmjs.com/package/vsix-extension-manager)
 [![license: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![CI](https://github.com/gabros20/vsix-extension-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/gabros20/vsix-extension-manager/actions/workflows/ci.yml)
+[![Release (semantic-release)](https://github.com/gabros20/vsix-extension-manager/actions/workflows/semantic-release.yml/badge.svg)](https://github.com/gabros20/vsix-extension-manager/actions/workflows/semantic-release.yml)
+[![Last commit](https://img.shields.io/github/last-commit/gabros20/vsix-extension-manager)](https://github.com/gabros20/vsix-extension-manager/commits/main)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-donate-FFDD00?logo=buymeacoffee&logoColor=black)](https://www.buymeacoffee.com/tamas_gabor)
 
 ### Table of Contents
 
@@ -824,7 +828,8 @@ MIT — see [LICENSE](LICENSE).
 - Inspired by [mjmirza/download-vsix-from-visual-studio-market-place](https://github.com/mjmirza/download-vsix-from-visual-studio-market-place)
 - Built with modern CLI tooling: [Commander.js](https://github.com/tj/commander.js) and [@clack/prompts](https://github.com/natemooe/clack)
 
-<div align="left" style="padding-top: 20px; display: flex; flex-direction: row; align-items: center; gap: 10px;">
-  <img src="assets/cursor-inside.png" alt="Built with Cursor" width="100" />
-  <em>This package is Built with Cursor for Cursor</em>
-</div>
+<p align="left">
+  <a href="https://www.buymeacoffee.com/tamas_gabor">
+    <img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=&slug=tamas_gabor&button_colour=FFDD00&font_colour=000000&font_family=Lato&outline_colour=000000&coffee_colour=ffffff" alt="Buy Me a Coffee" />
+  </a>
+</p>
