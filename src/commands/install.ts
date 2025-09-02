@@ -152,11 +152,19 @@ async function installSingleVsix(options: InstallOptions) {
 
   if (!vsixPath) {
     const result = await p.text({
-      message: "Enter path to VSIX file:",
+      message: "Enter path to VSIX file or directory:",
       validate: (input: string) => {
-        if (!input.trim()) return "Please enter a VSIX file path";
-        if (!fs.existsSync(input.trim())) return "File does not exist";
-        if (!input.toLowerCase().endsWith(".vsix")) return "File must be a .vsix file";
+        const trimmed = input.trim();
+        if (!trimmed) return "Please enter a path";
+        if (!fs.existsSync(trimmed)) return "File or directory does not exist";
+        try {
+          const stat = fs.statSync(trimmed);
+          if (stat.isFile() && !trimmed.toLowerCase().endsWith(".vsix")) {
+            return "Must be a .vsix file or a directory";
+          }
+        } catch {
+          return "Unable to access the given path";
+        }
         return undefined;
       },
     });
@@ -169,10 +177,45 @@ async function installSingleVsix(options: InstallOptions) {
     vsixPath = result as string;
   }
 
-  // Validate VSIX file exists
+  // Resolve VSIX path: allow directory input and pick a VSIX inside
   if (!fs.existsSync(vsixPath!)) {
     p.log.error(`❌ VSIX file not found: ${vsixPath}`);
     process.exit(1);
+  }
+
+  const vsixStat = fs.statSync(vsixPath!);
+  if (vsixStat.isDirectory()) {
+    const vsixScanner = getVsixScanner();
+    const scanResult = await vsixScanner.scanDirectory(vsixPath!, { recursive: false });
+    const candidates = scanResult.validVsixFiles;
+
+    if (candidates.length === 0) {
+      p.log.error(`❌ No VSIX files found in directory: ${vsixPath}`);
+      process.exit(1);
+    }
+
+    if (!options.quiet && !options.json && candidates.length > 1) {
+      const choice = await p.select({
+        message: "Select VSIX to install:",
+        options: candidates.map((f) => ({ value: f.path, label: f.filename })),
+      });
+      if (p.isCancel(choice)) {
+        p.cancel("Operation cancelled.");
+        process.exit(0);
+      }
+      vsixPath = choice as string;
+    } else {
+      const chosen = candidates.sort((a, b) => b.modified.getTime() - a.modified.getTime())[0];
+      if (!options.quiet) {
+        p.log.info(`🔍 Using ${path.basename(chosen.path)} from directory`);
+      }
+      vsixPath = chosen.path;
+    }
+  } else {
+    if (!vsixPath!.toLowerCase().endsWith(".vsix")) {
+      p.log.error("❌ File must be a .vsix file");
+      process.exit(1);
+    }
   }
 
   const editor = await resolveEditor(options);
