@@ -258,6 +258,9 @@ vsix-extension-manager install
 # Install specific VSIX file with auto-detected editor
 vsix-extension-manager install --vsix ./downloads/ms-python.python-2023.1.0.vsix
 
+# Install from directory - scans for VSIX files and lets you pick
+vsix-extension-manager install --vsix ./downloads
+
 # Specify target editor explicitly
 vsix-extension-manager install --vsix ./extension.vsix --editor cursor
 vsix-extension-manager install --vsix ./extension.vsix --editor vscode
@@ -513,7 +516,7 @@ code   --install-extension ./downloads/<file>.vsix
 | Bulk from JSON collection   | JSON array of `{ url, version, source? }` | Exact or `latest` per entry              | Yes (CLI `--parallel`, non-interactive) | Mixed sources, pinned versions     |
 | Download from exported list | `txt` of IDs or `extensions.json`         | Resolves `latest` automatically          | Yes (CLI)                               | Migrating/export-import workflows  |
 | **Install Modes**           |                                           |                                          |                                         |                                    |
-| Install single VSIX         | Single `.vsix` file path                  | N/A (version in filename)                | N/A                                     | Testing individual extensions      |
+| Install single VSIX         | Single `.vsix` file or directory path     | N/A (version in filename)                | N/A                                     | Testing individual extensions      |
 | Install from directory      | Directory path (scans for `.vsix`)        | N/A (version in filename)                | Yes (CLI `--parallel`)                  | Bulk setup from downloads          |
 | Install from list           | `txt` or `extensions.json`                | Resolves `latest` (or uses existing)     | Yes (CLI `--parallel`)                  | Complete environment setup         |
 | **Integrated Workflows**    |                                           |                                          |                                         |                                    |
@@ -635,7 +638,7 @@ export VSIX_ALLOW_MISMATCHED_BINARY=false # Allow proceeding when binary identit
   - Inherits bulk options from download
 
 - Install:
-  - `--vsix <path>`: Single VSIX file to install
+  - `--vsix <path>`: Single VSIX file or directory to install (directory scans for .vsix files)
   - `--vsix-dir <path>`: Directory to scan for VSIX files (recursive). Repeat flag to add multiple directories.
   - `--file <path>`: Extension list file (.txt or extensions.json)
   - `--download-missing`: Download missing extensions when installing from list
@@ -735,7 +738,7 @@ See [`TODO.md`](TODO.md) for upcoming features and ideas. Feedback and PRs are a
   - Install on new machine: `vsix-extension-manager install --file my-setup.txt --download-missing`
 
 - What's the difference between install modes?
-  - `install --vsix`: Install single VSIX file you already have
+  - `install --vsix`: Install single VSIX file or directory you already have
   - `install --vsix-dir`: Install all VSIX files from directory/directories
   - `install --file`: Install from extension list (with optional auto-download)
 
