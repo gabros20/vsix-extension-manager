@@ -1,3 +1,9 @@
+# [1.12.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.11.0...v1.12.0) (2025-09-02)
+
+### Features
+
+- add quick-install command (temp download → install → cleanup) ([3e5bb9d](https://github.com/gabros20/vsix-extension-manager/commit/3e5bb9d4ae5464066e06f5e9a0c86260baaa7c56))
+
 # [1.11.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.10.0...v1.11.0) (2025-09-02)
 
 ### Features
