@@ -1,3 +1,9 @@
+# [1.11.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.10.0...v1.11.0) (2025-09-02)
+
+### Features
+
+- allow single install to accept directory and pick VSIX inside ([adbdbb2](https://github.com/gabros20/vsix-extension-manager/commit/adbdbb287dd13a97768953de8bd4ecd767fa2abf))
+
 # [1.10.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.9.1...v1.10.0) (2025-09-01)
 
 ### Features
