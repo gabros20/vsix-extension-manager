@@ -8,6 +8,7 @@ export async function runInteractive(config: Config) {
   const choice = await p.select({
     message: "What do you want to do?",
     options: [
+      { value: "quick-install", label: "Quick install by URL (temp download → install → cleanup)" },
       { value: "single", label: "Download single extension from marketplace URL" },
       {
         value: "bulk",
@@ -29,6 +30,11 @@ export async function runInteractive(config: Config) {
   }
 
   switch (choice) {
+    case "quick-install": {
+      const { runQuickInstallUI } = await import("./quickInstall");
+      await runQuickInstallUI({ ...config });
+      break;
+    }
     case "single": {
       const { runSingleDownloadUI } = await import("./download");
       await runSingleDownloadUI({ ...config });

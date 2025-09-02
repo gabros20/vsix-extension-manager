@@ -6,6 +6,16 @@ export function truncateText(text: string, maxLength: number = 30): string {
   return text.slice(0, maxLength - 3) + "...";
 }
 
+// Middle truncation preserving both ends (useful for long paths)
+export function truncateMiddle(text: string, maxLength: number = 80): string {
+  if (text.length <= maxLength) return text;
+  const ellipsis = "...";
+  const keep = Math.max(4, Math.floor((maxLength - ellipsis.length) / 2));
+  const start = text.slice(0, keep);
+  const end = text.slice(-keep);
+  return `${start}${ellipsis}${end}`;
+}
+
 type CliBulk = {
   parallel?: number | string;
   retry?: number | string;

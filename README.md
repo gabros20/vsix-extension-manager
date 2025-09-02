@@ -12,6 +12,7 @@ A modern CLI for downloading, exporting, importing, and managing VS Code/Cursor 
 - [Features / Highlights](#features--highlights)
 - [Installation / Getting Started](#installation--getting-started)
 - [Usage / Examples](#usage--examples)
+  - [Quick Install (one-off)](#quick-install-one-off)
   - [Interactive Mode](#interactive-mode)
   - [Single Extension Download](#single-extension-download)
   - [Bulk Download from JSON](#bulk-download-from-json)
@@ -78,6 +79,36 @@ npm run build
 
 ### Usage / Examples
 
+#### Quick Install (one-off)
+
+Download an extension by URL to a temporary folder, install it, then clean up.
+
+```bash
+# Quick install (auto-detect editor; prefers Cursor)
+vsix-extension-manager quick-install \
+  --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python"
+
+# Shorthand alias
+vsix-extension-manager qi --url "https://open-vsx.org/extension/ms-python/python"
+
+# Explicit editor and binary
+vsix-extension-manager qi \
+  --url "https://marketplace.visualstudio.com/items?itemName=Fuzionix.file-tree-extractor" \
+  --editor cursor \
+  --cursor-bin "/Applications/Cursor.app/Contents/Resources/app/bin/cursor"
+
+# Non-interactive output for scripts/CI
+vsix-extension-manager qi --url "..." --quiet --json
+```
+
+Behavior:
+
+- Creates a unique temp directory
+- Downloads latest (or pre-release with --pre-release)
+- Prompts for target editor when multiple are available (quiet/json prefers Cursor)
+- Installs the VSIX
+- Cleans up the temp directory regardless of outcome
+
 #### Quick Start - Install Extensions
 
 ```bash
@@ -109,6 +140,7 @@ vsix-extension-manager
 
 Interactive Mode Menu:
 
+- Quick install by URL (temp download → install → cleanup)
 - Download single extension from marketplace URL
 - Download multiple extensions from JSON collection (URLs + versions)
 - Download from exported list (txt / extensions.json)
@@ -621,6 +653,15 @@ export VSIX_ALLOW_MISMATCHED_BINARY=false # Allow proceeding when binary identit
   - `--quiet` / `--json` (machine-readable)
   - `--summary <path>`: write bulk summary JSON
   - `--install-after`: install downloaded extensions
+
+- Quick-Install:
+  - `--url <url>`: Marketplace or OpenVSX URL
+  - `--editor <vscode|cursor|auto>`: Target editor (default: auto)
+  - `--code-bin <path>` / `--cursor-bin <path>`: Explicit binaries
+  - `--allow-mismatched-binary`: Proceed when PATH alias points to a different editor
+  - `--pre-release`: Prefer pre-release when resolving latest
+  - `--quiet` / `--json`: Non-interactive / machine-readable output
+  - `--dry-run`: Show what would be installed without making changes
 
 - Export-Installed:
   - `--output <path>`

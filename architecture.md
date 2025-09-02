@@ -33,6 +33,7 @@ Layers and responsibilities:
 src/
 ├─ commands/                    # CLI command handlers (UI/Orchestration layer)
 │  ├─ download.ts              # Interactive single & bulk entrypoint
+│  ├─ quickInstall.ts          # One-off: temp download → install → cleanup
 │  ├─ exportInstalled.ts       # Export installed extensions from editors
 │  ├─ fromList.ts              # Download from list formats (txt/json/extensions.json)
 │  ├─ install.ts               # Install VSIX files into editors (supports directory scanning)
@@ -153,6 +154,24 @@ Notes:
 2. Editor detection and binary resolution via `features/install/services/editorCliService`
 3. Installation execution via `features/install/services/installService`
 4. Results surfaced via CLI with progress tracking and error handling
+
+### Quick-Install Flow
+
+1. `commands/quickInstall.ts` collects the URL (and optional editor/bin flags)
+2. Creates a unique temp directory under `os.tmpdir()`
+3. Uses `features/download/downloadSingleExtension` to fetch the VSIX (latest by default)
+4. Resolves target editor via `features/install/services/editorCliService`
+   - Auto-detects; prompts when multiple; quiet/json prefers Cursor
+   - Supports `--code-bin` / `--cursor-bin` and `--allow-mismatched-binary`
+5. Preflight validation via `InstallService.validatePrerequisites`
+6. Shows "Install Details" (paths are middle‑truncated to fit TTY)
+7. On confirmation, installs via `InstallService.installSingleVsix`
+8. Finally, removes the temp directory regardless of success/failure
+
+Notes:
+
+- This command is intentionally non-persistent: no output artifacts remain
+- Behavior mirrors single install’s editor selection and confirmation UX
 
 ## Foundational Modules
 
