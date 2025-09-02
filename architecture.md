@@ -35,6 +35,8 @@ src/
 │  ├─ download.ts              # Interactive single & bulk entrypoint
 │  ├─ exportInstalled.ts       # Export installed extensions from editors
 │  ├─ fromList.ts              # Download from list formats (txt/json/extensions.json)
+│  ├─ install.ts               # Install VSIX files into editors (supports directory scanning)
+│  ├─ interactive.ts           # Interactive command flows and prompts
 │  └─ versions.ts              # List versions for an extension
 ├─ config/                     # Configuration system
 │  ├─ constants.ts             # Re-exports and defaults for legacy consumers
@@ -42,17 +44,51 @@ src/
 │  └─ schema.ts                # Zod schema, types, env var mapping
 ├─ core/                       # Foundational modules
 │  ├─ errors/                  # Typed errors, formatting, enhancement
+│  │  ├─ definitions.ts        # Error class definitions and factories
+│  │  ├─ handler.ts            # Error handling and formatting
+│  │  ├─ index.ts              # Public error API exports
+│  │  └─ types.ts              # Error type definitions
 │  ├─ filesystem/              # File I/O, naming templates, checksums
+│  │  ├─ checksum.ts           # SHA256 checksum generation/verification
+│  │  ├─ fileManager.ts        # File operations and existence strategies
+│  │  ├─ filenameTemplate.ts   # Template-based filename generation
+│  │  └─ index.ts              # Filesystem API exports
 │  ├─ http/                    # HTTP downloader with progress tracking
+│  │  └─ downloader.ts         # Axios streaming download with progress
 │  ├─ registry/                # Marketplace/OpenVSX parsing and versions
+│  │  ├─ extensionVersions.ts  # Version fetching and resolution
+│  │  ├─ index.ts              # Registry API exports
+│  │  └─ urlParser.ts          # URL parsing for different registries
 │  ├─ ui/                      # Progress utilities and formatting helpers
+│  │  └─ progress.ts           # Progress tracking and rendering
 │  ├─ validation/              # AJV schemas and validator service
-│  ├─ helpers.ts               # Shared helpers
-│  └─ types.ts                 # Shared types
-└─ features/                   # Use-case orchestration
-   ├─ download/                # Single and bulk download services
-   ├─ export/                  # Export installed extensions
-   └─ import/                  # Parse extension lists and hand off to download
+│  │  ├─ index.ts              # Validation API exports
+│  │  ├─ schemas.ts            # JSON Schema definitions
+│  │  └─ validator.ts          # AJV validator service
+│  ├─ helpers.ts               # Shared utility functions
+│  └─ types.ts                 # Shared type definitions
+├─ features/                   # Use-case orchestration
+│  ├─ download/                # Single and bulk download services
+│  │  ├─ services/
+│  │  │  ├─ bulkDownloadService.ts    # Bulk download orchestration
+│  │  │  └─ singleDownloadService.ts  # Single download orchestration
+│  │  └─ index.ts              # Download feature exports
+│  ├─ export/                  # Export installed extensions
+│  │  ├─ services/
+│  │  │  └─ installedExtensionsService.ts  # Extension scanning and formatting
+│  │  └─ index.ts              # Export feature exports
+│  ├─ import/                  # Parse extension lists and hand off to download
+│  │  ├─ services/
+│  │  │  └─ extensionListParserService.ts  # List parsing and normalization
+│  │  └─ index.ts              # Import feature exports
+│  └─ install/                 # Install VSIX files into editors with scanning services
+│     ├─ services/
+│     │  ├─ editorCliService.ts        # Editor detection and CLI resolution
+│     │  ├─ installFromListService.ts  # Install from extension lists
+│     │  ├─ installService.ts          # Core installation logic
+│     │  └─ vsixScannerService.ts      # VSIX file discovery and selection
+│     └─ index.ts              # Install feature exports
+└─ index.ts                    # Main CLI entry point
 ```
 
 ## Core Flows
@@ -106,6 +142,17 @@ Notes:
 1. `commands/versions.ts` parses URL and infers source
 2. `core/registry/extensionVersions.ts` fetches versions from Marketplace or OpenVSX
 3. Outputs human-readable or JSON list
+
+### Install Flow
+
+1. `commands/install.ts` determines install mode and collects inputs
+   - Single install accepts either VSIX file path or directory path
+   - Directory input triggers VSIX scanning via `features/install/services/vsixScannerService`
+   - Interactive mode: user selects from multiple VSIX files when found
+   - Quiet/JSON mode: auto-selects newest by modification time
+2. Editor detection and binary resolution via `features/install/services/editorCliService`
+3. Installation execution via `features/install/services/installService`
+4. Results surfaced via CLI with progress tracking and error handling
 
 ## Foundational Modules
 
