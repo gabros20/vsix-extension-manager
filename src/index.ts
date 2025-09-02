@@ -77,6 +77,31 @@ program
   });
 
 program
+  .command("quick-install")
+  .alias("qi")
+  .description("Quickly download an extension by URL to a temp dir, install it, then clean up")
+  .option("-u, --url <url>", "Marketplace or OpenVSX URL of the extension")
+  .option("-e, --editor <editor>", "Target editor: vscode|cursor|auto (default: auto)")
+  .option("--code-bin <path>", "Explicit path to VS Code binary")
+  .option("--cursor-bin <path>", "Explicit path to Cursor binary")
+  .option(
+    "--allow-mismatched-binary",
+    "Allow proceeding when resolved binary identity mismatches the requested editor",
+    false,
+  )
+  .option("--pre-release", "Prefer pre-release when resolving 'latest'", false)
+  .option("--source <source>", "Source registry: marketplace|open-vsx|auto (default: auto)")
+  .option("--dry-run", "Show what would be installed without making changes", false)
+  .option("--quiet", "Reduce output", false)
+  .option("--json", "Machine-readable output", false)
+  .action(async (opts) => {
+    await withConfigAndErrorHandling(async (config, options) => {
+      const { quickInstall } = await import("./commands/quickInstall");
+      await quickInstall({ ...options, ...config });
+    }, opts);
+  });
+
+program
   .command("versions")
   .description("List available versions for an extension")
   .option("-u, --url <url>", "Marketplace URL of the extension")
