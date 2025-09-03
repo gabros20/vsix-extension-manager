@@ -18,6 +18,7 @@ export async function runInteractive(config: Config) {
       { value: "install-vsix-single", label: "Install single VSIX file into VS Code/Cursor" },
       { value: "install-vsix-dir", label: "Install all VSIX files from directory" },
       { value: "install-list", label: "Install extensions from list into VS Code/Cursor" },
+      { value: "update-installed", label: "Update installed extensions to latest" },
       { value: "export", label: "Export installed extensions to (txt / extensions.json)" },
       { value: "versions", label: "Show extension versions for extension URL" },
       { value: "quit", label: "Quit" },
@@ -73,6 +74,11 @@ export async function runInteractive(config: Config) {
     case "install-list": {
       const { runInstallFromListUI } = await import("./install");
       await runInstallFromListUI({ ...config });
+      break;
+    }
+    case "update-installed": {
+      const { runUpdateInstalledUI } = await import("./updateInstalled");
+      await runUpdateInstalledUI({ ...config });
       break;
     }
   }

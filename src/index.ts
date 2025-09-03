@@ -192,6 +192,34 @@ program
     }, opts);
   });
 
+program
+  .command("update-installed")
+  .alias("update")
+  .description("Update installed extensions to latest available versions")
+  .option("-e, --editor <editor>", "Target editor: vscode|cursor|auto (default: auto)")
+  .option("--pre-release", "Prefer pre-release when resolving 'latest'", false)
+  .option("--source <source>", "Source registry: marketplace|open-vsx|auto (default: auto)")
+  .option("--parallel <n>", "Number of parallel updates (default: 1)")
+  .option("--retry <n>", "Number of retry attempts per extension")
+  .option("--retry-delay <ms>", "Delay in ms between retries")
+  .option("--quiet", "Reduce output", false)
+  .option("--json", "Machine-readable output", false)
+  .option("--dry-run", "Preview updates without downloading/installing", false)
+  .option("--summary <path>", "Write update summary JSON to the given path")
+  .option("--code-bin <path>", "Explicit path to VS Code binary")
+  .option("--cursor-bin <path>", "Explicit path to Cursor binary")
+  .option(
+    "--allow-mismatched-binary",
+    "Allow proceeding when resolved binary identity mismatches the requested editor",
+    false,
+  )
+  .action(async (opts) => {
+    await withConfigAndErrorHandling(async (config, options) => {
+      const { updateInstalled } = await import("./commands/updateInstalled");
+      await updateInstalled({ ...options, ...config });
+    }, opts);
+  });
+
 // Default command - interactive launcher
 program.action(async () => {
   await withConfigAndErrorHandling(async (config) => {
