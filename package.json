@@ -44,11 +44,11 @@
     "access": "public"
   },
   "dependencies": {
-    "@clack/prompts": "^0.7.0",
+    "@clack/prompts": "^0.11.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "axios": "^1.6.2",
-    "commander": "^11.1.0",
+    "commander": "^14.0.0",
     "fs-extra": "^11.2.0",
     "yaml": "^2.8.1",
     "zod": "^4.1.5"
