@@ -1,0 +1,73 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":maintainLockFilesWeekly", ":semanticCommitTypeAll(chore)"],
+  "schedule": ["on monday before 10am"],
+  "timezone": "UTC",
+  "prConcurrentLimit": 5,
+  "reviewers": ["gabros20"],
+  "assignees": ["gabros20"],
+  "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "to {{newVersion}}",
+  "commitMessageSuffix": "",
+  "rangeStrategy": "bump",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["on monday before 10am"]
+  },
+  "packageRules": [
+    {
+      "description": "Group all development dependencies",
+      "groupName": "development dependencies",
+      "matchDepTypes": ["devDependencies"],
+      "matchPackagePatterns": [
+        "@types/*",
+        "@typescript-eslint/*",
+        "eslint*",
+        "prettier*",
+        "husky",
+        "lint-staged"
+      ],
+      "commitMessageTopic": "development dependencies"
+    },
+    {
+      "description": "Group all production dependencies",
+      "groupName": "production dependencies",
+      "matchDepTypes": ["dependencies"],
+      "commitMessageTopic": "production dependencies"
+    },
+    {
+      "description": "GitHub Actions updates",
+      "groupName": "GitHub Actions",
+      "matchManagers": ["github-actions"],
+      "commitMessageTopic": "GitHub Actions",
+      "commitMessagePrefix": "ci: "
+    },
+    {
+      "description": "Semantic release plugins - keep separate for stability",
+      "groupName": "semantic-release",
+      "matchPackagePatterns": ["@semantic-release/*", "semantic-release"],
+      "commitMessageTopic": "semantic-release"
+    },
+    {
+      "description": "Auto-merge patch updates for development dependencies",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "pr"
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "reviewers": ["gabros20"],
+    "assignees": ["gabros20"]
+  },
+  "osvVulnerabilityAlerts": true,
+  "separateMinorPatch": false,
+  "separateMajorMinor": true,
+  "separateMultipleMajor": true,
+  "dependencyDashboard": true,
+  "dependencyDashboardTitle": "Dependency Dashboard",
+  "dependencyDashboardHeader": "This issue contains a list of Renovate updates and their statuses.",
+  "suppressNotifications": ["prIgnoreNotification"],
+  "rebaseWhen": "conflicted"
+}
