@@ -1,3 +1,13 @@
+# [1.13.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.12.0...v1.13.0) (2025-09-24)
+
+### Bug Fixes
+
+- update axios to 1.12.2 to address DoS vulnerability ([5a4cf83](https://github.com/gabros20/vsix-extension-manager/commit/5a4cf832c750df85ad969d5a242d144678841738))
+
+### Features
+
+- add update-installed command with selective update workflow ([5d53fe8](https://github.com/gabros20/vsix-extension-manager/commit/5d53fe8eebe449cd34a2e9977b2049900c3f1e11))
+
 # [1.12.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.11.0...v1.12.0) (2025-09-02)
 
 ### Features
