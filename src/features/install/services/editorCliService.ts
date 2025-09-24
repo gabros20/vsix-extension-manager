@@ -30,15 +30,18 @@ export interface InstallResult {
  */
 export class EditorCliService {
   private editors: Map<string, EditorInfo> = new Map();
+  private initialized = false;
 
   constructor() {
-    this.initializeEditors();
+    // Don't initialize editors immediately - make it lazy
   }
 
   /**
    * Initialize available editors by searching common installation paths
    */
-  private initializeEditors(): void {
+  private async initializeEditors(): Promise<void> {
+    if (this.initialized) return;
+    this.initialized = true;
     const platform = os.platform();
     const homeDir = os.homedir();
 
@@ -47,7 +50,7 @@ export class EditorCliService {
 
     for (const [editorName, paths] of Object.entries(searchPaths)) {
       const binaryPath = this.findEditorBinary(editorName as "vscode" | "cursor", paths);
-      const isAvailable = binaryPath ? this.verifyEditorBinary(binaryPath) : false;
+      const isAvailable = binaryPath ? await this.verifyEditorBinaryAsync(binaryPath) : false;
 
       this.editors.set(editorName, {
         name: editorName as "vscode" | "cursor",
@@ -151,9 +154,9 @@ export class EditorCliService {
     try {
       const result = spawnSync(command, ["--version"], {
         stdio: "pipe",
-        timeout: 5000,
+        timeout: 15000, // Increased to handle slower editors like Cursor
       });
-      return result.status === 0;
+      return result.status === 0 && !result.signal;
     } catch {
       return false;
     }
@@ -223,38 +226,64 @@ export class EditorCliService {
    */
   private verifyEditorBinary(binaryPath: string): boolean {
     try {
+      // Cursor can take longer to respond, so we increase timeout
+      // Some editors (like Cursor) may take longer on first run
       const result = spawnSync(binaryPath, ["--version"], {
         stdio: "pipe",
-        timeout: 5000,
+        timeout: 15000, // Increased from 5000 to handle slower responses
       });
-      return result.status === 0;
+      // Check if command succeeded (exit code 0)
+      // Some editors may not output version info but still return 0
+      return result.status === 0 && !result.signal;
     } catch {
       return false;
     }
   }
 
   /**
+   * Verify that an editor binary is working (async version for spinner support)
+   */
+  private async verifyEditorBinaryAsync(binaryPath: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      const child = spawn(binaryPath, ["--version"], {
+        stdio: "pipe",
+        timeout: 15000, // Increased from 5000 to handle slower responses
+      });
+
+      child.on("close", (code, signal) => {
+        resolve(code === 0 && !signal);
+      });
+
+      child.on("error", () => {
+        resolve(false);
+      });
+    });
+  }
+
+  /**
    * Get information about available editors
    */
-  getAvailableEditors(): EditorInfo[] {
+  async getAvailableEditors(): Promise<EditorInfo[]> {
+    await this.initializeEditors(); // Lazy initialization
     return Array.from(this.editors.values()).filter((editor) => editor.isAvailable);
   }
 
   /**
    * Get editor info by name
    */
-  getEditorInfo(name: "vscode" | "cursor"): EditorInfo | null {
+  async getEditorInfo(name: "vscode" | "cursor"): Promise<EditorInfo | null> {
+    await this.initializeEditors(); // Lazy initialization
     return this.editors.get(name) || null;
   }
 
   /**
    * Resolve editor binary path with explicit override support
    */
-  resolveEditorBinary(
+  async resolveEditorBinary(
     editor: "vscode" | "cursor" | "auto",
     explicitPath?: string,
     allowMismatchedBinary: boolean = false,
-  ): string {
+  ): Promise<string> {
     // Use explicit path if provided
     if (explicitPath) {
       if (!fs.existsSync(explicitPath)) {
@@ -309,12 +338,12 @@ export class EditorCliService {
     // Auto-detect preferred editor
     if (editor === "auto") {
       // Prefer Cursor if available, fallback to VS Code
-      const cursor = this.getEditorInfo("cursor");
+      const cursor = await this.getEditorInfo("cursor");
       if (cursor?.isAvailable) {
         return cursor.binaryPath;
       }
 
-      const vscode = this.getEditorInfo("vscode");
+      const vscode = await this.getEditorInfo("vscode");
       if (vscode?.isAvailable) {
         return vscode.binaryPath;
       }
@@ -338,7 +367,7 @@ export class EditorCliService {
     }
 
     // Specific editor requested
-    const editorInfo = this.getEditorInfo(editor);
+    const editorInfo = await this.getEditorInfo(editor);
     if (!editorInfo?.isAvailable) {
       throw new InstallError(
         `${editorInfo?.displayName || editor} is not available`,
@@ -351,7 +380,7 @@ export class EditorCliService {
             description: `Use --${editor}-bin to specify binary path`,
           },
         ],
-        { editor, availableEditors: this.getAvailableEditors() },
+        { editor, availableEditors: await this.getAvailableEditors() },
       );
     }
 
@@ -553,7 +582,7 @@ export class EditorCliService {
     return new Promise((resolve, reject) => {
       const child = spawn(binaryPath, ["--version"], {
         stdio: ["ignore", "pipe", "pipe"],
-        timeout: 5000,
+        timeout: 15000, // Increased to handle Cursor's slower response
       });
 
       let stdout = "";

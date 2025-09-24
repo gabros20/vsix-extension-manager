@@ -192,7 +192,57 @@ program
     }, opts);
   });
 
-// Default command - interactive launcher
+program
+  .command("update-installed")
+  .alias("update")
+  .description("Update installed extensions to latest available versions")
+  .option("-e, --editor <editor>", "Target editor: vscode|cursor|auto (default: auto)")
+  .option("--pre-release", "Prefer pre-release when resolving 'latest'", false)
+  .option("--source <source>", "Source registry: marketplace|open-vsx|auto (default: auto)")
+  .option("--parallel <n>", "Number of parallel updates (default: 1)")
+  .option("--retry <n>", "Number of retry attempts per extension")
+  .option("--retry-delay <ms>", "Delay in ms between retries")
+  .option("--quiet", "Reduce output", false)
+  .option("--json", "Machine-readable output", false)
+  .option("--dry-run", "Preview updates without downloading/installing", false)
+  .option("--summary <path>", "Write update summary JSON to the given path")
+  .option("--code-bin <path>", "Explicit path to VS Code binary")
+  .option("--cursor-bin <path>", "Explicit path to Cursor binary")
+  .option(
+    "--allow-mismatched-binary",
+    "Allow proceeding when resolved binary identity mismatches the requested editor",
+    false,
+  )
+  .option("--skip-backup", "Skip creating backups before updating", false)
+  .option("--backup-dir <path>", "Custom backup directory (default: ~/.vsix-backups)")
+  .action(async (opts) => {
+    await withConfigAndErrorHandling(async (config, options) => {
+      const { updateInstalled } = await import("./commands/updateInstalled");
+      await updateInstalled({ ...options, ...config });
+    }, opts);
+  });
+
+program
+  .command("rollback")
+  .description("Rollback extensions from backups")
+  .option("--extension-id <id>", "Extension ID to rollback")
+  .option("-e, --editor <editor>", "Filter by editor: vscode|cursor")
+  .option("--backup-id <id>", "Specific backup ID to restore")
+  .option("--latest", "Restore latest backup for the extension", false)
+  .option("--list", "List available backups", false)
+  .option("--force", "Force restore even if extension exists", false)
+  .option("--cleanup", "Clean up old backups", false)
+  .option("--keep-count <n>", "Number of backups to keep per extension (default: 3)")
+  .option("--quiet", "Reduce output", false)
+  .option("--json", "Machine-readable output", false)
+  .option("--backup-dir <path>", "Custom backup directory (default: ~/.vsix-backups)")
+  .action(async (opts) => {
+    await withConfigAndErrorHandling(async (config, options) => {
+      const { rollback } = await import("./commands/rollback");
+      // Don't merge config for rollback - it has different options
+      await rollback(options);
+    }, opts);
+  });
 program.action(async () => {
   await withConfigAndErrorHandling(async (config) => {
     const { runInteractive } = await import("./commands/interactive");

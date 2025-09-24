@@ -674,8 +674,18 @@ async function resolveEditor(options: InstallOptions): Promise<"vscode" | "curso
   let editor = options.editor as "vscode" | "cursor" | "auto" | undefined;
 
   if (!editor || editor === "auto") {
+    // Show spinner during editor detection
+    const spinner = p.spinner();
+    if (!options.quiet && !options.json) {
+      spinner.start("Detecting installed editors...");
+    }
+
     const editorService = getEditorService();
-    const availableEditors = editorService.getAvailableEditors();
+    const availableEditors = await editorService.getAvailableEditors();
+
+    if (!options.quiet && !options.json) {
+      spinner.stop("Editor detection complete");
+    }
 
     if (availableEditors.length === 0) {
       p.log.error("❌ No editors found. Please install VS Code or Cursor.");
@@ -697,9 +707,11 @@ async function resolveEditor(options: InstallOptions): Promise<"vscode" | "curso
     }));
 
     if (options.quiet || options.json) {
-      // Non-interactive: prefer Cursor else VS Code
-      const cursor = availableEditors.find((e) => e.name === "cursor");
-      return (cursor || availableEditors[0]).name;
+      // In quiet/json mode with multiple editors, require explicit selection
+      throw new Error(
+        `Multiple editors found (${availableEditors.map((e) => e.displayName).join(", ")}). ` +
+          `Please specify which editor to use with --editor vscode or --editor cursor`,
+      );
     }
 
     const result = await p.select({
@@ -728,7 +740,7 @@ async function resolveEditorBinary(
   const explicitPath = editor === "vscode" ? options.codeBin : options.cursorBin;
 
   try {
-    return editorService.resolveEditorBinary(
+    return await editorService.resolveEditorBinary(
       editor,
       explicitPath,
       Boolean(options.allowMismatchedBinary),
@@ -737,7 +749,7 @@ async function resolveEditorBinary(
     p.log.error(`❌ ${error instanceof Error ? error.message : String(error)}`);
 
     // Show available editors for troubleshooting
-    const availableEditors = editorService.getAvailableEditors();
+    const availableEditors = await editorService.getAvailableEditors();
     if (availableEditors.length > 0) {
       p.log.info("📋 Available editors:");
       availableEditors.forEach((editor) => {

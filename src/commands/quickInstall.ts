@@ -92,11 +92,13 @@ export async function quickInstall(options: QuickInstallOptions) {
     const downloadedPath =
       downloadResult.filePath || path.join(downloadResult.outputDir, downloadResult.filename);
 
-    // Resolve editor (interactive selection if multiple, like single install)
+    // Get editor service first
     const editorService = getEditorService();
-    chosenEditor = await resolveEditorForQuick(options);
+
+    // Resolve editor (interactive selection if multiple, like single install)
+    chosenEditor = await resolveEditorForQuick(options, installSpinner);
     const explicit = chosenEditor === "vscode" ? options.codeBin : options.cursorBin;
-    binPath = editorService.resolveEditorBinary(
+    binPath = await editorService.resolveEditorBinary(
       chosenEditor,
       explicit,
       Boolean(options.allowMismatchedBinary),
@@ -211,9 +213,22 @@ function getIdentityBadge(expected: "vscode" | "cursor", binaryPath: string): st
   return identity === expected ? " — OK" : " — MISMATCH";
 }
 
-async function resolveEditorForQuick(options: QuickInstallOptions): Promise<"vscode" | "cursor"> {
+async function resolveEditorForQuick(
+  options: QuickInstallOptions,
+  spinner?: { start: (message: string) => void; stop: (message: string) => void },
+): Promise<"vscode" | "cursor"> {
   const editorService = getEditorService();
-  const availableEditors = editorService.getAvailableEditors();
+
+  // Show spinner during editor detection
+  if (spinner && !options.quiet && !options.json) {
+    spinner.start("Detecting installed editors...");
+  }
+
+  const availableEditors = await editorService.getAvailableEditors();
+
+  if (spinner && !options.quiet && !options.json) {
+    spinner.stop("Editor detection complete");
+  }
 
   if (options.editor && options.editor !== "auto") {
     return options.editor;
@@ -232,8 +247,11 @@ async function resolveEditorForQuick(options: QuickInstallOptions): Promise<"vsc
   }
 
   if (options.quiet || options.json) {
-    const cursor = availableEditors.find((e) => e.name === "cursor");
-    return (cursor || availableEditors[0]).name;
+    // In quiet/json mode with multiple editors, require explicit selection
+    throw new Error(
+      `Multiple editors found (${availableEditors.map((e) => e.displayName).join(", ")}). ` +
+        `Please specify which editor to use with --editor vscode or --editor cursor`,
+    );
   }
 
   const result = await p.select({

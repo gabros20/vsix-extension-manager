@@ -23,6 +23,8 @@ A modern CLI for downloading, exporting, importing, and managing VS Code/Cursor 
   - [Export Installed Extensions](#export-installed-extensions)
   - [Download from Lists](#download-from-lists)
   - [Install Extensions](#install-extensions)
+  - [Update Installed Extensions](#update-installed-extensions)
+  - [Backup & Rollback](#backup--rollback)
   - [Versions Command](#versions-command)
   - [Manual Installation Methods](#manual-installation-methods)
 - [Configuration / Options](#configuration--options)
@@ -52,6 +54,8 @@ VSIX Extension Manager solves this with a fast, reliable CLI for downloading VSI
 - ✅ Export installed extensions from VS Code or Cursor (txt/extensions.json)
 - ✅ Install VSIX files directly into VS Code or Cursor
 - ✅ Install from exported lists with automatic downloading
+- ✅ Update installed extensions with automatic backup
+- ✅ Rollback extensions from backups when updates fail
 - ✅ Input lists: .txt or VS Code `extensions.json`
 - ✅ Checksums: generate SHA256 or verify against a known hash
 - ✅ Configurable output/cache directories and filename templates
@@ -144,14 +148,29 @@ vsix-extension-manager
 
 Interactive Mode Menu:
 
+**Install**
+
 - Quick install by URL (temp download → install → cleanup)
-- Download single extension from marketplace URL
-- Download multiple extensions from JSON collection (URLs + versions)
-- Download from exported list (txt / extensions.json)
 - Install single VSIX file into VS Code/Cursor
 - Install all VSIX files from directory
 - Install extensions from list into VS Code/Cursor
+
+**Download**
+
+- Download single extension from marketplace URL
+- Download multiple extensions from JSON collection (URLs + versions)
+- Download from exported list (txt / extensions.json)
+
+**Update**
+
+- Update installed extensions to latest
+
+**Export**
+
 - Export installed extensions to (txt / extensions.json)
+
+**Version**
+
 - Show extension versions for extension URL
 
 #### Single extension (URL)
@@ -518,6 +537,127 @@ vsix-extension-manager install --vsix ./ext.vsix --editor vscode --allow-mismatc
 export VSIX_ALLOW_MISMATCHED_BINARY=true
 ```
 
+#### Update Installed Extensions
+
+Update all or selected installed extensions to their latest versions with automatic backup.
+
+```bash
+# Interactive update (choose all or selected)
+vsix-extension-manager update
+
+# Update all extensions
+vsix-extension-manager update --quiet
+
+# Update with options
+vsix-extension-manager update \
+  --editor cursor \
+  --pre-release \
+  --source marketplace \
+  --parallel 3
+
+# Skip backup (not recommended)
+vsix-extension-manager update --skip-backup
+
+# Custom backup directory
+vsix-extension-manager update --backup-dir /path/to/backups
+
+# Dry run to preview what would be updated
+vsix-extension-manager update --dry-run --json
+
+# Save update summary
+vsix-extension-manager update --summary update-results.json
+```
+
+##### Update Features:
+
+- **Smart Version Detection**: Compares installed vs. latest available versions
+- **Automatic Backup**: Creates backups before updating (enabled by default)
+- **Interactive Selection**: Choose specific extensions to update
+- **Source Fallback**: Tries Marketplace first, falls back to OpenVSX
+- **Parallel Updates**: Update multiple extensions simultaneously
+- **Detailed Summary**: Reports success, failures, and backup locations
+
+#### Backup & Rollback
+
+Protect against failed updates with automatic backups and easy rollback.
+
+##### List Backups
+
+```bash
+# Show all available backups
+vsix-extension-manager rollback --list
+
+# JSON output for scripting
+vsix-extension-manager rollback --list --json
+
+# Filter by extension
+vsix-extension-manager rollback --list --extension-id ms-python.python
+
+# Filter by editor
+vsix-extension-manager rollback --list --editor vscode
+```
+
+##### Restore from Backup
+
+```bash
+# Interactive rollback (select from list)
+vsix-extension-manager rollback
+
+# Restore latest backup for specific extension
+vsix-extension-manager rollback \
+  --extension-id ms-python.python \
+  --latest
+
+# Restore specific backup by ID
+vsix-extension-manager rollback \
+  --backup-id ms-python.python-2024.1.0-1757614701221
+
+# Force restore (overwrite existing)
+vsix-extension-manager rollback \
+  --backup-id <id> \
+  --force
+```
+
+##### Manage Backups
+
+```bash
+# Clean up old backups (keep last 3 per extension)
+vsix-extension-manager rollback --cleanup
+
+# Keep custom number of backups
+vsix-extension-manager rollback --cleanup --keep-count 5
+
+# Use custom backup directory
+vsix-extension-manager rollback --list \
+  --backup-dir /custom/backup/path
+```
+
+##### Backup Features:
+
+- **Automatic Creation**: Backups created before each update
+- **Metadata Tracking**: Version, timestamp, and reason recorded
+- **Smart Cleanup**: Automatically keeps last N backups per extension
+- **Quick Restore**: One command to rollback problematic updates
+- **Storage Info**: Monitor backup disk usage
+
+##### Example Workflow:
+
+```bash
+# 1. Update extensions (backups created automatically)
+vsix-extension-manager update
+
+# 2. If something breaks, check available backups
+vsix-extension-manager rollback --list
+
+# 3. Rollback the problematic extension
+vsix-extension-manager rollback \
+  --extension-id problematic.extension \
+  --latest
+
+# 4. Clean up old backups periodically
+vsix-extension-manager rollback --cleanup
+```
+
 #### Show extension versions (URL)
 
 List available versions from Marketplace or OpenVSX by URL.
@@ -701,6 +841,36 @@ export VSIX_ALLOW_MISMATCHED_BINARY=false # Allow proceeding when binary identit
   - `--summary <path>`: Write install summary JSON
   - `--allow-mismatched-binary`: Proceed even if `code` points to Cursor or vice versa (not recommended)
 
+- Update:
+  - `--editor <vscode|cursor|auto>`: Target editor (default: auto)
+  - `--pre-release`: Prefer pre-release when resolving 'latest'
+  - `--source <marketplace|open-vsx|auto>`: Source registry (default: auto)
+  - `--parallel <n>`: Number of parallel updates (default: 1)
+  - `--retry <n>`: Number of retry attempts per extension
+  - `--retry-delay <ms>`: Delay between retries
+  - `--quiet`: Reduce output
+  - `--json`: Machine-readable output
+  - `--dry-run`: Preview updates without downloading/installing
+  - `--summary <path>`: Write update summary JSON
+  - `--skip-backup`: Skip creating backups before updating
+  - `--backup-dir <path>`: Custom backup directory (default: ~/.vsix-backups)
+  - `--code-bin <path>`: Explicit VS Code binary path
+  - `--cursor-bin <path>`: Explicit Cursor binary path
+  - `--allow-mismatched-binary`: Proceed when binary identity mismatches editor
+
+- Rollback:
+  - `--extension-id <id>`: Extension ID to rollback
+  - `--editor <vscode|cursor>`: Filter by editor
+  - `--backup-id <id>`: Specific backup ID to restore
+  - `--latest`: Restore latest backup for the extension
+  - `--list`: List available backups
+  - `--force`: Force restore even if extension exists
+  - `--cleanup`: Clean up old backups
+  - `--keep-count <n>`: Number of backups to keep per extension (default: 3)
+  - `--quiet`: Reduce output
+  - `--json`: Machine-readable output
+  - `--backup-dir <path>`: Custom backup directory (default: ~/.vsix-backups)
+
 - Global:
   - `--config <path>`
   - `-h, --help`, `-V, --version`
@@ -782,6 +952,11 @@ See [`TODO.md`](TODO.md) for upcoming features and ideas. Feedback and PRs are a
   - Export from existing setup: `vsix-extension-manager export-installed -o my-setup.txt`
   - Install on new machine: `vsix-extension-manager install --file my-setup.txt --download-missing`
 
+- How do I update my extensions safely?
+  - Run `vsix-extension-manager update` - backups are created automatically
+  - If something breaks, use `vsix-extension-manager rollback` to restore
+  - See backup history with `vsix-extension-manager rollback --list`
+
 - What's the difference between install modes?
   - `install --vsix`: Install single VSIX file or directory you already have
   - `install --vsix-dir`: Install all VSIX files from directory/directories
@@ -813,7 +988,8 @@ See [`TODO.md`](TODO.md) for upcoming features and ideas. Feedback and PRs are a
   - This project focuses on a CLI. Follow issues for any future API plans.
 
 - Where can I learn about internals?
-  - See [`architecture.md`](architecture.md) for module layout and design.
+  - See [`ARCHITECTURE.md`](ARCHITECTURE.md) for module layout and design.
+  - See [`BACKUP_ROLLBACK_FEATURE.md`](BACKUP_ROLLBACK_FEATURE.md) for backup/rollback implementation details.
 
 - What are the constructed download URL patterns?
   - Marketplace: `https://[publisher].gallery.vsassets.io/_apis/public/gallery/publisher/[publisher]/extension/[extension]/[version]/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage`
