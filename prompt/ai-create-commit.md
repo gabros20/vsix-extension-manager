@@ -23,13 +23,13 @@ When a user mentions **"@ai-create-commit.md"**, execute this workflow:
    Also present a compact PR body to fill quickly:
 
    ```
-   - What:
-   - Why:
-   - How:
-   - Test:
-   - Impact: none | minor | breaking
-   - Issue: #___
-   - Notes/Screenshots:
+   - **What**:
+   - **Why**:
+   - **How**:
+   - **Test**:
+   - **Impact**: none | minor | breaking
+   - **Issue**: #___
+   - **Notes/Screenshots**:
    ```
 
 3. Branching logic (before committing):
@@ -44,7 +44,7 @@ When a user mentions **"@ai-create-commit.md"**, execute this workflow:
 5. Push the branch: `git push -u origin $(git branch --show-current)`
 6. Create a PR with GitHub CLI using the compact PR template body:
    - Command builds body from the template fields collected above.
-   - Command: `gh pr create --title "[title]" --body "- What: [one-liner]\n- Why: [goal]\n- How: [key changes]\n- Test: [steps]\n- Impact: [none|min|breaking]\n- Issue: #[id]\n- Notes/Screenshots: [optional]"`
+   - Command: `gh pr create --title "[title]" --body "- **What**: [one-liner]\n- **Why**: [goal]\n- **How**: [key changes]\n- **Test**: [steps]\n- **Impact**: [none|min|breaking]\n- **Issue**: #[id]\n- **Notes/Screenshots**: [optional]"`
    - Print the PR URL.
 
 ---
@@ -128,7 +128,7 @@ When a user mentions **"@ai-create-commit.md"**, execute this workflow:
 
    gh pr create \
      --title "$COMMIT_TITLE" \
-     --body "- What: Adds login and logout with JWT support\n- Why: Provide authentication for protected routes\n- How: New auth service, JWT middleware, login/logout commands\n- Test: npm test && manual login/logout in app\n- Impact: minor\n- Issue: #___\n- Notes/Screenshots: "
+     --body "- **What**: Adds login and logout with JWT support\n- **Why**: Provide authentication for protected routes\n- **How**: New auth service, JWT middleware, login/logout commands\n- **Test**: npm test && manual login/logout in app\n- **Impact**: minor\n- **Issue**: #___\n- **Notes/Screenshots**: "
    ```
 
 ### Best Practices
