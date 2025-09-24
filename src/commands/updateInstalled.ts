@@ -19,6 +19,8 @@ interface UpdateInstalledOptions {
   codeBin?: string;
   cursorBin?: string;
   allowMismatchedBinary?: boolean;
+  skipBackup?: boolean;
+  backupDir?: string;
 }
 
 export async function updateInstalled(options: UpdateInstalledOptions) {
@@ -29,11 +31,21 @@ export async function updateInstalled(options: UpdateInstalledOptions) {
     const quiet = Boolean(options.quiet);
     const json = Boolean(options.json);
     const service = getUpdateInstalledService();
+    const editorService = getEditorService();
     const spinner = p.spinner();
 
-    // Interactive editor selection (like quick install)
-    const editorService = getEditorService();
-    const availableEditors = editorService.getAvailableEditors();
+    // Show spinner during editor detection (can take up to 15 seconds for Cursor)
+    if (!quiet && !json) {
+      spinner.start("Detecting installed editors...");
+    }
+
+    // Editor selection - always prompt when multiple are available
+    const availableEditors = await editorService.getAvailableEditors();
+
+    if (!quiet && !json) {
+      spinner.stop("Editor detection complete");
+    }
+
     let chosenEditor = (options.editor as "vscode" | "cursor" | "auto" | undefined) || "auto";
 
     if (chosenEditor === "auto") {
@@ -46,12 +58,19 @@ export async function updateInstalled(options: UpdateInstalledOptions) {
           p.log.info(`🔍 Auto-detected ${detected.displayName} at ${detected.binaryPath}`);
         }
         chosenEditor = detected.name;
-      } else if (quiet || json) {
-        const cursor = availableEditors.find((e) => e.name === "cursor");
-        chosenEditor = (cursor || availableEditors[0]).name;
       } else {
+        // Multiple editors found - ALWAYS prompt the user to select
+        if (quiet || json) {
+          // In quiet/json mode with multiple editors, we cannot auto-select
+          throw new Error(
+            `Multiple editors found (${availableEditors.map((e) => e.displayName).join(", ")}). ` +
+              `Please specify which editor to update using --editor vscode or --editor cursor`,
+          );
+        }
+
+        // Interactive mode - let user choose
         const result = await p.select({
-          message: "Multiple editors found. Select target editor:",
+          message: "Multiple editors found. Select which editor to update:",
           options: availableEditors.map((editor) => ({
             value: editor.name,
             label: `${editor.displayName} (${editor.binaryPath})`,
@@ -179,7 +198,7 @@ export async function updateInstalled(options: UpdateInstalledOptions) {
 
     const summary = await service.updateInstalled(
       {
-        editor: (options.editor as "vscode" | "cursor" | "auto") || "auto",
+        editor: chosenEditor as "vscode" | "cursor", // Use the determined editor, not the raw option
         preRelease: options.preRelease,
         source: (options.source as "marketplace" | "open-vsx" | "auto") || "auto",
         parallel: options.parallel,
@@ -193,6 +212,8 @@ export async function updateInstalled(options: UpdateInstalledOptions) {
         cursorBin: options.cursorBin,
         allowMismatchedBinary: options.allowMismatchedBinary,
         selectedExtensions,
+        skipBackup: options.skipBackup,
+        backupDir: options.backupDir,
       },
       (message) => {
         if (!quiet) spinner.message(message);
@@ -219,6 +240,7 @@ export async function updateInstalled(options: UpdateInstalledOptions) {
       `Updated: ${summary.updated}`,
       `Skipped: ${summary.skipped}`,
       `Failed: ${summary.failed}`,
+      `Backups created: ${summary.backups.length}`,
       `Duration: ${Math.round(summary.elapsedMs / 1000)}s`,
     ].join("\n");
 
@@ -236,12 +258,20 @@ export async function updateInstalled(options: UpdateInstalledOptions) {
     }
 
     if (!quiet) {
-      if (summary.updated === 0 && summary.failed === 0) {
+      if (options.dryRun) {
+        if (summary.toUpdate > 0) {
+          p.outro(`🔍 Dry run complete! ${summary.toUpdate} extension(s) would be updated.`);
+        } else {
+          p.outro("✅ Dry run complete! All extensions are already up-to-date.");
+        }
+      } else if (summary.updated === 0 && summary.failed === 0 && summary.toUpdate === 0) {
         p.outro("✅ All extensions are already up-to-date!");
       } else if (summary.updated > 0) {
         p.outro(`✨ Update completed! ${summary.updated} extension(s) updated.`);
-      } else {
+      } else if (summary.failed > 0) {
         p.outro("⚠️ Update completed with issues. Check failed updates above.");
+      } else {
+        p.outro("✅ Update check complete.");
       }
     }
   } catch (error) {

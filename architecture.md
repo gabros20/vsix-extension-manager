@@ -38,12 +38,17 @@ src/
 │  ├─ fromList.ts              # Download from list formats (txt/json/extensions.json)
 │  ├─ install.ts               # Install VSIX files into editors (supports directory scanning)
 │  ├─ interactive.ts           # Interactive command flows and prompts
+│  ├─ rollback.ts              # Restore extensions from backups
+│  ├─ updateInstalled.ts       # Update installed extensions with automatic backup
 │  └─ versions.ts              # List versions for an extension
 ├─ config/                     # Configuration system
 │  ├─ constants.ts             # Re-exports and defaults for legacy consumers
 │  ├─ loader.ts                # CLI > ENV > FILE > DEFAULTS resolution
 │  └─ schema.ts                # Zod schema, types, env var mapping
 ├─ core/                       # Foundational modules
+│  ├─ backup/                  # Backup and restore functionality
+│  │  ├─ backupService.ts      # Backup creation, restoration, and history management
+│  │  └─ index.ts              # Backup API exports
 │  ├─ errors/                  # Typed errors, formatting, enhancement
 │  │  ├─ definitions.ts        # Error class definitions and factories
 │  │  ├─ handler.ts            # Error handling and formatting
@@ -82,13 +87,17 @@ src/
 │  │  ├─ services/
 │  │  │  └─ extensionListParserService.ts  # List parsing and normalization
 │  │  └─ index.ts              # Import feature exports
-│  └─ install/                 # Install VSIX files into editors with scanning services
+│  ├─ install/                 # Install VSIX files into editors with scanning services
+│  │  ├─ services/
+│  │  │  ├─ editorCliService.ts        # Editor detection and CLI resolution
+│  │  │  ├─ installFromListService.ts  # Install from extension lists
+│  │  │  ├─ installService.ts          # Core installation logic
+│  │  │  └─ vsixScannerService.ts      # VSIX file discovery and selection
+│  │  └─ index.ts              # Install feature exports
+│  └─ update/                  # Update installed extensions
 │     ├─ services/
-│     │  ├─ editorCliService.ts        # Editor detection and CLI resolution
-│     │  ├─ installFromListService.ts  # Install from extension lists
-│     │  ├─ installService.ts          # Core installation logic
-│     │  └─ vsixScannerService.ts      # VSIX file discovery and selection
-│     └─ index.ts              # Install feature exports
+│     │  └─ updateInstalledService.ts  # Update orchestration with backup integration
+│     └─ index.ts              # Update feature exports
 └─ index.ts                    # Main CLI entry point
 ```
 
@@ -171,9 +180,54 @@ Notes:
 Notes:
 
 - This command is intentionally non-persistent: no output artifacts remain
-- Behavior mirrors single install’s editor selection and confirmation UX
+- Behavior mirrors single install's editor selection and confirmation UX
+
+### Update Flow
+
+1. `commands/updateInstalled.ts` determines update mode (all vs selected)
+2. Scans installed extensions via `features/export/installedExtensionsService`
+3. Resolves latest versions from registry with fallback (Marketplace → OpenVSX)
+4. **Creates backup** via `core/backup/backupService` before each update (unless `--skip-backup`)
+5. Downloads new versions to temp directory
+6. Installs with force-reinstall flag via `features/install/installService`
+7. Reports summary including backup IDs for potential rollback
+
+Notes:
+
+- Interactive mode allows selecting specific extensions to update
+- Backups stored in `~/.vsix-backups/` by default (configurable)
+- Parallel updates supported via `--parallel` flag
+- Dry-run mode available for preview
+
+### Rollback Flow
+
+1. `commands/rollback.ts` determines operation mode (list/restore/cleanup)
+2. For restore: loads backup history from `~/.vsix-backups/backup-history.json`
+3. Interactive selection or direct restore via backup ID/latest flag
+4. Restoration via `core/backup/backupService.restoreExtension`
+5. Optional force flag to overwrite existing extensions
+
+Notes:
+
+- Cleanup mode removes old backups keeping last N per extension
+- JSON output available for automation
+- Supports filtering by extension ID or editor
 
 ## Foundational Modules
+
+### Backup (`core/backup`)
+
+- Complete backup and restore system for extension safety
+- Metadata tracking with JSON history file (`backup-history.json`)
+- Automatic cleanup keeping last N backups per extension
+- Directory size calculation for monitoring disk usage
+
+Key capabilities:
+
+- `backupExtension()`: Creates timestamped backup with metadata
+- `restoreExtension()`: Restores from backup with optional force
+- `listBackups()`: Query backups with filtering
+- `cleanupOldBackups()`: Automatic retention management
 
 ### Configuration (`config/`)
 
@@ -250,3 +304,7 @@ User-facing overview in README is intentionally brief; this section contains the
 - Expand JSON output surfaces for better automation and CI usage
 - Add unit/integration tests for registry parsing, version resolution, and validators
 - Pluggable source registries via an abstraction layer
+- Compression for backup storage to reduce disk usage
+- Cloud backup sync options for distributed teams
+- Automatic rollback on install failure detection
+- Extension dependency resolution and management

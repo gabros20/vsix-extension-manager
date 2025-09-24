@@ -190,7 +190,7 @@ export async function fromList(options: FromListOptions) {
         // Resolve editor for installation
         const { getEditorService } = await import("../features/install");
         const editorService = getEditorService();
-        const availableEditors = editorService.getAvailableEditors();
+        const availableEditors = await editorService.getAvailableEditors();
 
         if (availableEditors.length === 0) {
           p.log.warn(

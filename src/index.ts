@@ -213,6 +213,8 @@ program
     "Allow proceeding when resolved binary identity mismatches the requested editor",
     false,
   )
+  .option("--skip-backup", "Skip creating backups before updating", false)
+  .option("--backup-dir <path>", "Custom backup directory (default: ~/.vsix-backups)")
   .action(async (opts) => {
     await withConfigAndErrorHandling(async (config, options) => {
       const { updateInstalled } = await import("./commands/updateInstalled");
@@ -220,7 +222,27 @@ program
     }, opts);
   });
 
-// Default command - interactive launcher
+program
+  .command("rollback")
+  .description("Rollback extensions from backups")
+  .option("--extension-id <id>", "Extension ID to rollback")
+  .option("-e, --editor <editor>", "Filter by editor: vscode|cursor")
+  .option("--backup-id <id>", "Specific backup ID to restore")
+  .option("--latest", "Restore latest backup for the extension", false)
+  .option("--list", "List available backups", false)
+  .option("--force", "Force restore even if extension exists", false)
+  .option("--cleanup", "Clean up old backups", false)
+  .option("--keep-count <n>", "Number of backups to keep per extension (default: 3)")
+  .option("--quiet", "Reduce output", false)
+  .option("--json", "Machine-readable output", false)
+  .option("--backup-dir <path>", "Custom backup directory (default: ~/.vsix-backups)")
+  .action(async (opts) => {
+    await withConfigAndErrorHandling(async (config, options) => {
+      const { rollback } = await import("./commands/rollback");
+      // Don't merge config for rollback - it has different options
+      await rollback(options);
+    }, opts);
+  });
 program.action(async () => {
   await withConfigAndErrorHandling(async (config) => {
     const { runInteractive } = await import("./commands/interactive");

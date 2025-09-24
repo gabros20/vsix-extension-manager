@@ -372,7 +372,7 @@ async function downloadSingleExtension(options: DownloadOptions) {
         const editorService = getEditorService();
 
         // Auto-detect editor
-        const availableEditors = editorService.getAvailableEditors();
+        const availableEditors = await editorService.getAvailableEditors();
         if (availableEditors.length === 0) {
           p.log.warn(
             "⚠️ No editors found for installation. Extension downloaded but not installed.",
@@ -490,7 +490,7 @@ async function downloadBulkFromJson(options: DownloadOptions) {
       const editorService = getEditorService();
 
       // Auto-detect editor
-      const availableEditors = editorService.getAvailableEditors();
+      const availableEditors = await editorService.getAvailableEditors();
       if (availableEditors.length === 0) {
         p.log.warn(
           "⚠️ No editors found for installation. Extensions downloaded but not installed.",

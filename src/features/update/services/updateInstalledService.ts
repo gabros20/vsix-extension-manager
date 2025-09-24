@@ -6,6 +6,7 @@ import { getInstalledExtensions as getInstalledFromFs } from "../../export";
 import { resolveVersion } from "../../../core/registry";
 import { downloadSingleExtension } from "../../download";
 import { FileExistsAction } from "../../../core/filesystem";
+import { getBackupService, type BackupMetadata } from "../../../core/backup";
 import type { ProgressInfo } from "../../../core/ui/progress";
 
 export interface UpdateOptions {
@@ -23,6 +24,8 @@ export interface UpdateOptions {
   cursorBin?: string;
   allowMismatchedBinary?: boolean;
   selectedExtensions?: string[]; // Filter to only update these extension IDs
+  skipBackup?: boolean; // Skip creating backups before update
+  backupDir?: string; // Custom backup directory
 }
 
 export interface UpdateItemPlan {
@@ -36,6 +39,7 @@ export interface UpdateItemResult extends UpdateItemPlan {
   error?: string;
   filePath?: string;
   elapsedMs: number;
+  backupId?: string; // ID of the backup created before update
 }
 
 export interface UpdateSummary {
@@ -48,6 +52,7 @@ export interface UpdateSummary {
   failed: number;
   elapsedMs: number;
   items: UpdateItemResult[];
+  backups: BackupMetadata[]; // List of backups created during update
 }
 
 type MessageCallback = (message: string) => void;
@@ -73,7 +78,7 @@ export class UpdateInstalledService {
     const installService = getInstallService();
 
     // Detect editor and resolve binary
-    const available = editorService.getAvailableEditors();
+    const available = await editorService.getAvailableEditors();
     if (available.length === 0) {
       throw new Error("No editors found. Please install VS Code or Cursor.");
     }
@@ -82,7 +87,7 @@ export class UpdateInstalledService {
         ? (available.find((e) => e.name === "cursor") || available[0]).name
         : editorPref;
     const explicitBin = chosenEditor === "vscode" ? options.codeBin : options.cursorBin;
-    const binPath = editorService.resolveEditorBinary(
+    const binPath = await editorService.resolveEditorBinary(
       chosenEditor,
       explicitBin,
       Boolean(options.allowMismatchedBinary),
@@ -108,6 +113,7 @@ export class UpdateInstalledService {
       failed: 0,
       elapsedMs: 0,
       items: [],
+      backups: [],
     };
 
     if (installed.length === 0) {
@@ -152,7 +158,12 @@ export class UpdateInstalledService {
         }
 
         // Compare versions semantically
-        const needsUpdate = this.isVersionNewer(latest, current);
+        // If selectedExtensions is provided, the user has already chosen to update these,
+        // so we should trust that decision and always consider them as needing updates
+        const needsUpdate = options.selectedExtensions
+          ? options.selectedExtensions.includes(id)
+          : this.isVersionNewer(latest, current);
+
         if (!needsUpdate) {
           summary.upToDate++;
           summary.items.push({
@@ -206,6 +217,9 @@ export class UpdateInstalledService {
       await fs.writeJson(path.join(tempDir, "extensions.json"), extensionsJson, { spaces: 2 });
     } catch {}
 
+    // Initialize backup service if backups are enabled
+    const backupService = options.skipBackup ? null : getBackupService(options.backupDir);
+
     // Perform updates with bounded concurrency
     let index = 0;
     const results: UpdateItemResult[] = [];
@@ -222,6 +236,41 @@ export class UpdateInstalledService {
               if (dryRun) {
                 results.push({ ...plan, status: "skipped", elapsedMs: Date.now() - startItem });
                 continue;
+              }
+
+              // Create backup before updating (if enabled)
+              let backupMetadata: BackupMetadata | undefined;
+              if (backupService && !options.skipBackup) {
+                try {
+                  // Get the extension's current installation path
+                  const extensionsPath =
+                    chosenEditor === "cursor"
+                      ? path.join(os.homedir(), ".cursor", "extensions")
+                      : path.join(os.homedir(), ".vscode", "extensions");
+
+                  // Find the extension directory (format: publisher.name-version)
+                  const extensionDirs = await fs.readdir(extensionsPath);
+                  const extensionDir = extensionDirs.find((dir) =>
+                    dir.startsWith(plan.id.replace(".", ".") + "-"),
+                  );
+
+                  if (extensionDir) {
+                    const extensionPath = path.join(extensionsPath, extensionDir);
+                    backupMetadata = await backupService.backupExtension(
+                      extensionPath,
+                      plan.id,
+                      plan.currentVersion,
+                      chosenEditor,
+                      `Auto-backup before update to ${plan.targetVersion}`,
+                    );
+                    summary.backups.push(backupMetadata);
+                  }
+                } catch (backupError) {
+                  // Log backup error but continue with update
+                  if (!quiet) {
+                    onMessage?.(`Warning: Failed to backup ${plan.id}: ${backupError}`);
+                  }
+                }
               }
 
               // Download from preferred source with fallback
@@ -258,6 +307,7 @@ export class UpdateInstalledService {
                   status: "updated",
                   filePath,
                   elapsedMs: Date.now() - startItem,
+                  backupId: backupMetadata?.id,
                 });
               } else {
                 // Provide detailed error information for troubleshooting
@@ -290,6 +340,7 @@ export class UpdateInstalledService {
                   error: finalError,
                   filePath,
                   elapsedMs: Date.now() - startItem,
+                  backupId: backupMetadata?.id,
                 });
               }
             } catch (error) {
@@ -331,6 +382,7 @@ export class UpdateInstalledService {
             skipped: summary.skipped,
             failed: summary.failed,
             items: summary.items,
+            backups: summary.backups,
             extensionsJsonPath: path.join(tempDir, "extensions.json"),
           },
           { spaces: 2 },
