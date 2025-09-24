@@ -1,3 +1,10 @@
+## [1.13.1](https://github.com/gabros20/vsix-extension-manager/compare/v1.13.0...v1.13.1) (2025-09-24)
+
+### Bug Fixes
+
+- resolve NODE_ENV production issue preventing devDependencies installation ([eb96454](https://github.com/gabros20/vsix-extension-manager/commit/eb9645417c00fec810f773709566ad07fd30e9df))
+- resolve TypeScript process and Node.js type errors ([a4c1766](https://github.com/gabros20/vsix-extension-manager/commit/a4c176614d4afa9b2dfd3846a088eda863bd63cb))
+
 # [1.13.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.12.0...v1.13.0) (2025-09-24)
 
 ### Bug Fixes
