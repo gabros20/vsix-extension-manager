@@ -1,3 +1,13 @@
+# [1.14.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.13.1...v1.14.0) (2025-09-29)
+
+### Bug Fixes
+
+- udpated commit prompt ([86719af](https://github.com/gabros20/vsix-extension-manager/commit/86719af2f80b1ab8c7a96487da82f9d7d90bee09))
+
+### Features
+
+- replace Dependabot with Renovate for dependency management ([bda7097](https://github.com/gabros20/vsix-extension-manager/commit/bda7097c83b79bbd59d153c23ea56a254a8fc67f))
+
 # [1.14.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.13.1...v1.14.0) (2025-09-24)
 
 ### Bug Fixes
