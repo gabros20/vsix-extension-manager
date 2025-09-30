@@ -1,0 +1,70 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:base", "helpers:pinGitHubActionsDigests"],
+  "schedule": ["on monday at 9am"],
+  "timezone": "UTC",
+  "prConcurrentLimit": 5,
+  "reviewers": ["gabros20"],
+  "assignees": ["gabros20"],
+  "commitMessagePrefix": "chore",
+  "commitMessageAction": "update",
+  "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "to {{newVersion}}",
+  "includeForks": false,
+  "dependencyDashboard": true,
+  "dependencyDashboardTitle": "🔄 Dependency Dashboard",
+  "dependencyDashboardHeader": "This issue contains a list of Renovate updates and their statuses.",
+  "packageRules": [
+    {
+      "description": "Group development dependencies",
+      "groupName": "Development Dependencies",
+      "matchDepTypes": ["devDependencies"],
+      "matchPackagePatterns": [
+        "@types/*",
+        "@typescript-eslint/*",
+        "eslint*",
+        "prettier*",
+        "husky",
+        "lint-staged"
+      ]
+    },
+    {
+      "description": "Group production dependencies",
+      "groupName": "Production Dependencies",
+      "matchDepTypes": ["dependencies"]
+    },
+    {
+      "description": "Group GitHub Actions",
+      "groupName": "GitHub Actions",
+      "matchManagers": ["github-actions"]
+    },
+    {
+      "description": "Auto-merge minor and patch updates for dev dependencies",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "requiredStatusChecks": null
+    },
+    {
+      "description": "Auto-merge patch updates for production dependencies",
+      "matchDepTypes": ["dependencies"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "pr",
+      "requiredStatusChecks": null
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "assignees": ["gabros20"]
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["on monday at 9am"]
+  },
+  "semanticCommits": "enabled",
+  "semanticCommitType": "chore",
+  "semanticCommitScope": "deps"
+}
