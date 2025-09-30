@@ -80,14 +80,34 @@ export class InstallService {
       // Ensure file state is valid before each installation
       await this.ensureValidFileState(binaryPath);
 
-      // VS Code bug workaround: Add small delay to prevent file system conflicts
+      // VS Code bug workaround: Add delay to prevent file system conflicts
       // VS Code's CLI has race conditions during rapid installations
-      await this.delay(100);
+      // Increased delay to give VS Code more time to settle
+      await this.delay(250);
 
       const result = await this.editorService.installVsix(binaryPath, vsixPath, {
         force: options.forceReinstall,
         timeout: options.timeout,
       });
+
+      // VS Code bug workaround: Retry failed installations once
+      if (!result.success && this.isRetryableError(result)) {
+        // Wait a bit longer for VS Code to settle
+        await this.delay(1000);
+
+        // Ensure file state is still valid
+        await this.ensureValidFileState(binaryPath);
+
+        // Retry the installation
+        const retryResult = await this.editorService.installVsix(binaryPath, vsixPath, {
+          force: options.forceReinstall,
+          timeout: options.timeout,
+        });
+
+        if (retryResult.success) {
+          return retryResult;
+        }
+      }
 
       // Enhance error message if installation failed
       if (!result.success) {
@@ -118,6 +138,9 @@ export class InstallService {
       const extensionsJsonPath = path.join(extensionsDir, "extensions.json");
       const obsoletePath = path.join(extensionsDir, ".obsolete");
 
+      // VS Code bug workaround: Wait for file locks to clear
+      await this.waitForFileSystemSettle(extensionsDir);
+
       // VS Code bug workaround: Always ensure .obsolete exists
       // VS Code deletes this file during installation and fails to recreate it
       if (!(await fs.pathExists(obsoletePath))) {
@@ -142,6 +165,45 @@ export class InstallService {
     }
   }
 
+  /**
+   * Wait for VS Code file system operations to settle
+   * VS Code has race conditions during rapid file operations
+   */
+  private async waitForFileSystemSettle(extensionsDir: string): Promise<void> {
+    try {
+      // Check if there are any temporary files that indicate ongoing operations
+      const tempFiles = await fs.readdir(extensionsDir).catch(() => []);
+      const hasTempFiles = tempFiles.some(
+        (file) => file.includes(".tmp") || file.includes(".temp") || file.includes(".vsctmp"),
+      );
+
+      if (hasTempFiles) {
+        // Wait for temporary files to be cleaned up
+        await this.delay(500);
+      }
+
+      // Additional small delay to ensure file system is ready
+      await this.delay(100);
+    } catch {
+      // Silently ignore - this is just a best-effort optimization
+    }
+  }
+
+  /**
+   * Check if an installation error is retryable
+   * VS Code file system errors are often transient
+   */
+  private isRetryableError(result: InstallResult): boolean {
+    const errorText = [result.error, result.stderr, result.stdout].join(" ").toLowerCase();
+
+    return (
+      errorText.includes("missing .obsolete") ||
+      errorText.includes("entrynotfound") ||
+      errorText.includes("directory conflict") ||
+      errorText.includes("scanningextension") ||
+      errorText.includes("unable to write file")
+    );
+  }
   /**
    * Extract meaningful error message from install result
    */
