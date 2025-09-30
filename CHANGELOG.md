@@ -1,3 +1,9 @@
+# [1.15.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.14.0...v1.15.0) (2025-09-30)
+
+### Features
+
+- add extension compatibility checking with VS Code/Cursor versions ([f02e3a4](https://github.com/gabros20/vsix-extension-manager/commit/f02e3a44ed17ed67e53297ba7dc2c833e50406cc))
+
 # [1.14.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.13.1...v1.14.0) (2025-09-30)
 
 ### Features
