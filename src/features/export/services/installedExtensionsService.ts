@@ -62,6 +62,14 @@ function getExtensionsPathForEditor(editor: "vscode" | "cursor"): string {
 }
 
 /**
+ * Validate extension ID format (publisher.name)
+ */
+function isValidExtensionId(id: string): boolean {
+  const extensionIdPattern = /^[a-zA-Z0-9][a-zA-Z0-9\-]*\.[a-zA-Z0-9][a-zA-Z0-9\-.]*$/;
+  return extensionIdPattern.test(id);
+}
+
+/**
  * Read package.json from an extension directory
  */
 function readExtensionPackageJson(extensionPath: string): InstalledExtension | null {
@@ -71,20 +79,45 @@ function readExtensionPackageJson(extensionPath: string): InstalledExtension | n
       return null;
     }
 
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
-
-    // Parse extension ID from directory name (publisher.name-version)
-    const dirName = path.basename(extensionPath);
-    const match = dirName.match(/^(.+)\.(.+)-(.+)$/);
-
-    if (!match) {
+    // Skip if this is not an extension directory (e.g., .DS_Store, .obsolete, etc.)
+    if (path.basename(extensionPath).startsWith(".")) {
       return null;
     }
 
-    const [, publisher, name, version] = match;
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
+
+    // Try to get extension ID from package.json first (most reliable)
+    let extensionId: string;
+    let publisher: string;
+    let name: string;
+    let version: string;
+
+    if (packageJson.publisher && packageJson.name) {
+      // Use package.json publisher and name (most reliable)
+      publisher = packageJson.publisher;
+      name = packageJson.name;
+      extensionId = `${publisher}.${name}`;
+      version = packageJson.version || "unknown";
+    } else {
+      // Fallback to parsing directory name (publisher.name-version)
+      const dirName = path.basename(extensionPath);
+      const match = dirName.match(/^(.+)\.(.+)-(.+)$/);
+
+      if (!match) {
+        return null;
+      }
+
+      [, publisher, name, version] = match;
+      extensionId = `${publisher}.${name}`;
+    }
+
+    // Validate the extension ID format
+    if (!isValidExtensionId(extensionId)) {
+      return null;
+    }
 
     return {
-      id: `${publisher}.${name}`,
+      id: extensionId,
       displayName: packageJson.displayName || packageJson.name || name,
       version,
       publisher,
@@ -144,7 +177,10 @@ export function formatExtensions(extensions: InstalledExtension[], format: Expor
       return extensions.map((ext) => ext.id).join("\n");
 
     case "extensions.json": {
-      const recommendations = extensions.map((ext) => ext.id);
+      // Filter out invalid extension IDs and get valid ones
+      const validExtensions = extensions.filter((ext) => isValidExtensionId(ext.id));
+      const recommendations = validExtensions.map((ext) => ext.id);
+
       const extensionsJson: VSCodeExtensionsJson = {
         recommendations,
       };
@@ -154,6 +190,26 @@ export function formatExtensions(extensions: InstalledExtension[], format: Expor
     default:
       throw new Error(`Unknown format: ${format}`);
   }
+}
+
+/**
+ * Get export statistics for validation reporting
+ */
+export function getExportStats(extensions: InstalledExtension[]): {
+  total: number;
+  valid: number;
+  invalid: number;
+  invalidIds: string[];
+} {
+  const validExtensions = extensions.filter((ext) => isValidExtensionId(ext.id));
+  const invalidExtensions = extensions.filter((ext) => !isValidExtensionId(ext.id));
+
+  return {
+    total: extensions.length,
+    valid: validExtensions.length,
+    invalid: invalidExtensions.length,
+    invalidIds: invalidExtensions.map((ext) => ext.id),
+  };
 }
 
 /**

@@ -1,5 +1,6 @@
 import { getEditorService, InstallResult } from "./editorCliService";
 import { VsixFile } from "./vsixScannerService";
+import { getInstallPreflightService } from "./installPreflightService";
 
 export interface InstallOptions {
   dryRun?: boolean;
@@ -42,6 +43,20 @@ export interface BulkInstallResult {
  */
 export class InstallService {
   private editorService = getEditorService();
+  private preflightService = getInstallPreflightService();
+
+  /**
+   * Run preflight checks before installation
+   */
+  async validatePrerequisites(binaryPath: string): Promise<{ valid: boolean; errors: string[] }> {
+    const editor = binaryPath.toLowerCase().includes("cursor") ? "cursor" : "vscode";
+    const preflightResult = await this.preflightService.runPreflightChecks(editor);
+
+    return {
+      valid: preflightResult.valid,
+      errors: preflightResult.errors,
+    };
+  }
 
   /**
    * Install a single VSIX file
@@ -248,11 +263,20 @@ export class InstallService {
           timeout,
         });
 
+        // Check if this was an "already installed" scenario
+        const output = ((result.stdout || "") + (result.stderr || "")).toLowerCase();
+        const isAlreadyInstalled =
+          output.includes("already installed") ||
+          output.includes("is already installed") ||
+          output.includes("please restart") ||
+          output.includes("reinstalling");
+
         return {
           task,
-          success: result.success,
+          success: result.success || isAlreadyInstalled,
+          skipped: isAlreadyInstalled,
           installResult: result,
-          error: result.error,
+          error: result.success || isAlreadyInstalled ? undefined : result.error,
           elapsedMs: Date.now() - startTime,
           startTime,
         };
@@ -314,36 +338,6 @@ export class InstallService {
    */
   async uninstallExtension(binaryPath: string, extensionId: string): Promise<InstallResult> {
     return this.editorService.uninstallExtension(binaryPath, extensionId);
-  }
-
-  /**
-   * Validate installation prerequisites
-   */
-  async validatePrerequisites(binaryPath: string): Promise<{ valid: boolean; errors: string[] }> {
-    const errors: string[] = [];
-
-    try {
-      // If binaryPath is an absolute/path-like string, check on disk
-      const isPathLike = /[\\/]/.test(binaryPath);
-      if (isPathLike) {
-        const fs = await import("fs-extra");
-        if (!(await fs.pathExists(binaryPath))) {
-          errors.push(`Editor binary not found: ${binaryPath}`);
-        }
-      }
-
-      // Try to get version to verify it's working (works for PATH commands too)
-      await this.editorService.getEditorVersion(binaryPath);
-    } catch (error) {
-      errors.push(
-        `Editor binary not accessible: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors,
-    };
   }
 
   /**

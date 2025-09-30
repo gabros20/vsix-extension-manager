@@ -4,6 +4,7 @@ export {
   formatExtensions,
   findWorkspaceExtensionsJson,
   getExtensionsPath,
+  getExportStats,
 } from "./services/installedExtensionsService";
 
 // Type exports

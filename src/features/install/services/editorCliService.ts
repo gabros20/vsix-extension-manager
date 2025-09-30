@@ -446,9 +446,22 @@ export class EditorCliService {
       });
 
       child.on("close", (code) => {
-        const success = code === 0;
+        // Check for success indicators in output, not just exit code
+        const output = (stdout + stderr).toLowerCase();
+        const isAlreadyInstalled =
+          output.includes("already installed") ||
+          output.includes("is already installed") ||
+          output.includes("please restart") ||
+          output.includes("reinstalling");
+
+        const isSuccess =
+          code === 0 ||
+          output.includes("successfully installed") ||
+          output.includes("installed successfully") ||
+          isAlreadyInstalled;
+
         resolve({
-          success,
+          success: isSuccess,
           exitCode: code || 0,
           stdout: stdout.trim(),
           stderr: stderr.trim(),

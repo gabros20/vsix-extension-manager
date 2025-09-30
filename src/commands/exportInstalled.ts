@@ -5,6 +5,7 @@ import {
   getInstalledExtensions,
   formatExtensions,
   findWorkspaceExtensionsJson,
+  getExportStats,
 } from "../features/export";
 import type { ExportFormat, EditorType } from "../features/export";
 import { validate } from "../core/validation";
@@ -178,6 +179,19 @@ export async function exportInstalled(options: ExportInstalledOptions) {
         `⚠️ No extensions found. Make sure ${editorDisplayName} is installed and has extensions.`,
       );
       return;
+    }
+
+    // Get export statistics for validation reporting
+    const stats = getExportStats(extensions);
+
+    // Show validation summary for extensions.json format
+    if (format === "extensions.json" && stats.invalid > 0) {
+      p.log.warn(`⚠️ Found ${stats.invalid} invalid extension ID(s) that will be excluded:`);
+      stats.invalidIds.slice(0, 5).forEach((id) => p.log.warn(`  • ${id}`));
+      if (stats.invalidIds.length > 5) {
+        p.log.warn(`  • ... and ${stats.invalidIds.length - 5} more`);
+      }
+      p.log.info(`✅ ${stats.valid} valid extension(s) will be exported`);
     }
 
     // Format output
