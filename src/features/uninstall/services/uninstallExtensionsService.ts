@@ -88,6 +88,10 @@ export class UninstallExtensionsService {
       // Silently ignore cleanup errors
     }
 
+    // VS Code bug workaround: Ensure file state is valid before uninstall
+    // VS Code CLI has the same file management bugs during uninstall
+    await this.ensureValidFileState(binPath);
+
     // Get installed extensions
     progressCallback?.("Scanning installed extensions...");
     const installed = await getInstalledExtensions(chosenEditor);
@@ -210,6 +214,13 @@ export class UninstallExtensionsService {
 
     for (let attempt = 0; attempt <= options.retry; attempt++) {
       try {
+        // VS Code bug workaround: Ensure file state is valid before each uninstall
+        await this.ensureValidFileState(binaryPath);
+
+        // VS Code bug workaround: Add small delay to prevent file system conflicts
+        // VS Code's CLI has race conditions during rapid uninstalls
+        await this.delay(100);
+
         const result = await this.editorService.uninstallExtension(binaryPath, extensionId);
 
         // If CLI reports failure, verify if extension is actually gone
@@ -566,6 +577,44 @@ export class UninstallExtensionsService {
       await fs.writeFile(obsoletePath, JSON.stringify(obsolete, null, 2));
     } catch {
       // Silently fail - .obsolete is optional metadata
+    }
+  }
+
+  /**
+   * Ensure extensions folder file state is valid before uninstall
+   * This is a workaround for VS Code's buggy file management
+   */
+  private async ensureValidFileState(binaryPath: string): Promise<void> {
+    try {
+      const isCursor = binaryPath.toLowerCase().includes("cursor");
+      const extensionsDir = isCursor
+        ? path.join(process.env.HOME || "~", ".cursor", "extensions")
+        : path.join(process.env.HOME || "~", ".vscode", "extensions");
+
+      const extensionsJsonPath = path.join(extensionsDir, "extensions.json");
+      const obsoletePath = path.join(extensionsDir, ".obsolete");
+
+      // VS Code bug workaround: Always ensure .obsolete exists
+      // VS Code deletes this file during operations and fails to recreate it
+      if (!(await fs.pathExists(obsoletePath))) {
+        await fs.writeFile(obsoletePath, JSON.stringify({}, null, 2));
+      }
+
+      // VS Code bug workaround: Ensure extensions.json is valid
+      // VS Code sometimes creates corrupted JSON during bulk operations
+      if (!(await fs.pathExists(extensionsJsonPath))) {
+        await fs.writeFile(extensionsJsonPath, JSON.stringify([], null, 2));
+      } else {
+        try {
+          const content = await fs.readFile(extensionsJsonPath, "utf-8");
+          JSON.parse(content); // Validate JSON
+        } catch {
+          // VS Code created corrupted JSON, fix it
+          await fs.writeFile(extensionsJsonPath, JSON.stringify([], null, 2));
+        }
+      }
+    } catch {
+      // Silently ignore file state errors - this is VS Code's problem
     }
   }
 
