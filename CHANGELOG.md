@@ -1,3 +1,9 @@
+# [1.14.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.13.1...v1.14.0) (2025-09-30)
+
+### Features
+
+- add uninstall functionality and improve extension management ([d7eb482](https://github.com/gabros20/vsix-extension-manager/commit/d7eb482fdaaa897f44855d49c497c9c278551986))
+
 ## [1.13.1](https://github.com/gabros20/vsix-extension-manager/compare/v1.13.0...v1.13.1) (2025-09-24)
 
 ### Bug Fixes
