@@ -80,6 +80,10 @@ export class InstallService {
       // Ensure file state is valid before each installation
       await this.ensureValidFileState(binaryPath);
 
+      // VS Code bug workaround: Add small delay to prevent file system conflicts
+      // VS Code's CLI has race conditions during rapid installations
+      await this.delay(100);
+
       const result = await this.editorService.installVsix(binaryPath, vsixPath, {
         force: options.forceReinstall,
         timeout: options.timeout,
@@ -102,6 +106,7 @@ export class InstallService {
 
   /**
    * Ensure extensions folder file state is valid before each installation
+   * This is a workaround for VS Code's buggy file management
    */
   private async ensureValidFileState(binaryPath: string): Promise<void> {
     try {
@@ -113,34 +118,27 @@ export class InstallService {
       const extensionsJsonPath = path.join(extensionsDir, "extensions.json");
       const obsoletePath = path.join(extensionsDir, ".obsolete");
 
-      // Ensure extensions.json exists and is valid
+      // VS Code bug workaround: Always ensure .obsolete exists
+      // VS Code deletes this file during installation and fails to recreate it
+      if (!(await fs.pathExists(obsoletePath))) {
+        await fs.writeFile(obsoletePath, JSON.stringify({}, null, 2));
+      }
+
+      // VS Code bug workaround: Ensure extensions.json is valid
+      // VS Code sometimes creates corrupted JSON during bulk operations
       if (!(await fs.pathExists(extensionsJsonPath))) {
         await fs.writeFile(extensionsJsonPath, JSON.stringify([], null, 2));
       } else {
         try {
           const content = await fs.readFile(extensionsJsonPath, "utf-8");
-          JSON.parse(content);
+          JSON.parse(content); // Validate JSON
         } catch {
+          // VS Code created corrupted JSON, fix it
           await fs.writeFile(extensionsJsonPath, JSON.stringify([], null, 2));
         }
       }
-
-      // Ensure .obsolete exists and is valid
-      if (!(await fs.pathExists(obsoletePath))) {
-        await fs.writeFile(obsoletePath, JSON.stringify({}, null, 2));
-      } else {
-        try {
-          const content = await fs.readFile(obsoletePath, "utf-8");
-          const parsed = JSON.parse(content);
-          if (typeof parsed !== "object" || parsed === null) {
-            throw new Error("Invalid format");
-          }
-        } catch {
-          await fs.writeFile(obsoletePath, JSON.stringify({}, null, 2));
-        }
-      }
     } catch {
-      // Silently ignore file state errors
+      // Silently ignore file state errors - this is VS Code's problem
     }
   }
 
