@@ -57,6 +57,12 @@ export class InstallPreflightService {
       // Check for corrupted extensions
       await this.checkCorruptedExtensions(extensionsDir, result);
 
+      // Clean up temporary directories that might cause conflicts
+      const cleanedTempDirs = await this.cleanupTemporaryDirectories(extensionsDir);
+      if (cleanedTempDirs.length > 0) {
+        result.suggestions.push(`Cleaned up ${cleanedTempDirs.length} temporary directory(ies)`);
+      }
+
       // Check disk space
       await this.checkDiskSpace(extensionsDir, result);
     } catch (error) {
@@ -171,6 +177,48 @@ export class InstallPreflightService {
           } catch {
             // Ignore cleanup errors
           }
+        }
+      }
+    } catch {
+      // Ignore cleanup errors
+    }
+
+    return cleaned;
+  }
+
+  /**
+   * Clean up temporary directories that might cause installation conflicts
+   */
+  async cleanupTemporaryDirectories(extensionsDir: string): Promise<string[]> {
+    const cleaned: string[] = [];
+
+    try {
+      const entries = await fs.readdir(extensionsDir, { withFileTypes: true });
+
+      // Look for temporary directories (usually start with . and contain UUIDs)
+      const tempDirs = entries.filter(
+        (entry) =>
+          entry.isDirectory() &&
+          entry.name.startsWith(".") &&
+          entry.name.length > 8 && // Likely a UUID
+          !entry.name.startsWith(".obsolete"), // Don't remove .obsolete
+      );
+
+      for (const entry of tempDirs) {
+        const tempPath = path.join(extensionsDir, entry.name);
+        try {
+          // Check if directory is empty or contains only temp files
+          const contents = await fs.readdir(tempPath);
+          const hasImportantFiles = contents.some(
+            (file) => file === "package.json" || file.endsWith(".js") || file.endsWith(".json"),
+          );
+
+          if (!hasImportantFiles) {
+            await fs.remove(tempPath);
+            cleaned.push(entry.name);
+          }
+        } catch {
+          // Ignore cleanup errors
         }
       }
     } catch {

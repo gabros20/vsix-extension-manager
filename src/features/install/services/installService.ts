@@ -126,6 +126,15 @@ export class InstallService {
     if (combined.includes("corrupted") || combined.includes("invalid")) {
       return "VSIX file appears to be corrupted";
     }
+    if (combined.includes("UnsetRemoved") || combined.includes(".obsolete")) {
+      return "Missing .obsolete file - try running preflight checks";
+    }
+    if (combined.includes("ENOTEMPTY") || combined.includes("directory not empty")) {
+      return "Directory conflict - try cleaning up temporary files";
+    }
+    if (combined.includes("Rename") && combined.includes("directory not empty")) {
+      return "Extension directory conflict - temporary files may be blocking installation";
+    }
 
     // Return first non-empty part with exit code if available
     const firstPart = parts[0] || "Installation failed";
