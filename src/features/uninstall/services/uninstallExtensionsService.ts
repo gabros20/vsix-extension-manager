@@ -302,7 +302,13 @@ export class UninstallExtensionsService {
     const extensionsJsonPath = path.join(extensionsDir, "extensions.json");
 
     if (!(await fs.pathExists(extensionsJsonPath))) {
-      return; // File doesn't exist, nothing to update
+      // File doesn't exist - create it as empty array to prevent VS Code errors
+      try {
+        await fs.writeFile(extensionsJsonPath, JSON.stringify([], null, 2));
+      } catch {
+        // Ignore if we can't create the file
+      }
+      return;
     }
 
     try {
@@ -324,12 +330,17 @@ export class UninstallExtensionsService {
 
         // Only write if content actually changed
         if (filtered.length !== extensions.length) {
-          await fs.writeFile(extensionsJsonPath, JSON.stringify(filtered));
+          await fs.writeFile(extensionsJsonPath, JSON.stringify(filtered, null, 2));
         }
       }
     } catch {
-      // Silently fail - extensions.json format might be corrupt or proprietary
-      // The extension folder removal is the critical part anyway
+      // If file is corrupt, recreate it as empty array
+      try {
+        await fs.writeFile(extensionsJsonPath, JSON.stringify([], null, 2));
+      } catch {
+        // Silently fail - extensions.json format might be corrupt or proprietary
+        // The extension folder removal is the critical part anyway
+      }
     }
   }
 
@@ -353,7 +364,7 @@ export class UninstallExtensionsService {
       }
 
       obsolete[extensionId] = true;
-      await fs.writeFile(obsoletePath, JSON.stringify(obsolete));
+      await fs.writeFile(obsoletePath, JSON.stringify(obsolete, null, 2));
     } catch {
       // Silently fail - .obsolete is optional metadata
     }
