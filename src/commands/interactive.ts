@@ -121,7 +121,7 @@ async function showDownloadMenu(config: Config): Promise<boolean> {
       {
         value: "bulk",
         label: "Download multiple extensions",
-        hint: "Bulk download from JSON collection",
+        hint: "Bulk download from marketplace URL collection",
       },
       {
         value: "from-list",

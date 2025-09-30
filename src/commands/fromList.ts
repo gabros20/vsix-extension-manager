@@ -6,6 +6,9 @@ import { downloadBulkExtensions } from "../features/download";
 import type { BulkOptions } from "../core/types";
 import { buildBulkOptionsFromCli } from "../core/helpers";
 import { DEFAULT_OUTPUT_DIR } from "../config/constants";
+import { isInteractive, getSafeIntro } from "../core/helpers/tty";
+import { getExtensionCompatibilityService } from "../features/install/services/extensionCompatibilityService";
+import { getEditorService } from "../features/install/services/editorCliService";
 
 interface FromListOptions {
   file?: string;
@@ -26,15 +29,28 @@ interface FromListOptions {
   format?: string;
   install?: boolean;
   downloadOnly?: boolean;
+  checkCompatibility?: boolean;
+  editor?: string;
 }
 
 export async function fromList(options: FromListOptions) {
   try {
-    p.intro("📥 Download from Extension List");
+    // Check if we're in a TTY environment and adjust options accordingly
+    if (!isInteractive() && !options.quiet && !options.json) {
+      p.log.warn("⚠️ Non-interactive environment detected. Using quiet mode.");
+      options.quiet = true;
+    }
+
+    getSafeIntro("📥 Download from Extension List", options);
 
     // Get input file
     let filePath = options.file;
     if (!filePath) {
+      if (options.quiet || options.json) {
+        p.log.error("❌ File path is required when using --quiet or --json mode");
+        process.exit(1);
+      }
+
       filePath = (await p.text({
         message: "Enter path to extensions list file:",
         validate: (input: string) => {
@@ -141,6 +157,75 @@ export async function fromList(options: FromListOptions) {
     }
 
     p.log.info(`Found ${extensionIds.length} extension(s) to download`);
+
+    // Check compatibility if requested
+    if (options.checkCompatibility) {
+      if (!options.quiet) {
+        p.log.info("🔍 Checking extension compatibility...");
+      }
+
+      try {
+        const editorService = getEditorService();
+        const compatibilityService = getExtensionCompatibilityService();
+
+        // Resolve editor binary
+        const editor = (options.editor as "vscode" | "cursor" | "auto") || "auto";
+        const binaryPath = await editorService.resolveEditorBinary(editor);
+
+        // Check compatibility for all extensions
+        const compatibilityResults = await compatibilityService.checkBulkCompatibility(
+          extensionIds.map((id) => ({ id, version: "latest" })),
+          binaryPath,
+        );
+
+        // Report results
+        const incompatible = compatibilityResults.filter((r) => !r.compatible);
+        const warnings = compatibilityResults.filter((r) => r.result.severity === "warning");
+
+        if (incompatible.length > 0) {
+          p.log.warn(`⚠️ Found ${incompatible.length} incompatible extension(s):`);
+          incompatible.forEach((result) => {
+            p.log.warn(`  • ${result.extensionId}: ${result.result.reason}`);
+          });
+
+          if (!options.quiet) {
+            const proceed = await p.confirm({
+              message: "Continue downloading despite compatibility issues?",
+            });
+
+            if (p.isCancel(proceed) || !proceed) {
+              p.cancel("Operation cancelled due to compatibility issues.");
+              process.exit(0);
+            }
+          }
+        }
+
+        if (warnings.length > 0 && !options.quiet) {
+          p.log.warn(`⚠️ ${warnings.length} extension(s) have compatibility warnings:`);
+          warnings.forEach((result) => {
+            p.log.warn(`  • ${result.extensionId}: ${result.result.reason}`);
+          });
+        }
+
+        if (incompatible.length === 0 && warnings.length === 0 && !options.quiet) {
+          p.log.success("✅ All extensions are compatible with your editor version!");
+        }
+      } catch (error) {
+        p.log.warn(
+          `⚠️ Compatibility check failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        if (!options.quiet) {
+          const proceed = await p.confirm({
+            message: "Continue downloading without compatibility check?",
+          });
+
+          if (p.isCancel(proceed) || !proceed) {
+            p.cancel("Operation cancelled.");
+            process.exit(0);
+          }
+        }
+      }
+    }
 
     // Convert extension IDs to bulk download format
     const bulkItems = extensionIds.map((id) => {
