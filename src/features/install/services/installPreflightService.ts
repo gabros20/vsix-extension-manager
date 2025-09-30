@@ -67,7 +67,10 @@ export class InstallPreflightService {
       await this.cleanupTemporaryFiles(extensionsDir);
 
       // Remove corrupted extensions that might cause issues
-      await this.removeCorruptedExtensions(extensionsDir);
+      const removedCorrupted = await this.removeCorruptedExtensions(extensionsDir);
+      if (removedCorrupted.length > 0) {
+        result.suggestions.push(`Removed ${removedCorrupted.length} corrupted extension(s)`);
+      }
 
       // Check disk space
       await this.checkDiskSpace(extensionsDir, result);
@@ -88,7 +91,7 @@ export class InstallPreflightService {
     const extensionsJsonPath = path.join(extensionsDir, "extensions.json");
     const obsoletePath = path.join(extensionsDir, ".obsolete");
 
-    // Ensure extensions.json exists
+    // Ensure extensions.json exists and is valid
     if (!(await fs.pathExists(extensionsJsonPath))) {
       try {
         await fs.writeFile(extensionsJsonPath, JSON.stringify([], null, 2));
@@ -96,9 +99,23 @@ export class InstallPreflightService {
       } catch {
         result.errors.push("Failed to create extensions.json");
       }
+    } else {
+      // Validate existing file
+      try {
+        const content = await fs.readFile(extensionsJsonPath, "utf-8");
+        JSON.parse(content); // Validate JSON format
+      } catch {
+        result.warnings.push("extensions.json is corrupted. Reinitializing.");
+        try {
+          await fs.writeFile(extensionsJsonPath, JSON.stringify([], null, 2));
+          result.suggestions.push("Restored corrupted extensions.json file");
+        } catch {
+          result.errors.push("Failed to restore corrupted extensions.json");
+        }
+      }
     }
 
-    // Ensure .obsolete exists
+    // Ensure .obsolete exists and is valid
     if (!(await fs.pathExists(obsoletePath))) {
       try {
         await fs.writeFile(obsoletePath, JSON.stringify({}, null, 2));
@@ -107,6 +124,23 @@ export class InstallPreflightService {
         result.errors.push(
           `Failed to create .obsolete file: ${error instanceof Error ? error.message : String(error)}`,
         );
+      }
+    } else {
+      // Validate existing file
+      try {
+        const content = await fs.readFile(obsoletePath, "utf-8");
+        const parsed = JSON.parse(content);
+        if (typeof parsed !== "object" || parsed === null) {
+          throw new Error("Invalid format");
+        }
+      } catch {
+        result.warnings.push(".obsolete file is corrupted. Reinitializing.");
+        try {
+          await fs.writeFile(obsoletePath, JSON.stringify({}, null, 2));
+          result.suggestions.push("Restored corrupted .obsolete file");
+        } catch {
+          result.errors.push("Failed to restore corrupted .obsolete file");
+        }
       }
     }
   }
@@ -265,7 +299,9 @@ export class InstallPreflightService {
   /**
    * Remove corrupted extension directories that might cause installation issues
    */
-  private async removeCorruptedExtensions(extensionsDir: string): Promise<void> {
+  private async removeCorruptedExtensions(extensionsDir: string): Promise<string[]> {
+    const removed: string[] = [];
+
     try {
       const entries = await fs.readdir(extensionsDir, { withFileTypes: true });
       const extensionDirs = entries.filter(
@@ -280,6 +316,7 @@ export class InstallPreflightService {
         if (!(await fs.pathExists(packageJsonPath))) {
           try {
             await fs.remove(extensionPath);
+            removed.push(entry.name);
           } catch {
             // Ignore cleanup errors
           }
@@ -290,16 +327,20 @@ export class InstallPreflightService {
             if (!packageJson.name || !packageJson.publisher) {
               // Invalid package.json, remove the extension
               await fs.remove(extensionPath);
+              removed.push(entry.name);
             }
           } catch {
             // Corrupted package.json, remove the extension
             await fs.remove(extensionPath);
+            removed.push(entry.name);
           }
         }
       }
     } catch {
       // Silently ignore cleanup errors
     }
+
+    return removed;
   }
 }
 
