@@ -1,3 +1,5 @@
+import path from "node:path";
+import fs from "fs-extra";
 import { getEditorService, InstallResult } from "./editorCliService";
 import { VsixFile } from "./vsixScannerService";
 import { getInstallPreflightService } from "./installPreflightService";
@@ -75,6 +77,9 @@ export class InstallService {
         };
       }
 
+      // Ensure file state is valid before each installation
+      await this.ensureValidFileState(binaryPath);
+
       const result = await this.editorService.installVsix(binaryPath, vsixPath, {
         force: options.forceReinstall,
         timeout: options.timeout,
@@ -92,6 +97,50 @@ export class InstallService {
         error: error instanceof Error ? error.message : String(error),
         exitCode: 1,
       };
+    }
+  }
+
+  /**
+   * Ensure extensions folder file state is valid before each installation
+   */
+  private async ensureValidFileState(binaryPath: string): Promise<void> {
+    try {
+      const isCursor = binaryPath.toLowerCase().includes("cursor");
+      const extensionsDir = isCursor
+        ? path.join(process.env.HOME || "~", ".cursor", "extensions")
+        : path.join(process.env.HOME || "~", ".vscode", "extensions");
+
+      const extensionsJsonPath = path.join(extensionsDir, "extensions.json");
+      const obsoletePath = path.join(extensionsDir, ".obsolete");
+
+      // Ensure extensions.json exists and is valid
+      if (!(await fs.pathExists(extensionsJsonPath))) {
+        await fs.writeFile(extensionsJsonPath, JSON.stringify([], null, 2));
+      } else {
+        try {
+          const content = await fs.readFile(extensionsJsonPath, "utf-8");
+          JSON.parse(content);
+        } catch {
+          await fs.writeFile(extensionsJsonPath, JSON.stringify([], null, 2));
+        }
+      }
+
+      // Ensure .obsolete exists and is valid
+      if (!(await fs.pathExists(obsoletePath))) {
+        await fs.writeFile(obsoletePath, JSON.stringify({}, null, 2));
+      } else {
+        try {
+          const content = await fs.readFile(obsoletePath, "utf-8");
+          const parsed = JSON.parse(content);
+          if (typeof parsed !== "object" || parsed === null) {
+            throw new Error("Invalid format");
+          }
+        } catch {
+          await fs.writeFile(obsoletePath, JSON.stringify({}, null, 2));
+        }
+      }
+    } catch {
+      // Silently ignore file state errors
     }
   }
 
