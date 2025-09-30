@@ -81,6 +81,13 @@ export class UninstallExtensionsService {
       Boolean(options.allowMismatchedBinary),
     );
 
+    // Ensure extensions folder is in clean state before starting uninstall
+    try {
+      await this.ensureCleanExtensionsFolder(binPath);
+    } catch {
+      // Silently ignore cleanup errors
+    }
+
     // Get installed extensions
     progressCallback?.("Scanning installed extensions...");
     const installed = await getInstalledExtensions(chosenEditor);
@@ -495,45 +502,43 @@ export class UninstallExtensionsService {
   ): Promise<void> {
     const extensionsJsonPath = path.join(extensionsDir, "extensions.json");
 
-    if (!(await fs.pathExists(extensionsJsonPath))) {
-      // File doesn't exist - create it as empty array to prevent VS Code errors
-      try {
-        await fs.writeFile(extensionsJsonPath, JSON.stringify([], null, 2));
-      } catch {
-        // Ignore if we can't create the file
-      }
-      return;
-    }
-
     try {
-      const content = await fs.readFile(extensionsJsonPath, "utf-8");
-
-      // Handle empty or nearly empty files
-      if (!content || content.trim() === "" || content.trim() === "[]") {
+      // Always ensure the file exists and is valid before attempting to modify
+      if (!(await fs.pathExists(extensionsJsonPath))) {
+        await fs.writeFile(extensionsJsonPath, JSON.stringify([], null, 2));
         return;
       }
 
-      const extensions = JSON.parse(content);
-
-      if (Array.isArray(extensions)) {
-        const filtered = extensions.filter((ext: unknown) => {
-          const extObj = ext as { identifier?: { id?: string }; id?: string };
-          const id = extObj?.identifier?.id || extObj?.id;
-          return id !== extensionId;
-        });
-
-        // Only write if content actually changed
-        if (filtered.length !== extensions.length) {
-          await fs.writeFile(extensionsJsonPath, JSON.stringify(filtered, null, 2));
+      // Validate and fix the file if needed
+      let extensions: unknown[] = [];
+      try {
+        const content = await fs.readFile(extensionsJsonPath, "utf-8");
+        if (content && content.trim() && content.trim() !== "[]") {
+          const parsed = JSON.parse(content);
+          if (Array.isArray(parsed)) {
+            extensions = parsed;
+          }
         }
+      } catch {
+        // File is corrupted, start with empty array
+        extensions = [];
       }
+
+      // Filter out the extension
+      const filtered = extensions.filter((ext: unknown) => {
+        const extObj = ext as { identifier?: { id?: string }; id?: string };
+        const id = extObj?.identifier?.id || extObj?.id;
+        return id !== extensionId;
+      });
+
+      // Write the updated content
+      await fs.writeFile(extensionsJsonPath, JSON.stringify(filtered, null, 2));
     } catch {
-      // If file is corrupt, recreate it as empty array
+      // If all else fails, ensure we have a valid empty file
       try {
         await fs.writeFile(extensionsJsonPath, JSON.stringify([], null, 2));
       } catch {
-        // Silently fail - extensions.json format might be corrupt or proprietary
-        // The extension folder removal is the critical part anyway
+        // Silently fail - the extension folder removal is the critical part
       }
     }
   }
