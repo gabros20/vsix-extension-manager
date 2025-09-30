@@ -437,12 +437,67 @@ async function installFromVsixDirectory(options: InstallOptions) {
     );
 
     if (installResult.failed > 0 && !options.quiet) {
-      p.log.error("❌ Failed installations:");
+      p.log.error("Failed installations:");
       installResult.results
         .filter((r) => !r.success && !r.skipped)
         .forEach((result) => {
-          p.log.error(`  • ${path.basename(result.task.vsixFile.path)}: ${result.error}`);
+          p.log.error(`  ${path.basename(result.task.vsixFile.path)}: ${result.error}`);
         });
+    }
+
+    // Retry failed installations (interactive mode only)
+    if (installResult.failed > 0 && !options.quiet && !options.json && !options.dryRun) {
+      const shouldRetry = await p.confirm({
+        message: `Retry ${installResult.failed} failed installation(s) with conservative settings?`,
+        initialValue: false,
+      });
+
+      if (!p.isCancel(shouldRetry) && shouldRetry) {
+        const failedTasks = installResult.results
+          .filter((r) => !r.success && !r.skipped)
+          .map((r) => r.task);
+
+        spinner.start(`Retrying ${failedTasks.length} failed installation(s)...`);
+
+        const retryResult = await installService.retryFailedInstallations(
+          binPath,
+          failedTasks,
+          {
+            dryRun: false,
+            forceReinstall: options.forceReinstall,
+            skipInstalled: false,
+            timeout: 60000, // Longer timeout for retries
+            quiet: options.quiet,
+          },
+          (result) => {
+            if (!options.quiet) {
+              const status = result.success ? "✅" : "❌";
+              const filename = path.basename(result.task.vsixFile.path);
+              spinner.message(`${status} ${filename}`);
+            }
+          },
+        );
+
+        spinner.stop("Retry completed!");
+
+        // Update overall results
+        const totalSuccessful = installResult.successful + retryResult.successful;
+        const totalFailed = retryResult.failed;
+
+        p.note(
+          `Original: ${installResult.successful} successful\nRetry: ${retryResult.successful} successful\nTotal Successful: ${totalSuccessful}\nStill Failed: ${totalFailed}`,
+          "Retry Summary",
+        );
+
+        if (retryResult.failed > 0) {
+          p.log.error("Still failed after retry:");
+          retryResult.results
+            .filter((r) => !r.success && !r.skipped)
+            .forEach((result) => {
+              p.log.error(`  ${path.basename(result.task.vsixFile.path)}: ${result.error}`);
+            });
+        }
+      }
     }
 
     // Write summary JSON if requested
@@ -610,15 +665,74 @@ async function installFromList(options: InstallOptions) {
     }
 
     if (result.installResult.failed > 0 && !options.quiet) {
-      p.log.error("❌ Failed installations:");
+      p.log.error("Failed installations:");
       result.installResult.results
         .filter((r) => !r.success && !r.skipped)
         .forEach((result) => {
           const filename = result.task.vsixFile
             ? path.basename(result.task.vsixFile.path)
             : result.task.extensionId || "unknown";
-          p.log.error(`  • ${filename}: ${result.error}`);
+          p.log.error(`  ${filename}: ${result.error}`);
         });
+
+      // Retry failed installations (interactive mode only)
+      if (!options.json && !options.dryRun) {
+        const shouldRetry = await p.confirm({
+          message: `Retry ${result.installResult.failed} failed installation(s)?`,
+          initialValue: false,
+        });
+
+        if (!p.isCancel(shouldRetry) && shouldRetry) {
+          const failedTasks = result.installResult.results
+            .filter((r) => !r.success && !r.skipped)
+            .map((r) => r.task);
+
+          spinner.start(`Retrying ${failedTasks.length} failed installation(s)...`);
+
+          const retryResult = await getInstallService().retryFailedInstallations(
+            binPath,
+            failedTasks,
+            {
+              dryRun: false,
+              forceReinstall: options.forceReinstall,
+              skipInstalled: false,
+              timeout: 60000,
+              quiet: options.quiet,
+            },
+            (retryRes) => {
+              if (!options.quiet) {
+                const status = retryRes.success ? "✅" : "❌";
+                const filename = retryRes.task.vsixFile
+                  ? path.basename(retryRes.task.vsixFile.path)
+                  : retryRes.task.extensionId || "unknown";
+                spinner.message(`${status} ${filename}`);
+              }
+            },
+          );
+
+          spinner.stop("Retry completed!");
+
+          const totalSuccessful = result.installedExtensions + retryResult.successful;
+          const totalFailed = retryResult.failed;
+
+          p.note(
+            `Original: ${result.installedExtensions} successful\nRetry: ${retryResult.successful} successful\nTotal Successful: ${totalSuccessful}\nStill Failed: ${totalFailed}`,
+            "Retry Summary",
+          );
+
+          if (retryResult.failed > 0) {
+            p.log.error("Still failed after retry:");
+            retryResult.results
+              .filter((r) => !r.success && !r.skipped)
+              .forEach((retryRes) => {
+                const filename = retryRes.task.vsixFile
+                  ? path.basename(retryRes.task.vsixFile.path)
+                  : retryRes.task.extensionId || "unknown";
+                p.log.error(`  ${filename}: ${retryRes.error}`);
+              });
+          }
+        }
+      }
     }
 
     // Write summary JSON if requested

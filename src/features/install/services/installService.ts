@@ -65,6 +65,11 @@ export class InstallService {
         timeout: options.timeout,
       });
 
+      // Enhance error message if installation failed
+      if (!result.success) {
+        result.error = this.extractErrorMessage(result);
+      }
+
       return result;
     } catch (error) {
       return {
@@ -73,6 +78,43 @@ export class InstallService {
         exitCode: 1,
       };
     }
+  }
+
+  /**
+   * Extract meaningful error message from install result
+   */
+  private extractErrorMessage(result: InstallResult): string {
+    // Try to get the most informative error message
+    const parts = [result.error, result.stderr, result.stdout].filter(Boolean);
+
+    if (parts.length === 0) {
+      return result.exitCode !== 0
+        ? `Installation failed with exit code ${result.exitCode}`
+        : "Unknown error";
+    }
+
+    const combined = parts.join("; ");
+
+    // Check for common error patterns
+    if (combined.includes("not compatible")) {
+      return "Extension not compatible with current editor version";
+    }
+    if (combined.includes("requires a newer version")) {
+      return "Extension requires a newer editor version";
+    }
+    if (combined.includes("ENOENT") || combined.includes("not found")) {
+      return "VSIX file not found or inaccessible";
+    }
+    if (combined.includes("EACCES") || combined.includes("permission")) {
+      return "Permission denied - check file/directory permissions";
+    }
+    if (combined.includes("corrupted") || combined.includes("invalid")) {
+      return "VSIX file appears to be corrupted";
+    }
+
+    // Return first non-empty part with exit code if available
+    const firstPart = parts[0] || "Installation failed";
+    return result.exitCode !== 0 ? `${firstPart} (exit code: ${result.exitCode})` : firstPart;
   }
 
   /**
@@ -302,6 +344,26 @@ export class InstallService {
       valid: errors.length === 0,
       errors,
     };
+  }
+
+  /**
+   * Retry failed installations with more conservative settings
+   */
+  async retryFailedInstallations(
+    binaryPath: string,
+    failedTasks: InstallTask[],
+    options: InstallOptions = {},
+    progressCallback?: (result: InstallTaskResult) => void,
+  ): Promise<BulkInstallResult> {
+    // Use more conservative settings for retry
+    const retryOptions: InstallOptions = {
+      ...options,
+      parallel: 1, // Sequential for retries
+      timeout: options.timeout || 60000, // Longer timeout (60s)
+      retry: options.retry ?? 1, // One retry per task
+    };
+
+    return this.installBulkVsix(binaryPath, failedTasks, retryOptions, progressCallback);
   }
 
   /**

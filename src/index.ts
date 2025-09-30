@@ -243,6 +243,33 @@ program
       await rollback(options);
     }, opts);
   });
+
+program
+  .command("uninstall")
+  .description("Uninstall extensions from VS Code/Cursor")
+  .option("-e, --editor <editor>", "Target editor: vscode|cursor|auto (default: auto)")
+  .option("--code-bin <path>", "Explicit path to VS Code binary")
+  .option("--cursor-bin <path>", "Explicit path to Cursor binary")
+  .option("--all", "Uninstall all extensions (non-interactive)", false)
+  .option("--parallel <n>", "Number of parallel uninstalls (default: 1)")
+  .option("--retry <n>", "Number of retry attempts per uninstall")
+  .option("--retry-delay <ms>", "Delay in ms between retries")
+  .option("--quiet", "Reduce output", false)
+  .option("--json", "Machine-readable output", false)
+  .option("--dry-run", "Show what would be uninstalled without making changes", false)
+  .option("--summary <path>", "Write uninstall summary JSON to the given path")
+  .option(
+    "--allow-mismatched-binary",
+    "Allow proceeding when resolved binary identity mismatches the requested editor",
+    false,
+  )
+  .action(async (opts) => {
+    await withConfigAndErrorHandling(async (config, options) => {
+      const { uninstallExtensions } = await import("./commands/uninstallExtensions");
+      await uninstallExtensions({ ...options, ...config });
+    }, opts);
+  });
+
 program.action(async () => {
   await withConfigAndErrorHandling(async (config) => {
     const { runInteractive } = await import("./commands/interactive");

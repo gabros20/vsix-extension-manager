@@ -1,7 +1,7 @@
 import path from "path";
 import fs from "fs-extra";
 import { parseExtensionsList } from "../../import";
-import { downloadBulkExtensions } from "../../download";
+import { downloadWithFallback } from "../../download";
 import { resolveVersion } from "../../../core/registry";
 import { getInstallService, InstallTask, BulkInstallResult } from "./installService";
 import { getVsixScanner, VsixFile } from "./vsixScannerService";
@@ -273,90 +273,93 @@ export class InstallFromListService {
   }
 
   /**
-   * Download missing extensions
+   * Download missing extensions with automatic fallback
    */
   private async downloadMissingExtensions(
     missingIds: string[],
     downloadOptions: InstallFromListOptions["downloadOptions"],
-  ): Promise<{ total: number; successful: number; failed: number }> {
+  ): Promise<{ total: number; successful: number; failed: number; failedIds: string[] }> {
     if (missingIds.length === 0) {
-      return { total: 0, successful: 0, failed: 0 };
+      return { total: 0, successful: 0, failed: 0, failedIds: [] };
     }
 
-    // Create a temporary directory for downloads
-    const tempDir = path.join(process.cwd(), ".vsix-temp-install");
-    await fs.ensureDir(tempDir);
+    const outputDir = downloadOptions?.cacheDir || downloadOptions?.outputDir || "./downloads";
+    await fs.ensureDir(outputDir);
 
-    try {
-      // Create bulk download items
-      const bulkItems = [];
-      for (const id of missingIds) {
-        // Resolve latest version for each extension
-        try {
-          const version = await resolveVersion(
-            id,
-            "latest",
-            downloadOptions?.preRelease || false,
-            downloadOptions?.source || "marketplace",
-          );
+    const sourcePref = (downloadOptions?.source || "auto") as "marketplace" | "open-vsx" | "auto";
+    const retry = Number(downloadOptions?.retry ?? 2);
+    const retryDelay = Number(downloadOptions?.retryDelay ?? 1000);
+    const preRelease = Boolean(downloadOptions?.preRelease);
+    const quiet = Boolean(downloadOptions?.quiet);
 
-          bulkItems.push({
-            url: `https://marketplace.visualstudio.com/items?itemName=${id}`,
-            version,
-            name: id,
-          });
-        } catch (error) {
+    let successCount = 0;
+    let failCount = 0;
+    const failedIds: string[] = [];
+
+    // Download with fallback for each extension
+    for (const id of missingIds) {
+      try {
+        // Resolve version first
+        const version = await this.resolveVersionWithRetry(
+          id,
+          preRelease,
+          sourcePref,
+          retry,
+          retryDelay,
+        );
+
+        // Download with automatic fallback to alternate source
+        await downloadWithFallback(id, version, outputDir, {
+          preRelease,
+          sourcePref,
+          quiet,
+          retry,
+          retryDelay,
+        });
+
+        successCount++;
+      } catch (error) {
+        failCount++;
+        failedIds.push(id);
+        if (!quiet) {
           console.warn(
-            `Warning: Failed to resolve version for ${id}: ${error instanceof Error ? error.message : String(error)}`,
-          );
-          // Use latest as fallback
-          bulkItems.push({
-            url: `https://marketplace.visualstudio.com/items?itemName=${id}`,
-            version: "latest",
-            name: id,
-          });
-        }
-      }
-
-      // Create temporary JSON file
-      const tempJsonPath = path.join(tempDir, "extensions.json");
-      await fs.writeJson(tempJsonPath, bulkItems);
-
-      // Download the extensions
-      const source = downloadOptions?.source === "auto" ? undefined : downloadOptions?.source;
-      const bulkOptions = {
-        parallel: downloadOptions?.parallel ? Number(downloadOptions.parallel) : 3,
-        retry: downloadOptions?.retry ? Number(downloadOptions.retry) : 2,
-        retryDelay: downloadOptions?.retryDelay ? Number(downloadOptions.retryDelay) : 1000,
-        quiet: downloadOptions?.quiet ?? true,
-        source: source as "marketplace" | "open-vsx" | undefined,
-        filenameTemplate: "{publisher}.{name}-{version}.vsix",
-      };
-
-      const outputDir = downloadOptions?.cacheDir || downloadOptions?.outputDir || tempDir;
-      await downloadBulkExtensions(tempJsonPath, outputDir, bulkOptions);
-
-      // Count successful downloads (rough estimate)
-      const downloadedFiles = await fs.readdir(outputDir);
-      const vsixFiles = downloadedFiles.filter((file) => file.endsWith(".vsix"));
-
-      return {
-        total: missingIds.length,
-        successful: vsixFiles.length,
-        failed: missingIds.length - vsixFiles.length,
-      };
-    } finally {
-      // Clean up temp directory (keep downloads if they were saved elsewhere)
-      if (downloadOptions?.outputDir !== tempDir) {
-        try {
-          await fs.remove(tempDir);
-        } catch (error) {
-          console.warn(
-            `Warning: Failed to clean up temp directory: ${error instanceof Error ? error.message : String(error)}`,
+            `Warning: Failed to download ${id}: ${error instanceof Error ? error.message : String(error)}`,
           );
         }
       }
     }
+
+    return {
+      total: missingIds.length,
+      successful: successCount,
+      failed: failCount,
+      failedIds,
+    };
+  }
+
+  /**
+   * Resolve version with retry logic
+   */
+  private async resolveVersionWithRetry(
+    extensionId: string,
+    preRelease: boolean,
+    source: "marketplace" | "open-vsx" | "auto",
+    retry: number,
+    retryDelay: number,
+  ): Promise<string> {
+    for (let attempt = 0; attempt <= retry; attempt++) {
+      try {
+        return await resolveVersion(extensionId, "latest", preRelease, source);
+      } catch {
+        if (attempt < retry) {
+          await new Promise((r) => setTimeout(r, retryDelay * Math.pow(2, attempt)));
+        }
+      }
+    }
+
+    // If all retries failed, return "latest" as fallback
+    console.warn(`Warning: Could not resolve version for ${extensionId}, using "latest"`);
+    return "latest";
   }
 }
 

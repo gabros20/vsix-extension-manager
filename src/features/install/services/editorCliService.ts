@@ -552,7 +552,18 @@ export class EditorCliService {
       });
 
       child.on("close", (code) => {
-        const success = code === 0;
+        // VS Code uninstall can return non-zero codes even on success
+        // Check for success indicators in output instead of just exit code
+        const output = (stdout + stderr).toLowerCase();
+        const success =
+          code === 0 ||
+          output.includes("successfully uninstalled") ||
+          output.includes("extension uninstalled") ||
+          output.includes("removed") ||
+          (!output.includes("error") &&
+            !output.includes("failed") &&
+            !output.includes("not found"));
+
         resolve({
           success,
           extensionId,

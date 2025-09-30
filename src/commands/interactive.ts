@@ -32,6 +32,7 @@ async function showMainMenu(): Promise<string | symbol> {
       { value: "install", label: "Install", hint: "Install extensions or VSIX files" },
       { value: "download", label: "Download", hint: "Download VSIX files" },
       { value: "update", label: "Update", hint: "Update installed extensions" },
+      { value: "uninstall", label: "Uninstall", hint: "Uninstall extensions" },
       { value: "export", label: "Export", hint: "Export extension lists" },
       { value: "version", label: "Version", hint: "Check extension versions" },
       { value: "quit", label: "Quit", hint: "Exit the application" },
@@ -50,6 +51,8 @@ async function handleCategorySelection(category: string, config: Config): Promis
       return await showDownloadMenu(config);
     case "update":
       return await showUpdateMenu(config);
+    case "uninstall":
+      return await showUninstallMenu(config);
     case "export":
       return await showExportMenu(config);
     case "version":
@@ -168,6 +171,35 @@ async function showUpdateMenu(config: Config): Promise<boolean> {
 
   // Execute the selected update command
   await executeUpdateCommand(choice as string, config);
+  return false; // Return to main menu after command execution
+}
+
+/**
+ * Show Uninstall sub-menu
+ */
+async function showUninstallMenu(config: Config): Promise<boolean> {
+  const choice = await p.select({
+    message: "Uninstall Options:",
+    options: [
+      {
+        value: "uninstall-extensions",
+        label: "Uninstall extensions",
+        hint: "Remove extensions from VS Code or Cursor",
+      },
+      { value: "back", label: "Back to main menu" },
+    ],
+  });
+
+  if (p.isCancel(choice)) {
+    return false; // Go Back to main menu
+  }
+
+  if (choice === "back") {
+    return false; // Go Back to main menu
+  }
+
+  // Execute the selected uninstall command
+  await executeUninstallCommand(choice as string, config);
   return false; // Return to main menu after command execution
 }
 
@@ -301,6 +333,19 @@ async function executeExportCommand(command: string, config: Config): Promise<vo
     case "export": {
       const { exportInstalled } = await import("./exportInstalled");
       await exportInstalled({ ...config });
+      break;
+    }
+  }
+}
+
+/**
+ * Execute uninstall commands
+ */
+async function executeUninstallCommand(command: string, config: Config): Promise<void> {
+  switch (command) {
+    case "uninstall-extensions": {
+      const { runUninstallExtensionsUI } = await import("./uninstallExtensions");
+      await runUninstallExtensionsUI({ ...config });
       break;
     }
   }
