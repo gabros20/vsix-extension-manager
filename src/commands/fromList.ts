@@ -31,6 +31,8 @@ interface FromListOptions {
   downloadOnly?: boolean;
   checkCompatibility?: boolean;
   editor?: string;
+  manualVersion?: boolean;
+  customVersion?: string;
 }
 
 export async function fromList(options: FromListOptions) {
@@ -158,25 +160,209 @@ export async function fromList(options: FromListOptions) {
 
     p.log.info(`Found ${extensionIds.length} extension(s) to download`);
 
-    // Check compatibility if requested
-    if (options.checkCompatibility) {
-      if (!options.quiet) {
-        p.log.info("🔍 Checking extension compatibility...");
+    // Ask user if they want to check compatibility (in interactive mode)
+    if (!options.quiet && !options.json && !options.checkCompatibility) {
+      const compatibilityChoice = await p.select({
+        message: "Extension compatibility checking:",
+        options: [
+          {
+            value: "auto",
+            label: "Yes (auto-detect editor version)",
+            hint: "Check compatibility with your current editor version",
+          },
+          {
+            value: "manual",
+            label: "Yes (specify version manually)",
+            hint: "Check compatibility with a specific VS Code version",
+          },
+          {
+            value: "skip",
+            label: "No (skip compatibility check)",
+            hint: "Download extensions without version validation",
+          },
+        ],
+      });
+
+      if (p.isCancel(compatibilityChoice)) {
+        p.cancel("Operation cancelled.");
+        process.exit(0);
       }
 
+      if (compatibilityChoice === "skip") {
+        options.checkCompatibility = false;
+      } else {
+        options.checkCompatibility = true;
+        options.manualVersion = compatibilityChoice === "manual";
+      }
+    }
+
+    // Check compatibility if requested
+    if (options.checkCompatibility) {
       try {
         const editorService = getEditorService();
         const compatibilityService = getExtensionCompatibilityService();
 
-        // Resolve editor binary
-        const editor = (options.editor as "vscode" | "cursor" | "auto") || "auto";
-        const binaryPath = await editorService.resolveEditorBinary(editor);
+        // First, let user select target editor for compatibility checking
+        let targetEditor: "vscode" | "cursor";
+        const availableEditors = await editorService.getAvailableEditors();
+
+        if (availableEditors.length === 0) {
+          p.log.error("❌ No editors found. Please install VS Code or Cursor.");
+          process.exit(1);
+        }
+
+        if (options.editor && options.editor !== "auto") {
+          targetEditor = options.editor as "vscode" | "cursor";
+          const editorInfo = availableEditors.find((e) => e.name === targetEditor);
+          if (!editorInfo) {
+            p.log.error(
+              `❌ ${targetEditor} not found. Available editors: ${availableEditors.map((e) => e.displayName).join(", ")}`,
+            );
+            process.exit(1);
+          }
+        } else if (availableEditors.length === 1) {
+          targetEditor = availableEditors[0].name;
+          if (!options.quiet) {
+            p.log.info(
+              `🔍 Auto-detected ${availableEditors[0].displayName} for compatibility checking`,
+            );
+          }
+        } else {
+          // Multiple editors found - prompt user to select
+          if (options.quiet || options.json) {
+            p.log.error(
+              `❌ Multiple editors found (${availableEditors.map((e) => e.displayName).join(", ")}). Please specify target editor with --editor vscode or --editor cursor`,
+            );
+            process.exit(1);
+          }
+
+          const editorChoice = await p.select({
+            message: "Select target editor for compatibility checking:",
+            options: availableEditors.map((editor) => ({
+              value: editor.name,
+              label: `${editor.displayName} (${editor.binaryPath})`,
+            })),
+          });
+
+          if (p.isCancel(editorChoice)) {
+            p.cancel("Operation cancelled.");
+            process.exit(0);
+          }
+
+          targetEditor = editorChoice as "vscode" | "cursor";
+        }
+
+        // Handle manual version input
+        let customVersion: string | undefined;
+        if (options.manualVersion && !options.customVersion) {
+          if (!options.quiet) {
+            // Get latest version for placeholder
+            const latestVersion = await compatibilityService.getLatestVSCodeVersion();
+            const placeholder = latestVersion
+              ? `e.g., ${latestVersion}, 1.80.0, 1.90.0`
+              : "e.g., 1.80.0, 1.90.0, 1.100.0";
+
+            customVersion = (await p.text({
+              message: `Enter VS Code engine version to check compatibility against (for ${targetEditor === "cursor" ? "Cursor" : "VS Code"}):`,
+              placeholder,
+              validate: (input: string) => {
+                if (!input.trim()) return "Please enter a version number";
+                const versionPattern = /^\d+\.\d+\.\d+$/;
+                if (!versionPattern.test(input.trim())) {
+                  return "Version must be in format X.Y.Z (e.g., 1.80.0)";
+                }
+                return undefined;
+              },
+            })) as string;
+
+            // Validate the entered version after input
+            if (customVersion && !options.quiet) {
+              p.log.info("🔍 Validating VS Code version...");
+
+              const validation = await compatibilityService.validateVSCodeVersion(
+                customVersion.trim(),
+              );
+
+              if (!validation.valid) {
+                p.log.error(`❌ ${validation.error || "Invalid VS Code version"}`);
+
+                const retry = await p.confirm({
+                  message: "Try entering a different version?",
+                });
+
+                if (p.isCancel(retry) || !retry) {
+                  p.cancel("Operation cancelled.");
+                  process.exit(0);
+                }
+
+                // Recursive call to try again
+                return await fromList({ ...options, manualVersion: true });
+              }
+
+              // Show additional info if available
+              if (validation.isLatest) {
+                p.log.success(`✅ Using latest VS Code version: ${customVersion.trim()}`);
+              } else if (validation.isPrerelease) {
+                p.log.warn(`⚠️ Using prerelease version: ${customVersion.trim()}`);
+              } else if (validation.releaseDate) {
+                const date = new Date(validation.releaseDate).toLocaleDateString();
+                p.log.info(`📅 Release date: ${date}`);
+              }
+            }
+
+            if (p.isCancel(customVersion)) {
+              p.cancel("Operation cancelled.");
+              process.exit(0);
+            }
+          }
+        } else if (options.customVersion) {
+          customVersion = options.customVersion;
+        }
+
+        // Resolve editor binary (only needed for auto-detection)
+        let binaryPath: string | undefined;
+        if (!customVersion) {
+          binaryPath = await editorService.resolveEditorBinary(targetEditor);
+        }
+
+        // Show version being used for compatibility check (only for manual version)
+        if (customVersion && !options.quiet) {
+          p.log.info(`🔍 Checking compatibility against VS Code ${customVersion}`);
+        }
+
+        // Start loading spinner for compatibility check
+        const spinner = p.spinner();
+        if (!options.quiet) {
+          spinner.start(`Checking ${extensionIds.length} extension(s) compatibility...`);
+        }
 
         // Check compatibility for all extensions
         const compatibilityResults = await compatibilityService.checkBulkCompatibility(
           extensionIds.map((id) => ({ id, version: "latest" })),
-          binaryPath,
+          binaryPath || "",
+          customVersion,
         );
+
+        // Stop spinner with results summary
+        if (!options.quiet) {
+          const incompatible = compatibilityResults.filter((r) => !r.compatible).length;
+          const warnings = compatibilityResults.filter(
+            (r) => r.result.severity === "warning",
+          ).length;
+
+          let summary = `Checked ${compatibilityResults.length} extension(s)`;
+          if (incompatible > 0) {
+            summary += ` • ${incompatible} incompatible`;
+          }
+          if (warnings > 0) {
+            summary += ` • ${warnings} warnings`;
+          }
+          if (incompatible === 0 && warnings === 0) {
+            summary += ` • All compatible!`;
+          }
+
+          spinner.stop(summary);
+        }
 
         // Report results
         const incompatible = compatibilityResults.filter((r) => !r.compatible);

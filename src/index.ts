@@ -154,10 +154,14 @@ program
     false,
   )
   .option("--download-only", "Download only, do not install (default behavior)", false)
-  .option("--check-compatibility", "Check extension compatibility with editor version", false)
+  .option(
+    "--check-compatibility",
+    "Check extension compatibility with editor version before downloading",
+    false,
+  )
   .option(
     "--editor <editor>",
-    "Target editor for compatibility check: vscode|cursor|auto (default: auto)",
+    "Target editor for compatibility check and download: vscode|cursor|auto (default: auto)",
   )
   .action(async (opts) => {
     await withConfigAndErrorHandling(async (config, options) => {

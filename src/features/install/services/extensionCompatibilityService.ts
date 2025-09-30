@@ -2,6 +2,13 @@ import axios from "axios";
 import { DEFAULT_USER_AGENT } from "../../../config/constants";
 import { getEditorService } from "./editorCliService";
 
+interface VSCodeRelease {
+  tag_name: string;
+  name: string;
+  published_at: string;
+  prerelease: boolean;
+}
+
 export interface ExtensionMetadata {
   id: string;
   name: string;
@@ -221,10 +228,12 @@ export class ExtensionCompatibilityService {
     version: string,
     binaryPath: string,
     source: "marketplace" | "open-vsx" = "marketplace",
+    customVersion?: string,
   ): Promise<CompatibilityCheckResult> {
     try {
-      // Get editor version
-      const editorVersion = await this.getEditorVersion(binaryPath);
+      // Get editor version (use custom version if provided)
+      const editorVersion =
+        customVersion || (binaryPath ? await this.getEditorVersion(binaryPath) : "unknown");
       const editorVersionClean = this.cleanVersion(editorVersion);
 
       // Get extension metadata
@@ -300,6 +309,7 @@ export class ExtensionCompatibilityService {
   async checkBulkCompatibility(
     extensions: Array<{ id: string; version: string; source?: "marketplace" | "open-vsx" }>,
     binaryPath: string,
+    customVersion?: string,
   ): Promise<CompatibilityCheckResult[]> {
     const results: CompatibilityCheckResult[] = [];
 
@@ -310,6 +320,7 @@ export class ExtensionCompatibilityService {
           ext.version,
           binaryPath,
           ext.source || "marketplace",
+          customVersion,
         );
         results.push(result);
       } catch (error) {
@@ -382,6 +393,134 @@ export class ExtensionCompatibilityService {
       minor: parts[1],
       patch: parts[2],
     };
+  }
+
+  /**
+   * Validate VS Code version against GitHub releases
+   */
+  async validateVSCodeVersion(version: string): Promise<{
+    valid: boolean;
+    isLatest: boolean;
+    isPrerelease: boolean;
+    releaseDate?: string;
+    error?: string;
+  }> {
+    try {
+      // Clean the version string
+      const cleanVersion = this.cleanVersion(version);
+
+      // Fetch VS Code releases from GitHub API
+      const response = await axios.get<VSCodeRelease[]>(
+        "https://api.github.com/repos/microsoft/vscode/releases",
+        {
+          headers: {
+            Accept: "application/vnd.github.v3+json",
+            "User-Agent": DEFAULT_USER_AGENT,
+          },
+          timeout: 10000,
+        },
+      );
+
+      const releases = response.data;
+
+      // Find exact match
+      const exactMatch = releases.find(
+        (release) => release.tag_name === `v${cleanVersion}` || release.tag_name === cleanVersion,
+      );
+
+      if (exactMatch) {
+        return {
+          valid: true,
+          isLatest: releases[0].tag_name === exactMatch.tag_name,
+          isPrerelease: exactMatch.prerelease,
+          releaseDate: exactMatch.published_at,
+        };
+      }
+
+      // Check if version exists in a different format
+      const alternativeMatch = releases.find((release) => {
+        const releaseVersion = release.tag_name.replace(/^v/, "");
+        return releaseVersion === cleanVersion;
+      });
+
+      if (alternativeMatch) {
+        return {
+          valid: true,
+          isLatest: releases[0].tag_name === alternativeMatch.tag_name,
+          isPrerelease: alternativeMatch.prerelease,
+          releaseDate: alternativeMatch.published_at,
+        };
+      }
+
+      // Check if it's a valid version format but not found in releases
+      const parsed = this.parseVersion(cleanVersion);
+      if (parsed) {
+        // Find the closest version
+        const closestRelease = releases.find((release) => {
+          const releaseVersion = release.tag_name.replace(/^v/, "");
+          const releaseParsed = this.parseVersion(releaseVersion);
+          if (!releaseParsed) return false;
+
+          return (
+            releaseParsed.major === parsed.major &&
+            releaseParsed.minor === parsed.minor &&
+            Math.abs(releaseParsed.patch - parsed.patch) <= 1
+          );
+        });
+
+        if (closestRelease) {
+          return {
+            valid: false,
+            isLatest: false,
+            isPrerelease: false,
+            error: `Version ${cleanVersion} not found. Did you mean ${closestRelease.tag_name}?`,
+          };
+        }
+      }
+
+      return {
+        valid: false,
+        isLatest: false,
+        isPrerelease: false,
+        error: `Version ${cleanVersion} not found in VS Code releases`,
+      };
+    } catch (error) {
+      return {
+        valid: false,
+        isLatest: false,
+        isPrerelease: false,
+        error: `Failed to validate version: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+
+  /**
+   * Get latest VS Code version
+   */
+  async getLatestVSCodeVersion(): Promise<string | null> {
+    try {
+      const response = await axios.get<VSCodeRelease[]>(
+        "https://api.github.com/repos/microsoft/vscode/releases",
+        {
+          headers: {
+            Accept: "application/vnd.github.v3+json",
+            "User-Agent": DEFAULT_USER_AGENT,
+          },
+          timeout: 10000,
+        },
+      );
+
+      const releases = response.data;
+      const latestRelease = releases.find((release) => !release.prerelease);
+
+      if (latestRelease) {
+        return latestRelease.tag_name.replace(/^v/, "");
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
   }
 }
 
