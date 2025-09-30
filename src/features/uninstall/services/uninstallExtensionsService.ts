@@ -171,6 +171,13 @@ export class UninstallExtensionsService {
     summary.results = results;
     summary.elapsedMs = Date.now() - startTime;
 
+    // Ensure extensions folder is in clean state after all uninstalls
+    try {
+      await this.ensureCleanExtensionsFolder(binPath);
+    } catch {
+      // Silently ignore cleanup errors
+    }
+
     return summary;
   }
 
@@ -289,6 +296,193 @@ export class UninstallExtensionsService {
       await this.addToObsoleteFile(extensionsDir, extensionId);
     } catch {
       // Silently ignore cleanup errors - the CLI uninstall already succeeded
+    }
+  }
+
+  /**
+   * Ensure extensions folder is in clean, default state for VS Code
+   * This is called after all uninstalls to ensure the folder is ready for new installations
+   */
+  async ensureCleanExtensionsFolder(binaryPath: string): Promise<void> {
+    try {
+      const isCursor = binaryPath.toLowerCase().includes("cursor");
+      const extensionsDir = isCursor
+        ? path.join(process.env.HOME || "~", ".cursor", "extensions")
+        : path.join(process.env.HOME || "~", ".vscode", "extensions");
+
+      // Ensure extensions directory exists
+      if (!(await fs.pathExists(extensionsDir))) {
+        await fs.ensureDir(extensionsDir);
+      }
+
+      // 1. Ensure extensions.json exists and is valid
+      await this.ensureValidExtensionsJson(extensionsDir);
+
+      // 2. Ensure .obsolete exists and is valid
+      await this.ensureValidObsoleteFile(extensionsDir);
+
+      // 3. Clean up any temporary files that might interfere
+      await this.cleanupTemporaryFiles(extensionsDir);
+
+      // 4. Remove any corrupted extension directories
+      await this.removeCorruptedExtensions(extensionsDir);
+    } catch {
+      // Silently ignore cleanup errors
+    }
+  }
+
+  /**
+   * Ensure extensions.json exists and is in valid VS Code format
+   */
+  private async ensureValidExtensionsJson(extensionsDir: string): Promise<void> {
+    const extensionsJsonPath = path.join(extensionsDir, "extensions.json");
+
+    try {
+      if (await fs.pathExists(extensionsJsonPath)) {
+        // Validate existing file
+        const content = await fs.readFile(extensionsJsonPath, "utf-8");
+        try {
+          const parsed = JSON.parse(content);
+          if (!Array.isArray(parsed)) {
+            throw new Error("Invalid format");
+          }
+          // File is valid, no action needed
+          return;
+        } catch {
+          // File is corrupted, recreate it
+        }
+      }
+
+      // Create or recreate extensions.json in VS Code standard format
+      const defaultExtensionsJson: unknown[] = [];
+      await fs.writeFile(extensionsJsonPath, JSON.stringify(defaultExtensionsJson, null, 2));
+    } catch {
+      // Silently fail if we can't create the file
+    }
+  }
+
+  /**
+   * Ensure .obsolete exists and is in valid VS Code format
+   */
+  private async ensureValidObsoleteFile(extensionsDir: string): Promise<void> {
+    const obsoletePath = path.join(extensionsDir, ".obsolete");
+
+    try {
+      if (await fs.pathExists(obsoletePath)) {
+        // Validate existing file
+        const content = await fs.readFile(obsoletePath, "utf-8");
+        try {
+          const parsed = JSON.parse(content);
+          if (typeof parsed !== "object" || parsed === null) {
+            throw new Error("Invalid format");
+          }
+          // File is valid, no action needed
+          return;
+        } catch {
+          // File is corrupted, recreate it
+        }
+      }
+
+      // Create or recreate .obsolete in VS Code standard format
+      const defaultObsolete = {};
+      await fs.writeFile(obsoletePath, JSON.stringify(defaultObsolete, null, 2));
+    } catch {
+      // Silently fail if we can't create the file
+    }
+  }
+
+  /**
+   * Clean up temporary files that might interfere with installations
+   */
+  private async cleanupTemporaryFiles(extensionsDir: string): Promise<void> {
+    try {
+      const entries = await fs.readdir(extensionsDir, { withFileTypes: true });
+
+      // Remove temporary files (usually have .tmp, .temp, or .vsctmp extensions)
+      const tempFiles = entries.filter(
+        (entry) =>
+          entry.isFile() &&
+          (entry.name.endsWith(".tmp") ||
+            entry.name.endsWith(".temp") ||
+            entry.name.endsWith(".vsctmp")),
+      );
+
+      for (const entry of tempFiles) {
+        try {
+          await fs.remove(path.join(extensionsDir, entry.name));
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+
+      // Remove temporary directories (UUID-like names starting with .)
+      const tempDirs = entries.filter(
+        (entry) =>
+          entry.isDirectory() &&
+          entry.name.startsWith(".") &&
+          entry.name.length > 8 &&
+          !entry.name.startsWith(".obsolete"),
+      );
+
+      for (const entry of tempDirs) {
+        try {
+          const tempPath = path.join(extensionsDir, entry.name);
+          const contents = await fs.readdir(tempPath);
+
+          // Only remove if it doesn't contain important files
+          const hasImportantFiles = contents.some(
+            (file) => file === "package.json" || file.endsWith(".js") || file.endsWith(".json"),
+          );
+
+          if (!hasImportantFiles) {
+            await fs.remove(tempPath);
+          }
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+    } catch {
+      // Silently ignore cleanup errors
+    }
+  }
+
+  /**
+   * Remove corrupted extension directories that might cause installation issues
+   */
+  private async removeCorruptedExtensions(extensionsDir: string): Promise<void> {
+    try {
+      const entries = await fs.readdir(extensionsDir, { withFileTypes: true });
+      const extensionDirs = entries.filter(
+        (entry) => entry.isDirectory() && !entry.name.startsWith("."),
+      );
+
+      for (const entry of extensionDirs) {
+        const extensionPath = path.join(extensionsDir, entry.name);
+        const packageJsonPath = path.join(extensionPath, "package.json");
+
+        // Remove extensions without valid package.json
+        if (!(await fs.pathExists(packageJsonPath))) {
+          try {
+            await fs.remove(extensionPath);
+          } catch {
+            // Ignore cleanup errors
+          }
+        } else {
+          // Validate package.json
+          try {
+            const packageJson = await fs.readJson(packageJsonPath);
+            if (!packageJson.name || !packageJson.publisher) {
+              // Invalid package.json, remove the extension
+              await fs.remove(extensionPath);
+            }
+          } catch {
+            // Corrupted package.json, remove the extension
+            await fs.remove(extensionPath);
+          }
+        }
+      }
+    } catch {
+      // Silently ignore cleanup errors
     }
   }
 
