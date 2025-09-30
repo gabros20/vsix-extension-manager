@@ -1,0 +1,10 @@
+[
+  {
+    "url": "https://marketplace.visualstudio.com/items?itemName=ms-python.python",
+    "version": "latest"
+  },
+  {
+    "url": "https://marketplace.visualstudio.com/items?itemName=ms-vscode.vscode-typescript-next",
+    "version": "latest"
+  }
+]

@@ -1,7 +1,7 @@
 import * as p from "@clack/prompts";
 import fs from "fs";
 import path from "path";
-import { parseExtensionsList } from "../features/import";
+import { parseExtensionsListDetailed } from "../features/import";
 import { downloadBulkExtensions } from "../features/download";
 import type { BulkOptions } from "../core/types";
 import { buildBulkOptionsFromCli } from "../core/helpers";
@@ -83,23 +83,64 @@ export async function fromList(options: FromListOptions) {
       process.exit(1);
     }
 
-    // Parse extensions list
-    let extensionIds: string[];
+    // Parse extensions list with detailed reporting
+    let parseResult;
     try {
-      extensionIds = parseExtensionsList(content, format as "txt" | "extensions.json", filePath);
+      parseResult = parseExtensionsListDetailed(
+        content,
+        format as "txt" | "extensions.json",
+        filePath,
+      );
     } catch (error) {
       p.log.error(
-        `❌ Failed to parse file: ${error instanceof Error ? error.message : String(error)}`,
+        `Failed to parse file: ${error instanceof Error ? error.message : String(error)}`,
       );
       process.exit(1);
     }
 
+    const extensionIds = parseResult.validIds;
+
     if (extensionIds.length === 0) {
-      p.log.warn("⚠️ No extensions found in the file");
+      p.log.warn("No valid extensions found in the file");
+
+      if (parseResult.invalidIds.length > 0) {
+        p.log.error(`Invalid IDs: ${parseResult.invalidIds.length}`);
+        parseResult.invalidIds.slice(0, 5).forEach((id) => p.log.error(`  ${id}`));
+        if (parseResult.invalidIds.length > 5) {
+          p.log.error(`  ... and ${parseResult.invalidIds.length - 5} more`);
+        }
+      }
       return;
     }
 
-    p.log.info(`📦 Found ${extensionIds.length} extension(s) to download`);
+    // Show parsing summary if there were normalizations or issues
+    if (
+      !options.quiet &&
+      (parseResult.skippedIds.length > 0 ||
+        parseResult.duplicates.length > 0 ||
+        parseResult.invalidIds.length > 0)
+    ) {
+      const summaryLines = [
+        `Total IDs in file: ${parseResult.validIds.length + parseResult.invalidIds.length + parseResult.duplicates.length}`,
+        `Valid: ${parseResult.validIds.length}`,
+      ];
+
+      if (parseResult.skippedIds.length > 0) {
+        summaryLines.push(
+          `Normalized: ${parseResult.skippedIds.length} (version/platform stripped)`,
+        );
+      }
+      if (parseResult.duplicates.length > 0) {
+        summaryLines.push(`Duplicates: ${parseResult.duplicates.length} (after normalization)`);
+      }
+      if (parseResult.invalidIds.length > 0) {
+        summaryLines.push(`Invalid: ${parseResult.invalidIds.length}`);
+      }
+
+      p.note(summaryLines.join("\n"), "Parse Summary");
+    }
+
+    p.log.info(`Found ${extensionIds.length} extension(s) to download`);
 
     // Convert extension IDs to bulk download format
     const bulkItems = extensionIds.map((id) => {

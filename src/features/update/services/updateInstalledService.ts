@@ -4,8 +4,7 @@ import fs from "fs-extra";
 import { getEditorService, getInstallService } from "../../install";
 import { getInstalledExtensions as getInstalledFromFs } from "../../export";
 import { resolveVersion } from "../../../core/registry";
-import { downloadSingleExtension } from "../../download";
-import { FileExistsAction } from "../../../core/filesystem";
+import { downloadWithFallback } from "../../download";
 import { getBackupService, type BackupMetadata } from "../../../core/backup";
 import type { ProgressInfo } from "../../../core/ui/progress";
 
@@ -274,7 +273,7 @@ export class UpdateInstalledService {
               }
 
               // Download from preferred source with fallback
-              const filePath = await this.downloadWithFallback(
+              const filePath = await this.downloadExtensionWithFallback(
                 plan.id,
                 plan.targetVersion,
                 tempDir,
@@ -471,7 +470,7 @@ export class UpdateInstalledService {
   /**
    * Download extension with intelligent source fallback
    */
-  private async downloadWithFallback(
+  private async downloadExtensionWithFallback(
     extensionId: string,
     version: string,
     outputDir: string,
@@ -484,42 +483,7 @@ export class UpdateInstalledService {
       progressCallback?: (progress: ProgressInfo) => void;
     },
   ): Promise<string> {
-    const url = `https://marketplace.visualstudio.com/items?itemName=${extensionId}`;
-    const sources: ("marketplace" | "open-vsx")[] =
-      options.sourcePref === "open-vsx"
-        ? ["open-vsx", "marketplace"]
-        : options.sourcePref === "marketplace"
-          ? ["marketplace", "open-vsx"]
-          : ["marketplace", "open-vsx"]; // auto: prefer marketplace
-
-    let lastError: Error | null = null;
-
-    for (const source of sources) {
-      try {
-        const dl = await this.withRetry(
-          async () => {
-            return downloadSingleExtension({
-              url,
-              requestedVersion: version,
-              preferPreRelease: options.preRelease,
-              source,
-              outputDir,
-              fileExistsAction: FileExistsAction.OVERWRITE,
-              quiet: options.quiet,
-              progressCallback: options.progressCallback,
-            });
-          },
-          options.retry,
-          options.retryDelay,
-        );
-        return dl.filePath || path.join(dl.outputDir, dl.filename);
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        // Continue to next source
-      }
-    }
-
-    throw lastError || new Error(`Failed to download ${extensionId} from all sources`);
+    return downloadWithFallback(extensionId, version, outputDir, options);
   }
 
   /**
