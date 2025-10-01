@@ -92,15 +92,54 @@ export class BackupService {
   ): Promise<BackupMetadata> {
     await this.ensureBackupDir();
 
+    // Check disk space before creating backup
+    const extensionSize = await this.getDirectorySize(extensionPath);
+    const requiredSpace = extensionSize * 1.2; // 20% buffer for safety
+
+    try {
+      // Import check-disk-space dynamically to avoid bundling issues
+      const checkDiskSpace = await import("check-disk-space").then((m) => m.default);
+      const diskSpace = await checkDiskSpace(this.backupRootDir);
+
+      if (diskSpace.free < requiredSpace) {
+        const requiredMB = (requiredSpace / (1024 * 1024)).toFixed(2);
+        const availableMB = (diskSpace.free / (1024 * 1024)).toFixed(2);
+        throw new Error(
+          `Insufficient disk space for backup. Required: ${requiredMB}MB, Available: ${availableMB}MB`,
+        );
+      }
+    } catch (error) {
+      // If check-disk-space fails or is not available, log warning but continue
+      // This ensures backup functionality doesn't break on unsupported platforms
+      if (error instanceof Error && error.message.includes("Insufficient disk space")) {
+        throw error; // Re-throw disk space errors
+      }
+      console.warn(
+        `[Backup] Could not verify disk space: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
+
     // Generate unique backup ID
     const backupId = `${extensionId}-${extensionVersion}-${Date.now()}`;
     const backupPath = path.join(this.backupRootDir, editor, backupId);
 
-    // Create backup
-    await fs.copy(extensionPath, backupPath, {
-      overwrite: false,
-      errorOnExist: true,
-    });
+    // Create backup (with cleanup on failure)
+    try {
+      await fs.copy(extensionPath, backupPath, {
+        overwrite: false,
+        errorOnExist: true,
+      });
+    } catch (error) {
+      // Clean up partial backup on failure
+      try {
+        await fs.remove(backupPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+      throw new Error(
+        `Failed to create backup: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
 
     // Create metadata
     const metadata: BackupMetadata = {

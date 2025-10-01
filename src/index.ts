@@ -154,10 +154,14 @@ program
     false,
   )
   .option("--download-only", "Download only, do not install (default behavior)", false)
-  .option("--check-compatibility", "Check extension compatibility with editor version", false)
+  .option(
+    "--check-compatibility",
+    "Check extension compatibility with editor version before downloading",
+    false,
+  )
   .option(
     "--editor <editor>",
-    "Target editor for compatibility check: vscode|cursor|auto (default: auto)",
+    "Target editor for compatibility check and download: vscode|cursor|auto (default: auto)",
   )
   .action(async (opts) => {
     await withConfigAndErrorHandling(async (config, options) => {
@@ -246,6 +250,23 @@ program
       const { rollback } = await import("./commands/rollback");
       // Don't merge config for rollback - it has different options
       await rollback(options);
+    }, opts);
+  });
+
+program
+  .command("install-direct")
+  .description("Install VSIX files directly (bypasses VS Code CLI)")
+  .option("-v, --vsix <path>", "Path to VSIX file")
+  .option("-d, --vsix-dir <path>", "Path to directory containing VSIX files")
+  .option("-e, --editor <editor>", "Target editor: vscode|cursor (default: vscode)")
+  .option("-f, --force", "Force reinstall if already installed", false)
+  .option("--quiet", "Reduce output", false)
+  .option("--json", "Machine-readable output", false)
+  .action(async (opts) => {
+    await withConfigAndErrorHandling(async () => {
+      const { createInstallDirectCommand } = await import("./commands/installDirect");
+      const command = createInstallDirectCommand();
+      await command.parseAsync([process.argv[0], process.argv[1], ...process.argv.slice(2)]);
     }, opts);
   });
 

@@ -50,6 +50,7 @@
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "axios": "^1.6.2",
+    "check-disk-space": "^3.4.0",
     "commander": "^11.1.0",
     "fs-extra": "^11.2.0",
     "yaml": "^2.8.1",

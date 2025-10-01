@@ -23,10 +23,13 @@ A modern CLI for downloading, exporting, importing, and managing VS Code/Cursor 
   - [Export Installed Extensions](#export-installed-extensions)
   - [Download from Lists](#download-from-lists)
   - [Install Extensions](#install-extensions)
-  - [Update Installed Extensions](#update-installed-extensions)
-  - [Backup & Rollback](#backup--rollback)
-  - [Versions Command](#versions-command)
-  - [Manual Installation Methods](#manual-installation-methods)
+- [Update Installed Extensions](#update-installed-extensions)
+- [Uninstall Extensions](#uninstall-extensions)
+- [Direct Installation (Advanced)](#direct-installation-advanced)
+- [Extension Compatibility Checking](#extension-compatibility-checking)
+- [Backup & Rollback](#backup--rollback)
+- [Versions Command](#versions-command)
+- [Manual Installation Methods](#manual-installation-methods)
 - [Configuration / Options](#configuration--options)
   - [Configuration Files](#configuration-files)
   - [Environment Variables](#environment-variables)
@@ -54,6 +57,9 @@ VSIX Extension Manager solves this with a fast, reliable CLI for downloading VSI
 - ✅ Export installed extensions from VS Code or Cursor (txt/extensions.json)
 - ✅ Install VSIX files directly into VS Code or Cursor
 - ✅ Install from exported lists with automatic downloading
+- ✅ Direct installation bypassing CLI (for problematic environments)
+- ✅ Uninstall extensions with selective or batch processing
+- ✅ Extension compatibility checking against editor versions
 - ✅ Update installed extensions with automatic backup
 - ✅ Rollback extensions from backups when updates fail
 - ✅ Input lists: .txt or VS Code `extensions.json`
@@ -164,6 +170,11 @@ Interactive Mode Menu:
 **Update**
 
 - Update installed extensions to latest
+
+**Uninstall**
+
+- Remove extensions from VS Code or Cursor
+- Selective or bulk uninstall options
 
 **Export**
 
@@ -537,6 +548,112 @@ vsix-extension-manager install --vsix ./ext.vsix --editor vscode --allow-mismatc
 export VSIX_ALLOW_MISMATCHED_BINARY=true
 ```
 
+#### Uninstall Extensions
+
+Remove extensions from VS Code or Cursor with selective or bulk uninstall options.
+
+##### Interactive Uninstall
+
+```bash
+# Interactive uninstall (choose all or selected extensions)
+vsix-extension-manager uninstall
+
+# Uninstall from specific editor
+vsix-extension-manager uninstall --editor cursor
+vsix-extension-manager uninstall --editor vscode
+```
+
+##### Batch Uninstall
+
+```bash
+# Uninstall all extensions (non-interactive)
+vsix-extension-manager uninstall --all --quiet
+
+# Parallel uninstall with retry logic
+vsix-extension-manager uninstall --all --parallel 2 --retry 3
+
+# Dry run to see what would be uninstalled
+vsix-extension-manager uninstall --all --dry-run
+
+# Custom editor binary paths
+vsix-extension-manager uninstall --all \
+  --cursor-bin "/Applications/Cursor.app/Contents/Resources/app/bin/cursor"
+
+# Machine-readable output
+vsix-extension-manager uninstall --all --json
+```
+
+##### Uninstall Features:
+
+- **Interactive Selection**: Choose all or specific extensions to remove
+- **Batch Processing**: Uninstall multiple extensions with parallel support
+- **Safe Cleanup**: Removes extension files and updates metadata
+- **Retry Logic**: Automatic retry for failed uninstalls
+- **Dry Run**: Preview what would be uninstalled
+- **Summary Reports**: Detailed results with success/failure counts
+
+#### Direct Installation (Advanced)
+
+Install VSIX files directly to the extensions folder, bypassing VS Code/Cursor CLI entirely. This method is more reliable for environments where the CLI has issues.
+
+```bash
+# Install single VSIX file directly
+vsix-extension-manager install-direct --vsix ./extension.vsix --editor cursor
+
+# Install all VSIX files from directory
+vsix-extension-manager install-direct --vsix-dir ./downloads --editor vscode
+
+# Force reinstall existing extensions
+vsix-extension-manager install-direct --vsix ./extension.vsix --force
+
+# Machine-readable output
+vsix-extension-manager install-direct --vsix ./extension.vsix --json --quiet
+```
+
+##### Direct Install Features:
+
+- **CLI Bypass**: Directly extracts and installs VSIX files without using editor CLI
+- **Race Condition Safe**: Advanced file locking and atomic operations
+- **Metadata Management**: Properly updates extensions.json and .obsolete files
+- **Force Reinstall**: Override existing installations
+- **Bulk Support**: Install multiple VSIX files from directories
+
+##### When to Use Direct Installation:
+
+- VS Code/Cursor CLI has installation issues
+- Environments where editor CLI is unreliable
+- Container or CI environments
+- Advanced users who need more control
+
+#### Extension Compatibility Checking
+
+Validate extension compatibility with your editor version before downloading to avoid incompatible extensions.
+
+```bash
+# Enable compatibility checking in fromList command
+vsix-extension-manager from-list --file extensions.txt --check-compatibility
+
+# Auto-detect editor version for compatibility
+vsix-extension-manager from-list --file extensions.txt \
+  --check-compatibility \
+  --editor cursor
+
+# Manual version specification
+vsix-extension-manager from-list --file extensions.txt \
+  --check-compatibility \
+  --manual-version \
+  --custom-version "1.85.0"
+```
+
+##### Compatibility Features:
+
+- **Auto-Detection**: Automatically detects your current editor version
+- **Manual Version**: Specify any VS Code version for compatibility testing
+- **VS Code Validation**: Validates VS Code versions against GitHub releases
+- **Detailed Reports**: Shows compatibility status, warnings, and errors
+- **Source Support**: Works with both Marketplace and OpenVSX extensions
+- **Interactive Prompts**: Confirms whether to proceed with incompatible extensions
+
 #### Update Installed Extensions
 
 Update all or selected installed extensions to their latest versions with automatic backup.
@@ -871,6 +988,33 @@ export VSIX_ALLOW_MISMATCHED_BINARY=false # Allow proceeding when binary identit
   - `--json`: Machine-readable output
   - `--backup-dir <path>`: Custom backup directory (default: ~/.vsix-backups)
 
+- Uninstall:
+  - `--editor <vscode|cursor|auto>`: Target editor (default: auto)
+  - `--code-bin <path>`: Explicit VS Code binary path
+  - `--cursor-bin <path>`: Explicit Cursor binary path
+  - `--all`: Uninstall all extensions (non-interactive)
+  - `--parallel <n>`: Number of parallel uninstalls (default: 1)
+  - `--retry <n>`: Number of retry attempts per uninstall
+  - `--retry-delay <ms>`: Delay between retries
+  - `--dry-run`: Show what would be uninstalled without changes
+  - `--quiet`: Reduce output
+  - `--json`: Machine-readable output
+  - `--summary <path>`: Write uninstall summary JSON
+  - `--allow-mismatched-binary`: Proceed when binary identity mismatches editor
+
+- Install-Direct (Advanced):
+  - `--vsix <path>`: Path to VSIX file
+  - `--vsix-dir <path>`: Path to directory containing VSIX files
+  - `--editor <vscode|cursor>`: Target editor (default: vscode)
+  - `--force`: Force reinstall if already installed
+  - `--quiet`: Reduce output
+  - `--json`: Machine-readable output
+
+- Extension Compatibility (in from-list):
+  - `--check-compatibility`: Enable compatibility checking
+  - `--manual-version`: Specify editor version manually
+  - `--custom-version <version>`: Custom VS Code version for compatibility testing
+
 - Global:
   - `--config <path>`
   - `-h, --help`, `-V, --version`
@@ -970,10 +1114,28 @@ See [`TODO.md`](TODO.md) for upcoming features and ideas. Feedback and PRs are a
 - Can I install different extensions to different editors?
   - Yes, run separate commands with `--editor vscode` and `--editor cursor`
   - Or use explicit binary paths to target specific installations
-  - Binary mismatch detection: if `code` actually points to Cursor (or vice‑versa), the tool warns and blocks by default. Fix PATH via VS Code’s Command Palette (Shell Command: Install 'code' command in PATH) or pass explicit `--code-bin`/`--cursor-bin`. Use `--allow-mismatched-binary` to override.
+  - Binary mismatch detection: if `code` actually points to Cursor (or vice‑versa), the tool warns and blocks by default. Fix PATH via VS Code's Command Palette (Shell Command: Install 'code' command in PATH) or pass explicit `--code-bin`/`--cursor-bin`. Use `--allow-mismatched-binary` to override.
+
+- When should I use direct installation vs regular installation?
+  - Use `install-direct` when VS Code/Cursor CLI has issues or in problematic environments
+  - Regular `install` command uses editor CLI (recommended for most users)
+  - Direct installation bypasses CLI entirely and extracts VSIX files directly
+  - Direct installation is more reliable in containers, CI, or when CLI is buggy
+
+- How do I uninstall extensions?
+  - Use `vsix-extension-manager uninstall` for interactive selection
+  - Use `--all` flag for bulk uninstall of all extensions
+  - Supports parallel processing with `--parallel` flag
+  - Use `--dry-run` to preview what would be uninstalled
+
+- How does extension compatibility checking work?
+  - Available in `from-list` command with `--check-compatibility` flag
+  - Auto-detects your current editor version or specify manually
+  - Validates extensions against VS Code engine requirements
+  - Warns about incompatible extensions before downloading
 
 - Why can't I install some Microsoft extensions in Cursor?
-  - Some official Microsoft extensions enforce license or compatibility checks. Downloading the VSIX may still be restricted by the extension’s policies.
+  - Some official Microsoft extensions enforce license or compatibility checks. Downloading the VSIX may still be restricted by the extension's policies.
 
 - Does it support OpenVSX?
   - Yes. Use `--source open-vsx` or paste an OpenVSX URL; mixed sources work in bulk.

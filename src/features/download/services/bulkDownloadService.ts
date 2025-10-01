@@ -61,6 +61,13 @@ export interface BulkDownloadResult {
 }
 
 /**
+ * File download locks to prevent race conditions when multiple workers
+ * download the same file simultaneously.
+ * Key: absolute file path, Value: Promise that resolves when download completes
+ */
+const downloadLocks = new Map<string, Promise<void>>();
+
+/**
  * Validate JSON structure and content for bulk downloads using JSON Schema
  */
 export function validateBulkJson(data: unknown): BulkValidationResult {
@@ -231,6 +238,44 @@ export async function downloadBulkExtensions(
     });
 
     const filePath = path.join(effectiveOutputDir, filename);
+
+    // Check if another worker is already downloading this file
+    if (downloadLocks.has(filePath)) {
+      if (bulkSpinner) {
+        bulkSpinner.message(
+          `[${index + 1}/${extensions.length}] ${displayName} - Waiting for in-progress download...`,
+        );
+      }
+      try {
+        await downloadLocks.get(filePath);
+        // File should exist now, return success
+        if (await fs.pathExists(filePath)) {
+          const stats = await fs.stat(filePath);
+          const elapsedMs = Date.now() - startMs;
+          completedCount++;
+          if (bulkSpinner) {
+            bulkSpinner.message(
+              `[${completedCount}/${extensions.length}] ✅ ${displayName} (from concurrent download)`,
+            );
+          }
+          successCount++;
+          results.push({
+            index,
+            url: ext.url,
+            version: ext.version,
+            status: "success",
+            filePath,
+            filename,
+            sizeBytes: stats.size,
+            elapsedMs,
+          });
+          return;
+        }
+      } catch {
+        // Lock holder failed, we'll try downloading ourselves
+      }
+    }
+
     const shouldProceedWithDownload = await handleFileExists(filePath, fileExistsAction);
     if (!shouldProceedWithDownload) {
       const elapsedMs = Date.now() - startMs;
@@ -253,6 +298,13 @@ export async function downloadBulkExtensions(
       });
       return;
     }
+
+    // Acquire lock for this file
+    let releaseLock!: () => void;
+    const lockPromise = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    downloadLocks.set(filePath, lockPromise);
 
     let attempt = 0;
     while (true) {
@@ -346,6 +398,10 @@ export async function downloadBulkExtensions(
           verificationPassed: options.verifyChecksum ? verificationStatus === " ✅" : undefined,
           elapsedMs,
         });
+
+        // Release lock and cleanup
+        releaseLock();
+        downloadLocks.delete(filePath);
         return;
       } catch (e) {
         const errorMsg = e instanceof Error ? e.message : "Unknown error";
@@ -371,6 +427,10 @@ export async function downloadBulkExtensions(
             error: errorMsg,
             elapsedMs,
           });
+
+          // Release lock and cleanup on failure
+          releaseLock();
+          downloadLocks.delete(filePath);
           throw new Error(errorMsg);
         }
       }
