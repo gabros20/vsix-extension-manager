@@ -1,3 +1,21 @@
+# [1.16.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.15.0...v1.16.0) (2025-10-01)
+
+### Bug Fixes
+
+- add VS Code bug workarounds to uninstall process ([c419c76](https://github.com/gabros20/vsix-extension-manager/commit/c419c763dbff9613963cff2f8fb3b02b17e8fbb7))
+- add VS Code bug workarounds with delays ([b7dd79f](https://github.com/gabros20/vsix-extension-manager/commit/b7dd79f69b04af54f74ad4cc7c2c0ca1cee872bb))
+- enhance preflight checks for installation issues ([08c16fe](https://github.com/gabros20/vsix-extension-manager/commit/08c16fed13ebfda6ae627bc81f26304d015c216e))
+- enhance VS Code bug workarounds with retry logic ([f93866b](https://github.com/gabros20/vsix-extension-manager/commit/f93866bb1dfec1bee22a3ca9cbfa55231054bc20))
+- ensure file state before each installation ([1a2013f](https://github.com/gabros20/vsix-extension-manager/commit/1a2013f0deff9c0e04efecaa992f68c9dc93e4de))
+- handle missing extensions.json during uninstall ([e94f052](https://github.com/gabros20/vsix-extension-manager/commit/e94f052a34ca4a8cf653fb728fc73130d7525275))
+- improve installation error handling and cleanup ([046afa1](https://github.com/gabros20/vsix-extension-manager/commit/046afa1ff21d0f4f719bead9644d6a3e58265fa9))
+- robust uninstall with pre-cleanup ([3467337](https://github.com/gabros20/vsix-extension-manager/commit/3467337c3917d08e2efe3013bcc4b2db5597451c))
+
+### Features
+
+- enhance extension compatibility checking with manual version support ([1f75cd6](https://github.com/gabros20/vsix-extension-manager/commit/1f75cd68ba8ae06c8383979818493a30e92906ce))
+- implement bulletproof extensions folder cleanup ([a976a55](https://github.com/gabros20/vsix-extension-manager/commit/a976a551aaa9a79ffa0361d871d30eb3218c3292))
+
 # [1.15.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.14.0...v1.15.0) (2025-09-30)
 
 ### Features
