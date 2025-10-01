@@ -35,8 +35,8 @@ This document outlines a **complete refactor of VSIX Extension Manager v2.0.0** 
 4. [Phase 1: Foundation](#phase-1-foundation-core-refactor)
 5. [Phase 2: Intelligence](#phase-2-intelligence-quality-of-life)
 6. [Phase 3: Advanced Features](#phase-3-advanced-features-team--workflows)
-7. [New Command Structure](#new-command-structure-v30)
-8. [New Flag System](#new-flag-system-v30)
+7. [New Command Structure](#new-command-structure-v20)
+8. [New Flag System](#new-flag-system-v20)
 9. [Technical Specifications](#technical-specifications)
 10. [Implementation Strategy](#implementation-strategy)
 11. [Breaking Changes & Migration](#breaking-changes--migration)
@@ -1867,60 +1867,6 @@ vsix-extension-manager uninstall ms-python.python
 
 # New:
 vsix remove ms-python.python
-```
-
-### Migration Path for Users
-
-**Step 1: Install v2.0**
-
-```bash
-npm install -g vsix-extension-manager@2
-```
-
-**Step 2: Auto-migration on first run**
-
-v2.0 will automatically detect and migrate:
-
-- Old config files to new format (with backup)
-- Old usage patterns (shows helpful errors with migration hints)
-
-```
-🔄 First-time v2.0 setup detected
-
-✅ Migrated configuration
-   Old: ~/.vsix/config.json (v1.16.0)
-   New: ~/.vsix/config.yml (v2.0)
-   Backup: ~/.vsix/config.v1.backup
-
-📚 Review changes: https://github.com/.../MIGRATION.md
-```
-
-**Step 3: Update scripts/CI**
-
-Update any automation to use new commands:
-
-```diff
-# CI/CD example
-- vsix-extension-manager from-list --file extensions.txt --quiet --json --editor cursor
-+ vsix add extensions.txt --quiet --json --editor cursor
-
-- vsix-extension-manager export-installed -o extensions.txt
-+ vsix list --output extensions.txt
-```
-
-### Rollback Strategy
-
-If you need to rollback to v1.x:
-
-```bash
-# Uninstall v2.0
-npm uninstall -g vsix-extension-manager
-
-# Install v1.x (latest v1.16.0)
-npm install -g vsix-extension-manager@1
-
-# Restore old config (if needed)
-mv ~/.vsix/config.v1.backup ~/.vsix/config.json
 ```
 
 ### What's Preserved
