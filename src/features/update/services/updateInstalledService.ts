@@ -488,6 +488,7 @@ export class UpdateInstalledService {
 
   /**
    * Compare versions semantically - returns true if newVersion > currentVersion
+   * Supports both 3-part (X.Y.Z) and 4-part (X.Y.Z.W) version formats with optional prerelease
    */
   private isVersionNewer(newVersion: string, currentVersion: string): boolean {
     // If versions are identical, no update needed
@@ -495,15 +496,17 @@ export class UpdateInstalledService {
       return false;
     }
 
-    // Parse semantic versions
+    // Parse semantic versions (supports both X.Y.Z and X.Y.Z.W formats)
     const parseVersion = (v: string) => {
-      const match = v.match(/^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$/);
+      // Match X.Y.Z or X.Y.Z.W with optional prerelease tag
+      const match = v.match(/^(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?(?:-(.+))?$/);
       if (!match) return null;
       return {
         major: parseInt(match[1], 10),
         minor: parseInt(match[2], 10),
         patch: parseInt(match[3], 10),
-        prerelease: match[4] || null,
+        build: match[4] ? parseInt(match[4], 10) : 0, // 4th part defaults to 0
+        prerelease: match[5] || null,
       };
     };
 
@@ -515,7 +518,7 @@ export class UpdateInstalledService {
       return newVersion !== currentVersion;
     }
 
-    // Compare major.minor.patch
+    // Compare major.minor.patch.build
     if (newParsed.major !== currentParsed.major) {
       return newParsed.major > currentParsed.major;
     }
@@ -525,8 +528,11 @@ export class UpdateInstalledService {
     if (newParsed.patch !== currentParsed.patch) {
       return newParsed.patch > currentParsed.patch;
     }
+    if (newParsed.build !== currentParsed.build) {
+      return newParsed.build > currentParsed.build;
+    }
 
-    // Same major.minor.patch - check prerelease
+    // Same major.minor.patch.build - check prerelease
     // Stable (no prerelease) > prerelease
     if (!newParsed.prerelease && currentParsed.prerelease) {
       return true; // new stable > current prerelease

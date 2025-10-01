@@ -1,12 +1,54 @@
 import axios from "axios";
-import { DEFAULT_USER_AGENT } from "../../config/constants";
+import { DEFAULT_USER_AGENT, DEFAULT_HTTP_TIMEOUT_MS } from "../../config/constants";
 import type { ExtensionVersionInfo } from "../types";
+
+/**
+ * Version cache with TTL (5 minutes)
+ */
+interface CacheEntry {
+  data: ExtensionVersionInfo[];
+  timestamp: number;
+}
+
+const versionCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Clear expired cache entries
+ */
+function clearExpiredCache(): void {
+  const now = Date.now();
+  for (const [key, entry] of versionCache.entries()) {
+    if (now - entry.timestamp > CACHE_TTL_MS) {
+      versionCache.delete(key);
+    }
+  }
+}
+
+/**
+ * Clear all cache entries (useful for testing or manual refresh)
+ */
+export function clearVersionCache(): void {
+  versionCache.clear();
+}
 
 /**
  * Fetch available versions for an extension using the Marketplace Gallery API
  * itemName format: "publisher.extension"
+ * Results are cached for 5 minutes to reduce API calls
  */
 export async function fetchExtensionVersions(itemName: string): Promise<ExtensionVersionInfo[]> {
+  // Check cache first
+  const cacheKey = `marketplace:${itemName}`;
+  const cached = versionCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  // Clear expired entries periodically
+  if (versionCache.size > 100) {
+    clearExpiredCache();
+  }
   const url =
     "https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery?api-version=3.0-preview.1";
 
@@ -33,35 +75,126 @@ export async function fetchExtensionVersions(itemName: string): Promise<Extensio
     "User-Agent": DEFAULT_USER_AGENT,
   } as const;
 
-  const response = await axios.post(url, body, { headers });
+  try {
+    const response = await axios.post(url, body, {
+      headers,
+      timeout: DEFAULT_HTTP_TIMEOUT_MS,
+      validateStatus: (status) => status < 500, // Retry on 5xx
+    });
 
-  const results = (response.data?.results ?? [])[0];
-  const ext = results?.extensions?.[0];
-  const versions = (ext?.versions ?? []) as Array<{
-    version: string;
-    lastUpdated?: string;
-  }>;
+    const results = (response.data?.results ?? [])[0];
+    const ext = results?.extensions?.[0];
 
-  return versions.map((v) => ({ version: v.version, published: v.lastUpdated }));
+    if (!ext) {
+      throw new Error(`Extension '${itemName}' not found in marketplace`);
+    }
+
+    const versions = (ext?.versions ?? []) as Array<{
+      version: string;
+      lastUpdated?: string;
+    }>;
+
+    if (versions.length === 0) {
+      throw new Error(`No versions available for extension '${itemName}'`);
+    }
+
+    const result = versions.map((v) => ({ version: v.version, published: v.lastUpdated }));
+
+    // Cache the result
+    versionCache.set(cacheKey, {
+      data: result,
+      timestamp: Date.now(),
+    });
+
+    return result;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.code === "ECONNABORTED") {
+        throw new Error(
+          `Timeout fetching versions for '${itemName}' after ${DEFAULT_HTTP_TIMEOUT_MS}ms`,
+        );
+      }
+      if (error.response?.status === 404) {
+        throw new Error(`Extension '${itemName}' not found in marketplace`);
+      }
+      if (error.response?.status && error.response.status >= 500) {
+        throw new Error(`Marketplace service error (${error.response.status}): Try again later`);
+      }
+    }
+    throw error;
+  }
 }
 
 /**
  * Fetch available versions for an extension from OpenVSX API
  * itemName format: "publisher.extension"
+ * Results are cached for 5 minutes to reduce API calls
  */
 export async function fetchOpenVsxVersions(itemName: string): Promise<ExtensionVersionInfo[]> {
+  // Check cache first
+  const cacheKey = `openvsx:${itemName}`;
+  const cached = versionCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  // Clear expired entries periodically
+  if (versionCache.size > 100) {
+    clearExpiredCache();
+  }
+
   const [publisher, extension] = itemName.split(".");
+
+  if (!publisher || !extension) {
+    throw new Error(`Invalid extension name format: ${itemName}. Expected 'publisher.extension'`);
+  }
+
   const url = `https://open-vsx.org/api/${publisher}/${extension}`;
   const headers = {
     Accept: "application/json",
     "User-Agent": DEFAULT_USER_AGENT,
   } as const;
 
-  const response = await axios.get(url, { headers });
-  const data = response.data ?? {};
-  const allVersions = (data.allVersions ?? {}) as Record<string, string>;
-  const versions = Object.keys(allVersions).filter((v) => v && v !== "latest");
-  return versions.sort((a, b) => compareVersionsDesc(a, b)).map((v) => ({ version: v }));
+  try {
+    const response = await axios.get(url, {
+      headers,
+      timeout: DEFAULT_HTTP_TIMEOUT_MS,
+      validateStatus: (status) => status < 500, // Retry on 5xx
+    });
+
+    const data = response.data ?? {};
+    const allVersions = (data.allVersions ?? {}) as Record<string, string>;
+    const versions = Object.keys(allVersions).filter((v) => v && v !== "latest");
+
+    if (versions.length === 0) {
+      throw new Error(`Extension '${itemName}' found but has no versions in OpenVSX`);
+    }
+
+    const result = versions.sort((a, b) => compareVersionsDesc(a, b)).map((v) => ({ version: v }));
+
+    // Cache the result
+    versionCache.set(cacheKey, {
+      data: result,
+      timestamp: Date.now(),
+    });
+
+    return result;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      if (error.code === "ECONNABORTED") {
+        throw new Error(
+          `Timeout fetching versions for '${itemName}' from OpenVSX after ${DEFAULT_HTTP_TIMEOUT_MS}ms`,
+        );
+      }
+      if (error.response?.status === 404) {
+        throw new Error(`Extension '${itemName}' not found in OpenVSX registry`);
+      }
+      if (error.response?.status && error.response.status >= 500) {
+        throw new Error(`OpenVSX service error (${error.response.status}): Try again later`);
+      }
+    }
+    throw error;
+  }
 }
 
 function parseSemver(version: string): {

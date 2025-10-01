@@ -71,6 +71,7 @@ function isValidExtensionId(id: string): boolean {
 
 /**
  * Read package.json from an extension directory
+ * Handles corrupted JSON gracefully by logging and continuing
  */
 function readExtensionPackageJson(extensionPath: string): InstalledExtension | null {
   try {
@@ -84,7 +85,29 @@ function readExtensionPackageJson(extensionPath: string): InstalledExtension | n
       return null;
     }
 
-    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf-8"));
+    const dirName = path.basename(extensionPath);
+    let packageJson: unknown;
+
+    try {
+      const fileContent = fs.readFileSync(packageJsonPath, "utf-8");
+      packageJson = JSON.parse(fileContent);
+    } catch (parseError) {
+      // Log corrupted package.json but continue processing other extensions
+      console.warn(
+        `[Export] Corrupted package.json in extension '${dirName}': ${parseError instanceof Error ? parseError.message : "Parse error"}`,
+      );
+      console.warn(`[Export] Skipping extension at: ${extensionPath}`);
+      return null;
+    }
+
+    // Validate required fields exist
+    if (!packageJson || typeof packageJson !== "object") {
+      console.warn(`[Export] Invalid package.json structure in extension '${dirName}'`);
+      return null;
+    }
+
+    // Type-guard: now we know packageJson is an object
+    const pkgJson = packageJson as Record<string, unknown>;
 
     // Try to get extension ID from package.json first (most reliable)
     let extensionId: string;
@@ -92,18 +115,25 @@ function readExtensionPackageJson(extensionPath: string): InstalledExtension | n
     let name: string;
     let version: string;
 
-    if (packageJson.publisher && packageJson.name) {
+    if (
+      typeof pkgJson.publisher === "string" &&
+      pkgJson.publisher &&
+      typeof pkgJson.name === "string" &&
+      pkgJson.name
+    ) {
       // Use package.json publisher and name (most reliable)
-      publisher = packageJson.publisher;
-      name = packageJson.name;
+      publisher = pkgJson.publisher;
+      name = pkgJson.name;
       extensionId = `${publisher}.${name}`;
-      version = packageJson.version || "unknown";
+      version = typeof pkgJson.version === "string" ? pkgJson.version : "unknown";
     } else {
       // Fallback to parsing directory name (publisher.name-version)
-      const dirName = path.basename(extensionPath);
       const match = dirName.match(/^(.+)\.(.+)-(.+)$/);
 
       if (!match) {
+        console.warn(
+          `[Export] Could not extract extension ID from directory '${dirName}' and package.json is missing publisher/name`,
+        );
         return null;
       }
 
@@ -113,19 +143,34 @@ function readExtensionPackageJson(extensionPath: string): InstalledExtension | n
 
     // Validate the extension ID format
     if (!isValidExtensionId(extensionId)) {
+      console.warn(`[Export] Invalid extension ID format: ${extensionId} (from ${dirName})`);
       return null;
     }
 
     return {
       id: extensionId,
-      displayName: packageJson.displayName || packageJson.name || name,
+      displayName:
+        (typeof pkgJson.displayName === "string" ? pkgJson.displayName : null) ||
+        (typeof pkgJson.name === "string" ? pkgJson.name : null) ||
+        name,
       version,
       publisher,
       name,
-      description: packageJson.description,
-      repository: packageJson.repository,
+      description: typeof pkgJson.description === "string" ? pkgJson.description : undefined,
+      repository:
+        pkgJson.repository &&
+        typeof pkgJson.repository === "object" &&
+        pkgJson.repository !== null &&
+        "type" in pkgJson.repository &&
+        "url" in pkgJson.repository
+          ? (pkgJson.repository as { type: string; url: string })
+          : undefined,
     };
-  } catch {
+  } catch (error) {
+    // Catch any other unexpected errors
+    console.warn(
+      `[Export] Unexpected error reading extension at ${extensionPath}: ${error instanceof Error ? error.message : "Unknown error"}`,
+    );
     return null;
   }
 }

@@ -98,7 +98,31 @@ export function parseExtensionUrl(url: string): ExtensionInfo {
 export function constructDownloadUrl(extensionInfo: ExtensionInfo, version: string): string {
   const [publisher, extension] = extensionInfo.itemName.split(".");
 
-  return `https://${publisher}.gallery.vsassets.io/_apis/public/gallery/publisher/${publisher}/extension/${extension}/${version}/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage`;
+  // Validate components
+  if (!publisher || !extension) {
+    throw new Error(`Invalid extension itemName: ${extensionInfo.itemName}`);
+  }
+  if (!version || version.trim() === "") {
+    throw new Error(`Invalid version: ${version}`);
+  }
+
+  // Sanitize to prevent injection (URL encode special characters)
+  const safePublisher = encodeURIComponent(publisher);
+  const safeExtension = encodeURIComponent(extension);
+  const safeVersion = encodeURIComponent(version);
+
+  const url = `https://${safePublisher}.gallery.vsassets.io/_apis/public/gallery/publisher/${safePublisher}/extension/${safeExtension}/${safeVersion}/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage`;
+
+  // Validate constructed URL
+  try {
+    new URL(url);
+  } catch {
+    throw new Error(
+      `Failed to construct valid download URL for ${extensionInfo.itemName}@${version}`,
+    );
+  }
+
+  return url;
 }
 
 export type SourceRegistry = "marketplace" | "open-vsx";
@@ -109,7 +133,32 @@ export type SourceRegistry = "marketplace" | "open-vsx";
  */
 export function constructOpenVsxDownloadUrl(extensionInfo: ExtensionInfo, version: string): string {
   const [publisher, extension] = extensionInfo.itemName.split(".");
-  return `https://open-vsx.org/api/${publisher}/${extension}/${version}/file/${publisher}.${extension}-${version}.vsix`;
+
+  // Validate components
+  if (!publisher || !extension) {
+    throw new Error(`Invalid extension itemName: ${extensionInfo.itemName}`);
+  }
+  if (!version || version.trim() === "") {
+    throw new Error(`Invalid version: ${version}`);
+  }
+
+  // Sanitize to prevent injection
+  const safePublisher = encodeURIComponent(publisher);
+  const safeExtension = encodeURIComponent(extension);
+  const safeVersion = encodeURIComponent(version);
+
+  const url = `https://open-vsx.org/api/${safePublisher}/${safeExtension}/${safeVersion}/file/${safePublisher}.${safeExtension}-${safeVersion}.vsix`;
+
+  // Validate constructed URL
+  try {
+    new URL(url);
+  } catch {
+    throw new Error(
+      `Failed to construct valid OpenVSX download URL for ${extensionInfo.itemName}@${version}`,
+    );
+  }
+
+  return url;
 }
 
 /**

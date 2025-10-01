@@ -1,8 +1,12 @@
 import { getEditorService, getInstallService } from "../../install";
+import { getDirectInstallService } from "../../install/services/directInstallService";
 import { getInstalledExtensions } from "../../export";
 import type { EditorType } from "../../../core/types";
 import * as fs from "fs-extra";
 import * as path from "path";
+import * as os from "os";
+import { ExtensionStateManager } from "../../install/services/ExtensionStateManager";
+import { ExtensionEntry } from "../../install/services/ExtensionStateManager";
 
 export interface UninstallOptions {
   editor?: EditorType;
@@ -40,6 +44,7 @@ export interface UninstallSummary {
 export class UninstallExtensionsService {
   private editorService = getEditorService();
   private installService = getInstallService();
+  private directInstallService = getDirectInstallService();
 
   /**
    * Uninstall extensions based on provided options
@@ -182,6 +187,11 @@ export class UninstallExtensionsService {
     summary.results = results;
     summary.elapsedMs = Date.now() - startTime;
 
+    // After all uninstalls, re-scan the extensions directory and update extensions.json
+    // to match the actual disk state
+    const extensionsDir = this.getExtensionsDir(binPath);
+    await this.syncExtensionsJsonWithDisk(extensionsDir);
+
     // Ensure extensions folder is in clean state after all uninstalls
     try {
       await this.ensureCleanExtensionsFolder(binPath);
@@ -193,7 +203,7 @@ export class UninstallExtensionsService {
   }
 
   /**
-   * Uninstall a single extension with retry logic
+   * Uninstall a single extension using direct uninstall
    */
   private async uninstallSingleExtension(
     binaryPath: string,
@@ -210,67 +220,35 @@ export class UninstallExtensionsService {
       };
     }
 
-    let lastError: string | undefined;
-
-    for (let attempt = 0; attempt <= options.retry; attempt++) {
-      try {
-        // VS Code bug workaround: Ensure file state is valid before each uninstall
-        await this.ensureValidFileState(binaryPath);
-
-        // VS Code bug workaround: Add small delay to prevent file system conflicts
-        // VS Code's CLI has race conditions during rapid uninstalls
-        await this.delay(100);
-
-        const result = await this.editorService.uninstallExtension(binaryPath, extensionId);
-
-        // If CLI reports failure, verify if extension is actually gone
-        if (!result.success) {
-          try {
-            const isStillInstalled = await this.installService.isExtensionInstalled(
-              binaryPath,
-              extensionId,
-            );
-            if (!isStillInstalled.installed) {
-              // Extension was actually uninstalled despite CLI failure
-              return {
-                extensionId,
-                success: true,
-                elapsedMs: Date.now() - startTime,
-              };
-            }
-          } catch {
-            // Verification failed, stick with original result
-          }
-        }
-
-        // If CLI uninstall succeeded, perform additional cleanup
-        if (result.success) {
-          await this.performPostUninstallCleanup(binaryPath, extensionId);
-        }
-
-        return {
-          extensionId,
-          success: result.success,
-          error: result.success ? undefined : result.error || result.stderr || "Unknown error",
-          elapsedMs: Date.now() - startTime,
-        };
-      } catch (error) {
-        lastError = error instanceof Error ? error.message : String(error);
-
-        if (attempt < options.retry) {
-          // Wait before retry with exponential backoff
-          await this.delay(options.retryDelay * Math.pow(2, attempt));
+    try {
+      const extensionsDir = this.getExtensionsDir(binaryPath);
+      const stateManager = new ExtensionStateManager(extensionsDir);
+      // 1. Find all matching folders
+      const foundDirs = await findAllExtensionFolders(extensionsDir, extensionId);
+      for (const dir of foundDirs) {
+        if (await fs.pathExists(dir)) {
+          await fs.remove(dir);
         }
       }
+      // 2. Remove from extensions.json
+      await stateManager.removeExtension(extensionId);
+      // 3. Add to .obsolete
+      await stateManager.addToObsolete(extensionId);
+      // 4. If not found, report as already uninstalled
+      return {
+        extensionId,
+        success: true,
+        error: foundDirs.length === 0 ? "Already uninstalled (folder not found)" : undefined,
+        elapsedMs: Date.now() - startTime,
+      };
+    } catch (error) {
+      return {
+        extensionId,
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        elapsedMs: Date.now() - startTime,
+      };
     }
-
-    // All retries failed
-    return {
-      extensionId,
-      success: false,
-      error: lastError,
-      elapsedMs: Date.now() - startTime,
-    };
   }
 
   /**
@@ -282,10 +260,7 @@ export class UninstallExtensionsService {
   ): Promise<void> {
     try {
       // Determine editor type from binary path
-      const isCursor = binaryPath.toLowerCase().includes("cursor");
-      const extensionsDir = isCursor
-        ? path.join(process.env.HOME || "~", ".cursor", "extensions")
-        : path.join(process.env.HOME || "~", ".vscode", "extensions");
+      const extensionsDir = this.getExtensionsDir(binaryPath);
 
       // Ensure extensions directory exists
       if (!(await fs.pathExists(extensionsDir))) {
@@ -308,10 +283,11 @@ export class UninstallExtensionsService {
       }
 
       // 2. Update extensions.json (OPTIONAL - best effort)
-      await this.removeFromExtensionsJson(extensionsDir, extensionId);
+      const stateManager = new ExtensionStateManager(extensionsDir);
+      await stateManager.removeExtension(extensionId);
 
       // 3. Add to .obsolete file (OPTIONAL - best effort)
-      await this.addToObsoleteFile(extensionsDir, extensionId);
+      await stateManager.addToObsolete(extensionId);
     } catch {
       // Silently ignore cleanup errors - the CLI uninstall already succeeded
     }
@@ -323,10 +299,7 @@ export class UninstallExtensionsService {
    */
   async ensureCleanExtensionsFolder(binaryPath: string): Promise<void> {
     try {
-      const isCursor = binaryPath.toLowerCase().includes("cursor");
-      const extensionsDir = isCursor
-        ? path.join(process.env.HOME || "~", ".cursor", "extensions")
-        : path.join(process.env.HOME || "~", ".vscode", "extensions");
+      const extensionsDir = this.getExtensionsDir(binaryPath);
 
       // Ensure extensions directory exists
       if (!(await fs.pathExists(extensionsDir))) {
@@ -586,10 +559,7 @@ export class UninstallExtensionsService {
    */
   private async ensureValidFileState(binaryPath: string): Promise<void> {
     try {
-      const isCursor = binaryPath.toLowerCase().includes("cursor");
-      const extensionsDir = isCursor
-        ? path.join(process.env.HOME || "~", ".cursor", "extensions")
-        : path.join(process.env.HOME || "~", ".vscode", "extensions");
+      const extensionsDir = this.getExtensionsDir(binaryPath);
 
       const extensionsJsonPath = path.join(extensionsDir, "extensions.json");
       const obsoletePath = path.join(extensionsDir, ".obsolete");
@@ -624,6 +594,67 @@ export class UninstallExtensionsService {
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
+
+  /**
+   * Helper to get the extensions directory based on binary path
+   */
+  private getExtensionsDir(binaryPath: string): string {
+    const home = os.homedir();
+    const isCursor = binaryPath.toLowerCase().includes("cursor");
+    return isCursor
+      ? path.join(home, ".cursor", "extensions")
+      : path.join(home, ".vscode", "extensions");
+  }
+
+  /**
+   * After all uninstalls, re-scan the extensions directory and update extensions.json
+   * to match the actual disk state
+   */
+  private async syncExtensionsJsonWithDisk(extensionsDir: string): Promise<void> {
+    const stateManager = new ExtensionStateManager(extensionsDir);
+    const entries: ExtensionEntry[] = [];
+
+    // Validate that the path exists and is a directory
+    if (!(await fs.pathExists(extensionsDir))) {
+      await stateManager.writeExtensionsJson([]);
+      return;
+    }
+
+    const stats = await fs.stat(extensionsDir);
+    if (!stats.isDirectory()) {
+      throw new Error(`Expected a directory but got a file: ${extensionsDir}`);
+    }
+
+    const dirs = await fs.readdir(extensionsDir, { withFileTypes: true });
+    for (const entry of dirs) {
+      if (entry.isDirectory()) {
+        const pkgPath = path.join(extensionsDir, entry.name, "package.json");
+        if (await fs.pathExists(pkgPath)) {
+          try {
+            const pkg = await fs.readJson(pkgPath);
+            if (pkg.publisher && pkg.name && pkg.version) {
+              entries.push({
+                identifier: { id: `${pkg.publisher}.${pkg.name}` },
+                version: pkg.version,
+                location: {
+                  $mid: 1,
+                  path: path.join(extensionsDir, entry.name),
+                  scheme: "file",
+                },
+                relativeLocation: entry.name,
+                metadata: {
+                  installedTimestamp: Date.now(),
+                  pinned: true,
+                  source: "marketplace", // Default for existing extensions
+                },
+              });
+            }
+          } catch {}
+        }
+      }
+    }
+    await stateManager.writeExtensionsJson(entries);
+  }
 }
 
 // Global instance accessor
@@ -634,4 +665,37 @@ export function getUninstallExtensionsService(): UninstallExtensionsService {
     globalUninstallService = new UninstallExtensionsService();
   }
   return globalUninstallService;
+}
+
+// Helper to find all extension folders for a given extension ID (case-insensitive, all versions)
+async function findAllExtensionFolders(
+  extensionsDir: string,
+  extensionId: string,
+): Promise<string[]> {
+  const found: string[] = [];
+  if (!(await fs.pathExists(extensionsDir))) return found;
+  const entries = await fs.readdir(extensionsDir, { withFileTypes: true });
+  const lowerId = extensionId.toLowerCase();
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      const dirName = entry.name;
+      // Quick check: does the dirName start with publisher.name (case-insensitive)?
+      if (dirName.toLowerCase().startsWith(lowerId)) {
+        found.push(path.join(extensionsDir, dirName));
+        continue;
+      }
+      // Fallback: check package.json inside
+      const pkgPath = path.join(extensionsDir, dirName, "package.json");
+      if (await fs.pathExists(pkgPath)) {
+        try {
+          const pkg = await fs.readJson(pkgPath);
+          const fullId = `${pkg.publisher}.${pkg.name}`;
+          if (fullId === extensionId) {
+            found.push(path.join(extensionsDir, dirName));
+          }
+        } catch {}
+      }
+    }
+  }
+  return found;
 }

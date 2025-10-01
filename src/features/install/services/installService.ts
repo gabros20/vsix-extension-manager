@@ -3,6 +3,9 @@ import fs from "fs-extra";
 import { getEditorService, InstallResult } from "./editorCliService";
 import { VsixFile } from "./vsixScannerService";
 import { getInstallPreflightService } from "./installPreflightService";
+import { getDirectInstallService } from "./directInstallService";
+import { robustInstallService } from "./robustInstallService";
+import { getEnhancedBulkInstallService } from "./enhancedBulkInstallService";
 
 export interface InstallOptions {
   dryRun?: boolean;
@@ -46,6 +49,7 @@ export interface BulkInstallResult {
 export class InstallService {
   private editorService = getEditorService();
   private preflightService = getInstallPreflightService();
+  private directInstallService = getDirectInstallService();
 
   /**
    * Run preflight checks before installation
@@ -61,7 +65,7 @@ export class InstallService {
   }
 
   /**
-   * Install a single VSIX file
+   * Install a single VSIX file using direct installation
    */
   async installSingleVsix(
     binaryPath: string,
@@ -77,44 +81,21 @@ export class InstallService {
         };
       }
 
-      // Ensure file state is valid before each installation
-      await this.ensureValidFileState(binaryPath);
+      // Determine extensions directory
+      const isCursor = binaryPath.toLowerCase().includes("cursor");
+      const extensionsDir = isCursor
+        ? path.join(process.env.HOME || "~", ".cursor", "extensions")
+        : path.join(process.env.HOME || "~", ".vscode", "extensions");
 
-      // VS Code bug workaround: Add delay to prevent file system conflicts
-      // VS Code's CLI has race conditions during rapid installations
-      // Increased delay to give VS Code more time to settle
-      await this.delay(250);
+      // Ensure extensions directory exists
+      await fs.ensureDir(extensionsDir);
 
-      const result = await this.editorService.installVsix(binaryPath, vsixPath, {
+      // Use robust installation service with advanced race condition handling
+      return await robustInstallService.installVsix(vsixPath, extensionsDir, {
         force: options.forceReinstall,
-        timeout: options.timeout,
+        maxRetries: 3,
+        retryDelay: 1000,
       });
-
-      // VS Code bug workaround: Retry failed installations once
-      if (!result.success && this.isRetryableError(result)) {
-        // Wait a bit longer for VS Code to settle
-        await this.delay(1000);
-
-        // Ensure file state is still valid
-        await this.ensureValidFileState(binaryPath);
-
-        // Retry the installation
-        const retryResult = await this.editorService.installVsix(binaryPath, vsixPath, {
-          force: options.forceReinstall,
-          timeout: options.timeout,
-        });
-
-        if (retryResult.success) {
-          return retryResult;
-        }
-      }
-
-      // Enhance error message if installation failed
-      if (!result.success) {
-        result.error = this.extractErrorMessage(result);
-      }
-
-      return result;
     } catch (error) {
       return {
         success: false,
@@ -251,7 +232,7 @@ export class InstallService {
   }
 
   /**
-   * Install multiple VSIX files with retry logic and progress tracking
+   * Install multiple VSIX files with enhanced error handling and recovery
    */
   async installBulkVsix(
     binaryPath: string,
@@ -259,78 +240,37 @@ export class InstallService {
     options: InstallOptions = {},
     progressCallback?: (result: InstallTaskResult) => void,
   ): Promise<BulkInstallResult> {
-    const startTime = Date.now();
-    const results: InstallTaskResult[] = [];
-    let successful = 0;
-    let skipped = 0;
-    let failed = 0;
+    // Use enhanced bulk installation service for better error handling
+    const enhancedService = getEnhancedBulkInstallService();
 
-    const { skipInstalled = false, parallel = 1, dryRun = false } = options;
+    const enhancedOptions = {
+      dryRun: options.dryRun,
+      forceReinstall: options.forceReinstall,
+      skipInstalled: options.skipInstalled,
+      parallel: options.parallel || 1,
+      retry: options.retry || 3,
+      retryDelay: options.retryDelay || 1000,
+      timeout: options.timeout,
+      quiet: options.quiet,
+      maxConcurrent: 3,
+      batchSize: 10,
+    };
 
-    // Get currently installed extensions for skip logic
-    let installedExtensions: Map<string, string> | null = null;
-    if (skipInstalled && !dryRun) {
-      try {
-        const installed = await this.editorService.listInstalledExtensions(binaryPath);
-        installedExtensions = new Map(installed.map((ext) => [ext.id, ext.version]));
-      } catch {
-        // If we can't get installed extensions, continue without skip logic
-        console.warn("Warning: Could not retrieve installed extensions for skip logic");
-      }
-    }
+    const result = await enhancedService.installBulkVsix(
+      binaryPath,
+      tasks,
+      enhancedOptions,
+      progressCallback,
+    );
 
-    // Process tasks
-    if (parallel <= 1) {
-      // Sequential processing
-      for (const task of tasks) {
-        const result = await this.processInstallTask(
-          binaryPath,
-          task,
-          options,
-          installedExtensions,
-        );
-        results.push(result);
-
-        if (result.success) successful++;
-        else if (result.skipped) skipped++;
-        else failed++;
-
-        if (progressCallback) {
-          progressCallback(result);
-        }
-      }
-    } else {
-      // Parallel processing with concurrency limit
-      const batches = this.chunkArray(tasks, parallel);
-
-      for (const batch of batches) {
-        const batchPromises = batch.map((task) =>
-          this.processInstallTask(binaryPath, task, options, installedExtensions),
-        );
-
-        const batchResults = await Promise.all(batchPromises);
-
-        for (const result of batchResults) {
-          results.push(result);
-
-          if (result.success) successful++;
-          else if (result.skipped) skipped++;
-          else failed++;
-
-          if (progressCallback) {
-            progressCallback(result);
-          }
-        }
-      }
-    }
-
+    // Convert enhanced result to standard format
     return {
-      total: tasks.length,
-      successful,
-      skipped,
-      failed,
-      results,
-      elapsedMs: Date.now() - startTime,
+      total: result.total,
+      successful: result.successful,
+      skipped: result.skipped,
+      failed: result.failed,
+      results: result.results,
+      elapsedMs: result.elapsedMs,
     };
   }
 
@@ -467,15 +407,38 @@ export class InstallService {
     options: InstallOptions = {},
     progressCallback?: (result: InstallTaskResult) => void,
   ): Promise<BulkInstallResult> {
-    // Use more conservative settings for retry
-    const retryOptions: InstallOptions = {
-      ...options,
+    // Use enhanced bulk installation service for retry
+    const enhancedService = getEnhancedBulkInstallService();
+
+    const retryOptions = {
+      dryRun: options.dryRun,
+      forceReinstall: options.forceReinstall,
+      skipInstalled: options.skipInstalled,
       parallel: 1, // Sequential for retries
+      retry: options.retry ?? 2,
+      retryDelay: options.retryDelay || 2000,
       timeout: options.timeout || 60000, // Longer timeout (60s)
-      retry: options.retry ?? 1, // One retry per task
+      quiet: options.quiet,
+      maxConcurrent: 1,
+      batchSize: 5,
     };
 
-    return this.installBulkVsix(binaryPath, failedTasks, retryOptions, progressCallback);
+    const result = await enhancedService.retryFailedInstallations(
+      binaryPath,
+      failedTasks,
+      retryOptions,
+      progressCallback,
+    );
+
+    // Convert enhanced result to standard format
+    return {
+      total: result.total,
+      successful: result.successful,
+      skipped: result.skipped,
+      failed: result.failed,
+      results: result.results,
+      elapsedMs: result.elapsedMs,
+    };
   }
 
   /**

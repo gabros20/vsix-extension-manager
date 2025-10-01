@@ -254,6 +254,23 @@ program
   });
 
 program
+  .command("install-direct")
+  .description("Install VSIX files directly (bypasses VS Code CLI)")
+  .option("-v, --vsix <path>", "Path to VSIX file")
+  .option("-d, --vsix-dir <path>", "Path to directory containing VSIX files")
+  .option("-e, --editor <editor>", "Target editor: vscode|cursor (default: vscode)")
+  .option("-f, --force", "Force reinstall if already installed", false)
+  .option("--quiet", "Reduce output", false)
+  .option("--json", "Machine-readable output", false)
+  .action(async (opts) => {
+    await withConfigAndErrorHandling(async () => {
+      const { createInstallDirectCommand } = await import("./commands/installDirect");
+      const command = createInstallDirectCommand();
+      await command.parseAsync([process.argv[0], process.argv[1], ...process.argv.slice(2)]);
+    }, opts);
+  });
+
+program
   .command("uninstall")
   .description("Uninstall extensions from VS Code/Cursor")
   .option("-e, --editor <editor>", "Target editor: vscode|cursor|auto (default: auto)")

@@ -21,3 +21,6 @@ export type {
   InstallFromListOptions,
   InstallFromListResult,
 } from "./services/installFromListService";
+
+export { DirectInstallService, getDirectInstallService } from "./services/directInstallService";
+export type { DirectInstallOptions, ExtensionMetadata } from "./services/directInstallService";
