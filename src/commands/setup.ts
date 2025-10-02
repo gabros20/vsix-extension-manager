@@ -51,10 +51,13 @@ class SetupCommand extends BaseCommand {
       }
 
       if (!result) {
-        return builder.setSummary("Setup cancelled or skipped").addSkipped({
-          id: "config",
-          name: "configuration",
-        }).build();
+        return builder
+          .setSummary("Setup cancelled or skipped")
+          .addSkipped({
+            id: "config",
+            name: "configuration",
+          })
+          .build();
       }
 
       builder.addSuccess({
@@ -70,7 +73,10 @@ class SetupCommand extends BaseCommand {
         ui.log.error(`Setup failed: ${message}`);
       }
 
-      return CommandResultBuilder.fromError("setup", error instanceof Error ? error : new Error(message));
+      return CommandResultBuilder.fromError(
+        "setup",
+        error instanceof Error ? error : new Error(message),
+      );
     }
   }
 

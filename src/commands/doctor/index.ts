@@ -74,7 +74,10 @@ class DoctorCommand extends BaseCommand {
         ui.log.error(`Failed to run health check: ${message}`);
       }
 
-      return CommandResultBuilder.fromError("doctor", error instanceof Error ? error : new Error(message));
+      return CommandResultBuilder.fromError(
+        "doctor",
+        error instanceof Error ? error : new Error(message),
+      );
     }
   }
 

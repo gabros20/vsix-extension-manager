@@ -4,7 +4,7 @@ import type { Config } from "../config/constants";
 export async function runInteractive(config: Config) {
   console.clear();
   p.intro("🔽 VSIX Extension Manager v2.0");
-  
+
   // Interactive mode temporarily disabled during v2.0 migration
   p.log.warning("Interactive mode is being redesigned for v2.0");
   p.log.info("\nAvailable v2.0 commands:");
@@ -19,7 +19,7 @@ export async function runInteractive(config: Config) {
   vsix rollback                          - Rollback to previous state
   `);
   p.log.info("Use --help with any command for more options");
-  
+
   p.outro("Interactive menu will return in a future update");
   return;
 }

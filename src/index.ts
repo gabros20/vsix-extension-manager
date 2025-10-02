@@ -330,6 +330,48 @@ async function wireV2Command(commandName: string, aliases: string[] = []): Promi
 // Wire v2.0 commands and parse arguments
 (async () => {
   try {
+    // ============================================================================
+    // Startup: Config v2 Integration & First-Run Detection
+    // ============================================================================
+    
+    // Check for configuration migration (v1 → v2)
+    const { ConfigMigrator } = await import("./config/migrator");
+    const migrator = new ConfigMigrator();
+    const migrated = await migrator.autoMigrate();
+    
+    if (migrated) {
+      console.log("✅ Configuration migrated to v2.0 format");
+      console.log("");
+    }
+    
+    // Check for first run and offer setup wizard
+    // Only run if not executing setup command explicitly
+    const args = process.argv.slice(2);
+    const isSetupCommand = args.includes("setup");
+    const isHelpFlag = args.includes("--help") || args.includes("-h");
+    const isVersionFlag = args.includes("--version") || args.includes("-V");
+    
+    if (!isSetupCommand && !isHelpFlag && !isVersionFlag) {
+      const { handleFirstRun } = await import("./core/setup/firstRun");
+      
+      // Get global options to check for quiet/json modes
+      const globalOpts = program.opts();
+      const quiet = globalOpts.quiet || args.includes("--quiet");
+      const json = globalOpts.json || args.includes("--json");
+      
+      const ranWizard = await handleFirstRun({ 
+        skip: quiet || json,
+        quiet: quiet || json,
+      });
+      
+      // If wizard ran, we might want to reload config
+      // but for now we'll let each command load its own config
+    }
+    
+    // ============================================================================
+    // Command Registration
+    // ============================================================================
+    
     // Core v2.0 commands
     await wireV2Command("add", ["get"]); // Universal entry point
     await wireV2Command("remove", ["rm"]); // Enhanced uninstall
@@ -347,6 +389,10 @@ async function wireV2Command(commandName: string, aliases: string[] = []): Promi
     // await wireV2Command('workspace');
     // await wireV2Command('templates');
 
+    // ============================================================================
+    // Parse & Execute
+    // ============================================================================
+    
     // Parse arguments after all commands are registered
     await program.parseAsync();
   } catch (error) {

@@ -180,6 +180,17 @@ export class ConfigMigrator {
   }
 
   /**
+   * Auto-migrate without user interaction (silent)
+   * Returns true if migration was performed
+   */
+  async autoMigrate(): Promise<boolean> {
+    return await this.autoMigrateIfNeeded({ 
+      interactive: false,
+      dryRun: false,
+    });
+  }
+
+  /**
    * Create new v2 config file with sample content
    */
   async createSampleConfig(
