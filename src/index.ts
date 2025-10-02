@@ -136,12 +136,6 @@ program
 // Legacy v1.x commands have been removed. All functionality is now available
 // through the v2.0 command structure below.
 
-// TODO: Convert rollback to BaseCommand pattern (currently disabled)
-// program
-//   .command("rollback")
-//   .description("Rollback extensions from backups")
-//   ... (temporarily commented out until conversion)
-
 // Default action when no command specified - show interactive menu
 program.action(async () => {
   // TODO: Implement proper v2.0 interactive mode
@@ -363,14 +357,12 @@ async function checkForUpdatesInBackground(): Promise<void> {
     // Core v2.0 commands
     await wireV2Command("add", ["get"]); // Universal entry point
     await wireV2Command("remove", ["rm"]); // Enhanced uninstall
+    await wireV2Command("update", ["upgrade"]); // Smart update with rollback
     await wireV2Command("list", ["ls"]); // Enhanced export
     await wireV2Command("info"); // Enhanced versions
-
-    // Note: update command conflicts with existing "update-installed" alias
-    // We'll keep old "update-installed" for now and add "upgrade" alias for new command
-    await wireV2Command("update", ["upgrade"]);
     await wireV2Command("doctor"); // Health check & diagnostics
     await wireV2Command("setup"); // First-run configuration wizard
+    await wireV2Command("rollback", ["rb"]); // Restore from backups
 
     // TODO: Add remaining v2.0 commands as they're implemented
     // await wireV2Command('search');

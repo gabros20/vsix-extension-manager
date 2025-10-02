@@ -31,9 +31,9 @@ export const COMMANDS: Record<string, CommandLoader> = {
   // workspace: async () => await import("./workspace"),
   // templates: async () => await import("./templates"),
 
-  // Preserved commands (to be integrated - not yet converted to BaseCommand)
-  // rollback: async () => await import("./rollback"),
-  // interactive: async () => await import("./interactive"),
+  // Preserved commands
+  rollback: async () => await import("./rollback"),
+  // interactive: Not a BaseCommand - uses different pattern
 };
 
 /**
