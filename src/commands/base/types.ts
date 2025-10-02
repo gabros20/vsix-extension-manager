@@ -55,7 +55,6 @@ export interface GlobalOptions {
   // Special
   plan?: boolean;
   dryRun?: boolean;
-  profile?: string;
   config?: string;
   fix?: boolean; // For doctor command auto-fix
 }

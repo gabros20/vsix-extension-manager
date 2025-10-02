@@ -28,7 +28,6 @@ interface SetupResponses {
   safety: boolean;
   parallelDownloads: string;
   configLocation: "home" | "project" | "none";
-  createProfiles: boolean;
 }
 
 /**
@@ -149,13 +148,6 @@ export class SetupWizard {
           ],
         }),
 
-      createProfiles: async (results: any) => {
-        if (results.configLocation === "none") {
-          return false;
-        }
-
-        return await ui.confirm("Create default profiles? (production, development)", false);
-      },
     });
 
     return {
@@ -163,7 +155,6 @@ export class SetupWizard {
       safety: responses.safety as boolean,
       parallelDownloads: responses.parallelDownloads as string,
       configLocation: responses.configLocation as "home" | "project" | "none",
-      createProfiles: responses.createProfiles as boolean,
     };
   }
 
@@ -198,29 +189,6 @@ export class SetupWizard {
         "download-dir": "./downloads",
       },
     };
-
-    // Add profiles if requested
-    if (responses.createProfiles) {
-      config.profiles = {
-        production: {
-          safety: {
-            "check-compatibility": true,
-          },
-          performance: {
-            "parallel-installs": 1,
-          },
-        },
-        development: {
-          safety: {
-            "check-compatibility": false,
-          },
-          performance: {
-            "parallel-downloads": parallelDownloads + 2,
-            "parallel-installs": 3,
-          },
-        },
-      };
-    }
 
     return config;
   }

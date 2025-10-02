@@ -120,7 +120,7 @@ export class UpdateCommand extends BaseCommand {
         currentVersion?: string;
         error?: string;
       }
-      
+
       result.items.forEach((item: UpdateItem) => {
         const itemData = {
           id: item.id,

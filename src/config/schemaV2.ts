@@ -66,17 +66,8 @@ const OutputConfigSchema = z.object({
 
 /**
  * Complete configuration schema v2
+ * Simple, flat configuration - no profiles needed
  */
-// Profile schema (without version and profiles to avoid recursion)
-const ProfileSchema = z.object({
-  editor: EditorConfigSchema.partial().optional(),
-  safety: SafetyConfigSchema.partial().optional(),
-  performance: PerformanceConfigSchema.partial().optional(),
-  behavior: BehaviorConfigSchema.partial().optional(),
-  network: NetworkConfigSchema.partial().optional(),
-  output: OutputConfigSchema.partial().optional(),
-});
-
 export const ConfigV2Schema = z.object({
   version: z.literal("2.0").default("2.0"),
   editor: EditorConfigSchema,
@@ -85,8 +76,6 @@ export const ConfigV2Schema = z.object({
   behavior: BehaviorConfigSchema,
   network: NetworkConfigSchema.optional(),
   output: OutputConfigSchema.optional(),
-  "active-profile": z.string().optional(),
-  profiles: z.record(z.string(), ProfileSchema).optional(),
 });
 
 /**
@@ -94,7 +83,7 @@ export const ConfigV2Schema = z.object({
  */
 export type ConfigV2 = z.infer<typeof ConfigV2Schema>;
 
-// Deep partial for recursive config types
+// Partial config type for merging
 export type PartialConfigV2 = {
   version?: "2.0";
   editor?: Partial<z.infer<typeof EditorConfigSchema>>;
@@ -103,8 +92,6 @@ export type PartialConfigV2 = {
   behavior?: Partial<z.infer<typeof BehaviorConfigSchema>>;
   network?: Partial<z.infer<typeof NetworkConfigSchema>>;
   output?: Partial<z.infer<typeof OutputConfigSchema>>;
-  "active-profile"?: string;
-  profiles?: Record<string, Profile>;
 };
 
 export type EditorConfig = z.infer<typeof EditorConfigSchema>;
@@ -113,7 +100,6 @@ export type PerformanceConfig = z.infer<typeof PerformanceConfigSchema>;
 export type BehaviorConfig = z.infer<typeof BehaviorConfigSchema>;
 export type NetworkConfig = z.infer<typeof NetworkConfigSchema>;
 export type OutputConfig = z.infer<typeof OutputConfigSchema>;
-export type Profile = z.infer<typeof ProfileSchema>;
 
 /**
  * Default configuration values
@@ -198,7 +184,6 @@ export const ENV_VAR_MAP_V2: Record<string, string> = {
   VSIX_PROXY: "network.proxy",
   VSIX_FORMAT: "output.format",
   VSIX_COLORS: "output.colors",
-  VSIX_PROFILE: "active-profile",
 };
 
 /**
@@ -248,28 +233,4 @@ behavior:
 #   format: auto # auto | json | table | quiet
 #   colors: true
 #   show-progress: true
-
-# Active profile (optional)
-# active-profile: production
-
-# Configuration profiles (optional)
-# profiles:
-#   production:
-#     safety:
-#       check-compatibility: true
-#     performance:
-#       parallel-installs: 1
-#   
-#   development:
-#     safety:
-#       check-compatibility: false
-#     performance:
-#       parallel-installs: 3
-#   
-#   ci:
-#     output:
-#       format: json
-#       show-progress: false
-#     behavior:
-#       skip-installed: always
 `;

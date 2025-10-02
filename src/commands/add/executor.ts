@@ -10,10 +10,7 @@ import * as path from "path";
 import * as os from "os";
 import type { CommandResult } from "../base/types";
 import type { DetectionResult } from "./inputDetector";
-import {
-  downloadSingleExtension,
-  type SingleDownloadRequest,
-} from "../../features/download";
+import { downloadSingleExtension, type SingleDownloadRequest } from "../../features/download";
 import {
   getEditorService,
   getInstallService,

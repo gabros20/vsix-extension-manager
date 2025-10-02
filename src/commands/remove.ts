@@ -110,7 +110,7 @@ export class RemoveCommand extends BaseCommand {
         extensionId: string;
         error?: string;
       }
-      
+
       result.results.forEach((r: UninstallResult) => {
         if (r.success) {
           builder.addSuccess({

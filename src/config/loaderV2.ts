@@ -1,6 +1,6 @@
 /**
  * Configuration Loader v2.0
- * Enhanced loader with YAML support, profiles, and better error handling
+ * Simple, flat configuration with YAML support
  */
 
 import * as fs from "fs-extra";
@@ -31,7 +31,6 @@ export class ConfigLoaderV2 {
     cliConfig: PartialConfigV2 = {},
     options: {
       configPath?: string;
-      profile?: string;
       skipEnv?: boolean;
       skipFile?: boolean;
     } = {},
@@ -46,12 +45,6 @@ export class ConfigLoaderV2 {
       const fileConfig = await this.loadFileConfig(options.configPath);
       if (fileConfig) {
         configs.push(fileConfig);
-
-        // Apply profile if specified
-        const profileName = options.profile || fileConfig["active-profile"];
-        if (profileName && fileConfig.profiles?.[profileName]) {
-          configs.push(fileConfig.profiles[profileName]);
-        }
       }
     }
 
@@ -276,27 +269,17 @@ export class ConfigLoaderV2 {
   }
 
   /**
-   * Get effective configuration (resolved with profile)
+   * Get effective configuration
    */
   async getEffectiveConfig(
     options: {
       configPath?: string;
-      profile?: string;
       cliOverrides?: PartialConfigV2;
     } = {},
   ): Promise<ConfigV2> {
     return await this.loadConfig(options.cliOverrides || {}, {
       configPath: options.configPath,
-      profile: options.profile,
     });
-  }
-
-  /**
-   * List available profiles from config file
-   */
-  async listProfiles(configPath?: string): Promise<string[]> {
-    const config = await this.loadFileConfig(configPath);
-    return Object.keys(config?.profiles || {});
   }
 
   /**
@@ -324,7 +307,6 @@ export async function loadConfigV2(
   cliConfig: PartialConfigV2 = {},
   options: {
     configPath?: string;
-    profile?: string;
   } = {},
 ): Promise<ConfigV2> {
   return await configLoaderV2.loadConfig(cliConfig, options);
