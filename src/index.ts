@@ -91,50 +91,10 @@ program
   .option("--config <path>", "Path to configuration file");
 
 // ============================================================================
-// V2.0 COMMANDS (Integration Phase)
-// ============================================================================
-
-/**
- * add - Universal entry point for adding extensions
- * Integration Phase: First v2.0 command with Phase 2 systems integrated
- * Consolidates: download, quick-install, from-list, install, install-direct
- */
-program
-  .command("add <input>")
-  .description("Add extensions (universal entry point) - detects input type automatically")
-  .option("-e, --editor <type>", "Target editor: cursor|vscode|auto (default: auto)")
-  .option("--code-bin <path>", "VS Code binary path")
-  .option("--cursor-bin <path>", "Cursor binary path")
-  .option("--allow-mismatch", "Allow binary mismatch")
-  .option("--download-only", "Download without installing")
-  .option("--source <registry>", "Registry: marketplace|open-vsx|auto (default: auto)")
-  .option("--version <version>", "Specific version")
-  .option("--pre-release", "Use pre-release version")
-  .option("--parallel <n>", "Parallel operations (1-10)", "3")
-  .option("--timeout <sec>", "Timeout in seconds", "30")
-  .option("--retry <n>", "Retry attempts", "3")
-  .option("--retry-delay <ms>", "Delay between retries (ms)", "1000")
-  .option("--force", "Force reinstall/overwrite")
-  .option("--skip-installed", "Skip already installed")
-  .option("--output <path>", "Output directory")
-  .option("--check-compat", "Check compatibility")
-  .option("--no-backup", "Skip automatic backup")
-  .option("--verify-checksum", "Verify download checksums")
-  .option("-y, --yes", "Auto-confirm all prompts")
-  .option("--quiet", "Minimal output")
-  .option("--json", "JSON output")
-  .option("--debug", "Debug logging")
-  .option("--plan", "Show execution plan without running")
-  .option("--dry-run", "Validate only, no execution")
-  .action(async (input, opts) => {
-    await withV2CommandHandling(() => import("./commands/add"), [input], opts);
-  });
-
-// ============================================================================
 // V2.0 COMMANDS - Clean Slate
 // ============================================================================
-// Legacy v1.x commands have been removed. All functionality is now available
-// through the v2.0 command structure below.
+// All commands are registered dynamically via wireV2Command() below
+// No manual command registration needed
 
 // Default action when no command specified - show interactive menu
 program.action(async () => {
