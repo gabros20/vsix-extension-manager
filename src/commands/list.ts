@@ -1,6 +1,7 @@
 /**
  * List Command - List and export installed extensions
  * Enhanced from exportInstalled.ts with multiple formats and better UX
+ * Integration Phase: Now uses CommandResultBuilder
  */
 
 import * as fs from "fs-extra";
@@ -8,6 +9,7 @@ import * as path from "path";
 import * as yaml from "yaml";
 import { BaseCommand } from "./base/BaseCommand";
 import type { CommandResult, CommandHelp, GlobalOptions } from "./base/types";
+import { CommandResultBuilder } from "../core/output/CommandResultBuilder";
 import { getInstalledExtensions } from "../features/export";
 import { getEditorService } from "../features/install";
 import { ui, promptPolicy } from "../core/ui";
@@ -26,6 +28,7 @@ export interface ListOptions extends GlobalOptions {
  */
 export class ListCommand extends BaseCommand {
   async execute(_args: string[], options: GlobalOptions): Promise<CommandResult> {
+    const builder = new CommandResultBuilder("list");
     const context = this.createContext(options);
     const listOptions = options as ListOptions;
 
@@ -77,17 +80,7 @@ export class ListCommand extends BaseCommand {
 
       if (extensions.length === 0) {
         ui.log.warning("No extensions found");
-        return this.createSuccessResult("No extensions found", {
-          items: [],
-          totals: {
-            total: 0,
-            successful: 0,
-            failed: 0,
-            skipped: 0,
-            warnings: 0,
-            duration: this.getDuration(context),
-          },
-        });
+        return builder.setSummary("No extensions found").build();
       }
 
       // Determine format
@@ -129,30 +122,16 @@ export class ListCommand extends BaseCommand {
         ui.outro(`Listed ${extensions.length} extensions`);
       }
 
-      return {
-        status: "ok",
-        command: "list",
-        summary: `Listed ${extensions.length} extensions`,
-        items: extensions.map((ext) => ({
+      // Add extensions to builder
+      extensions.forEach((ext) => {
+        builder.addSuccess({
           id: ext.id,
+          name: ext.displayName || ext.id,
           version: ext.version,
-          status: "success" as const,
-          duration: 0,
-          details: {
-            displayName: ext.displayName,
-            publisher: ext.publisher,
-            enabled: true, // InstalledExtension doesn't have disabled property
-          },
-        })),
-        totals: {
-          total: 0,
-          successful: extensions.length,
-          failed: 0,
-          skipped: 0,
-          warnings: 0,
-          duration: this.getDuration(context),
-        },
-      };
+        });
+      });
+
+      return builder.setSummary(`Listed ${extensions.length} extensions`).build();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 
@@ -160,17 +139,7 @@ export class ListCommand extends BaseCommand {
         ui.log.error(message);
       }
 
-      return this.createErrorResult(message, {
-        errors: [{ code: "LIST_FAILED", message }],
-        totals: {
-          total: 0,
-          successful: 0,
-          failed: 1,
-          skipped: 0,
-          warnings: 0,
-          duration: this.getDuration(context),
-        },
-      });
+      return CommandResultBuilder.fromError("list", error instanceof Error ? error : new Error(message));
     }
   }
 

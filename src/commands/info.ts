@@ -1,10 +1,12 @@
 /**
  * Info Command - Show detailed extension information
  * Enhanced from versions.ts with richer extension details
+ * Integration Phase: Now uses CommandResultBuilder
  */
 
 import { BaseCommand } from "./base/BaseCommand";
 import type { CommandResult, CommandHelp, GlobalOptions } from "./base/types";
+import { CommandResultBuilder } from "../core/output/CommandResultBuilder";
 import { fetchExtensionVersions } from "../core/registry";
 import { ui, promptPolicy } from "../core/ui";
 
@@ -21,6 +23,7 @@ export interface InfoOptions extends GlobalOptions {
  */
 export class InfoCommand extends BaseCommand {
   async execute(args: string[], options: GlobalOptions): Promise<CommandResult> {
+    const builder = new CommandResultBuilder("info");
     const context = this.createContext(options);
     const infoOptions = options as InfoOptions;
 
@@ -48,17 +51,7 @@ export class InfoCommand extends BaseCommand {
 
       if (versions.length === 0) {
         ui.log.warning("No versions found for this extension");
-        return this.createSuccessResult("No versions found", {
-          items: [],
-          totals: {
-            total: 0,
-            successful: 0,
-            failed: 0,
-            skipped: 0,
-            warnings: 0,
-            duration: this.getDuration(context),
-          },
-        });
+        return builder.setSummary("No versions found").build();
       }
 
       // Determine how many versions to show
@@ -81,39 +74,18 @@ export class InfoCommand extends BaseCommand {
         this.displayExtensionInfo(extensionId, mappedAll, mappedToShow, infoOptions);
       }
 
-      // Create result
-      const items = versionsToShow.map((v) => ({
-        id: extensionId,
-        version: v.version,
-        status: "success" as const,
-        duration: 0,
-        details: {
-          published: v.published,
-        },
-      }));
+      // Add versions to builder
+      versionsToShow.forEach((v) => {
+        builder.addSuccess({
+          id: extensionId,
+          name: extensionId,
+          version: v.version,
+        });
+      });
 
       ui.outro(`Found ${versions.length} version(s)`);
 
-      return {
-        status: "ok",
-        command: "info",
-        summary: `Found ${versions.length} versions`,
-        items,
-        totals: {
-          total: 0,
-          successful: versions.length,
-          failed: 0,
-          skipped: 0,
-          warnings: 0,
-          duration: this.getDuration(context),
-        },
-        metadata: {
-          extensionId,
-          totalVersions: versions.length,
-          latestVersion: versions[0].version,
-          latestPreRelease: undefined, // ExtensionVersionInfo doesn't have isPreRelease
-        },
-      };
+      return builder.setSummary(`Found ${versions.length} versions`).build();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 
@@ -121,17 +93,7 @@ export class InfoCommand extends BaseCommand {
         ui.log.error(message);
       }
 
-      return this.createErrorResult(message, {
-        errors: [{ code: "INFO_FAILED", message }],
-        totals: {
-          total: 0,
-          successful: 0,
-          failed: 1,
-          skipped: 0,
-          warnings: 0,
-          duration: this.getDuration(context),
-        },
-      });
+      return CommandResultBuilder.fromError("info", error instanceof Error ? error : new Error(message));
     }
   }
 

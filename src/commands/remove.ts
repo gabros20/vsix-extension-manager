@@ -1,10 +1,12 @@
 /**
  * Remove Command - Uninstall extensions with enhanced backup
  * Refactored from uninstallExtensions.ts with automatic backup integration
+ * Integration Phase: Now uses CommandResultBuilder
  */
 
 import { BaseCommand } from "./base/BaseCommand";
 import type { CommandResult, CommandHelp, GlobalOptions } from "./base/types";
+import { CommandResultBuilder } from "../core/output/CommandResultBuilder";
 import { getUninstallExtensionsService } from "../features/uninstall";
 import { getEditorService } from "../features/install";
 import { getInstalledExtensions } from "../features/export";
@@ -23,6 +25,7 @@ export interface RemoveOptions extends GlobalOptions {
  */
 export class RemoveCommand extends BaseCommand {
   async execute(args: string[], options: GlobalOptions): Promise<CommandResult> {
+    const builder = new CommandResultBuilder("remove");
     const context = this.createContext(options);
     const removeOptions = options as RemoveOptions;
 
@@ -34,16 +37,7 @@ export class RemoveCommand extends BaseCommand {
 
       if (extensionIds.length === 0) {
         ui.log.info("No extensions selected for removal");
-        return this.createSuccessResult("No extensions removed", {
-          totals: {
-            total: 0,
-            successful: 0,
-            failed: 0,
-            skipped: 0,
-            warnings: 0,
-            duration: this.getDuration(context),
-          },
-        });
+        return builder.setSummary("No extensions removed").build();
       }
 
       // Get editor info
@@ -111,34 +105,35 @@ export class RemoveCommand extends BaseCommand {
         spinner.stop("Removal complete");
       }
 
-      // Format results
-      const items = result.results.map((r: any) => ({
-        id: r.extensionId,
-        status: r.success ? ("success" as const) : ("failed" as const),
-        duration: r.elapsedMs || 0,
-      }));
-
-      const errors = result.results
-        .filter((r: any) => !r.success)
-        .map((r: any) => ({
-          code: "UNINSTALL_FAILED",
-          message: r.error || "Unknown error",
-          item: r.extensionId,
-        }));
+      // Add results to builder
+      result.results.forEach((r: any) => {
+        if (r.success) {
+          builder.addSuccess({
+            id: r.extensionId,
+            name: r.extensionId,
+          });
+        } else {
+          builder.addFailure({
+            id: r.extensionId,
+            name: r.extensionId,
+          });
+          builder.addError({
+            code: "UNINSTALL_FAILED",
+            message: r.error || "Unknown error",
+            item: r.extensionId,
+          });
+        }
+      });
 
       // Show summary in interactive mode
       if (promptPolicy.isInteractive(options)) {
-        ui.showResultSummary({
-          total: 0,
-          successful: result.uninstalled,
-          failed: result.failed,
-          skipped: 0,
-          warnings: 0,
-          duration: this.getDuration(context),
-        });
+        const builtResult = builder.build();
+        if (builtResult.totals) {
+          ui.showResultSummary(builtResult.totals);
+        }
 
-        if (errors.length > 0) {
-          ui.note(errors.map((e) => `❌ ${e.item}: ${e.message}`).join("\n"), "Failed Removals");
+        if (builtResult.errors && builtResult.errors.length > 0) {
+          ui.note(builtResult.errors.map((e) => `❌ ${e.item}: ${e.message}`).join("\n"), "Failed Removals");
         }
       }
 
@@ -149,21 +144,7 @@ export class RemoveCommand extends BaseCommand {
           : `⚠️  Removed ${result.uninstalled} of ${extensionIds.length} extension(s)`,
       );
 
-      return {
-        status: allSucceeded ? "ok" : "error",
-        command: "remove",
-        summary: `Removed ${result.uninstalled} of ${extensionIds.length} extensions`,
-        items,
-        errors,
-        totals: {
-          total: 0,
-          successful: result.uninstalled,
-          failed: result.failed,
-          skipped: 0,
-          warnings: 0,
-          duration: this.getDuration(context),
-        },
-      };
+      return builder.setSummary(`Removed ${result.uninstalled} of ${extensionIds.length} extensions`).build();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 
@@ -171,17 +152,7 @@ export class RemoveCommand extends BaseCommand {
         ui.log.error(message);
       }
 
-      return this.createErrorResult(message, {
-        errors: [{ code: "REMOVE_FAILED", message }],
-        totals: {
-          total: 0,
-          successful: 0,
-          failed: 1,
-          skipped: 0,
-          warnings: 0,
-          duration: this.getDuration(context),
-        },
-      });
+      return CommandResultBuilder.fromError("remove", error instanceof Error ? error : new Error(message));
     }
   }
 

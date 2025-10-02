@@ -1,10 +1,12 @@
 /**
  * Update Command - Update installed extensions with smart rollback
  * Refactored from updateInstalled.ts with integrated backup/rollback
+ * Integration Phase: Now uses CommandResultBuilder
  */
 
 import { BaseCommand } from "./base/BaseCommand";
 import type { CommandResult, CommandHelp, GlobalOptions } from "./base/types";
+import { CommandResultBuilder } from "../core/output/CommandResultBuilder";
 import { getUpdateInstalledService } from "../features/update";
 import { getEditorService } from "../features/install";
 import { getInstalledExtensions } from "../features/export";
@@ -24,6 +26,7 @@ export interface UpdateOptions extends GlobalOptions {
  */
 export class UpdateCommand extends BaseCommand {
   async execute(args: string[], options: GlobalOptions): Promise<CommandResult> {
+    const builder = new CommandResultBuilder("update");
     const context = this.createContext(options);
     const updateOptions = options as UpdateOptions;
 
@@ -66,16 +69,7 @@ export class UpdateCommand extends BaseCommand {
 
       if (extensionIds.length === 0) {
         ui.log.info("No extensions selected for update");
-        return this.createSuccessResult("No extensions updated", {
-          totals: {
-            total: 0,
-            successful: 0,
-            failed: 0,
-            skipped: 0,
-            warnings: 0,
-            duration: this.getDuration(context),
-          },
-        });
+        return builder.setSummary("No extensions updated").build();
       }
 
       // Show what will be updated
@@ -119,30 +113,27 @@ export class UpdateCommand extends BaseCommand {
         spinner.stop("Update check complete");
       }
 
-      // Format results using UpdateSummary structure
-      const items = result.items.map((item: any) => ({
-        id: item.id,
-        version: item.targetVersion || item.currentVersion,
-        status:
-          item.status === "updated"
-            ? ("success" as const)
-            : item.status === "up-to-date" || item.status === "skipped"
-              ? ("skipped" as const)
-              : ("failed" as const),
-        duration: item.elapsedMs || 0,
-        details: {
-          oldVersion: item.currentVersion,
-          newVersion: item.targetVersion,
-        },
-      }));
+      // Add results to builder
+      result.items.forEach((item: any) => {
+        const itemData = {
+          id: item.id,
+          name: item.id,
+          version: item.targetVersion || item.currentVersion,
+        };
 
-      const errors = result.items
-        .filter((item: any) => item.status === "failed")
-        .map((item: any) => ({
-          code: "UPDATE_FAILED",
-          message: item.error || "Update failed",
-          item: item.id,
-        }));
+        if (item.status === "updated") {
+          builder.addSuccess(itemData);
+        } else if (item.status === "failed") {
+          builder.addFailure(itemData);
+          builder.addError({
+            code: "UPDATE_FAILED",
+            message: item.error || "Update failed",
+            item: item.id,
+          });
+        } else if (item.status === "up-to-date" || item.status === "skipped") {
+          builder.addSkipped(itemData);
+        }
+      });
 
       // Show summary
       if (promptPolicy.isInteractive(options)) {
@@ -158,17 +149,13 @@ export class UpdateCommand extends BaseCommand {
           ui.log.error(`❌ Failed ${result.failed} extension(s)`);
         }
 
-        ui.showResultSummary({
-          total: 0,
-          successful: result.updated,
-          failed: result.failed,
-          skipped: result.skipped,
-          warnings: 0,
-          duration: this.getDuration(context),
-        });
+        const builtResult = builder.build();
+        if (builtResult.totals) {
+          ui.showResultSummary(builtResult.totals);
+        }
 
-        if (errors.length > 0) {
-          ui.note(errors.map((e) => `❌ ${e.item}: ${e.message}`).join("\n"), "Failed Updates");
+        if (builtResult.errors && builtResult.errors.length > 0) {
+          ui.note(builtResult.errors.map((e) => `❌ ${e.item}: ${e.message}`).join("\n"), "Failed Updates");
         }
 
         // Show backup IDs if created
@@ -189,33 +176,15 @@ export class UpdateCommand extends BaseCommand {
           : `⚠️  Update incomplete: ${result.updated} updated, ${result.failed} failed`,
       );
 
-      return {
-        status: allSucceeded ? "ok" : "error",
-        command: "update",
-        summary: `Updated ${result.updated} of ${extensionIds.length} extensions`,
-        items,
-        errors,
-        warnings:
-          result.skipped > 0
-            ? [
-                {
-                  code: "SKIPPED",
-                  message: `${result.skipped} extensions skipped (already up-to-date)`,
-                },
-              ]
-            : [],
-        totals: {
-          total: 0,
-          successful: result.updated,
-          failed: result.failed,
-          skipped: result.skipped,
-          warnings: 0,
-          duration: this.getDuration(context),
-        },
-        metadata: {
-          backupIds: result.backups.map((b: any) => b.backupId),
-        },
-      };
+      // Add warnings if any skipped
+      if (result.skipped > 0) {
+        builder.addWarningItem({
+          code: "SKIPPED",
+          message: `${result.skipped} extensions skipped (already up-to-date)`,
+        });
+      }
+
+      return builder.setSummary(`Updated ${result.updated} of ${extensionIds.length} extensions`).build();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 
@@ -223,17 +192,7 @@ export class UpdateCommand extends BaseCommand {
         ui.log.error(message);
       }
 
-      return this.createErrorResult(message, {
-        errors: [{ code: "UPDATE_FAILED", message }],
-        totals: {
-          total: 0,
-          successful: 0,
-          failed: 1,
-          skipped: 0,
-          warnings: 0,
-          duration: this.getDuration(context),
-        },
-      });
+      return CommandResultBuilder.fromError("update", error instanceof Error ? error : new Error(message));
     }
   }
 
