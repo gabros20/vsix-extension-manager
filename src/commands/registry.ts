@@ -22,6 +22,7 @@ export const COMMANDS: Record<string, CommandLoader> = {
   list: async () => await import("./list"),
   info: async () => await import("./info"),
   doctor: async () => await import("./doctor"),
+  setup: async () => await import("./setup"),
 
   // Core commands (to be implemented)
   // search: async () => await import("./search"),
