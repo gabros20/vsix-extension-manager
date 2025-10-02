@@ -4,4 +4,5 @@
  */
 
 export { PlanGenerator, planGenerator } from "./planGenerator";
+export { PlanDisplay, planDisplay } from "./planDisplay";
 export * from "./types";
