@@ -47,7 +47,7 @@ export class InfoCommand extends BaseCommand {
       }
 
       if (versions.length === 0) {
-        ui.log.warn("No versions found for this extension");
+        ui.log.warning("No versions found for this extension");
         return this.createSuccessResult("No versions found", {
           items: [],
           totals: {
@@ -63,9 +63,16 @@ export class InfoCommand extends BaseCommand {
       const limit = infoOptions.limit || (infoOptions.all ? versions.length : 10);
       const versionsToShow = versions.slice(0, limit);
 
+      // Map to ensure compatible types
+      const mappedVersions = versionsToShow.map((v: any) => ({
+        version: v.version,
+        isPreRelease: v.flags?.includes("preview") || false,
+        lastUpdated: v.lastUpdated,
+      }));
+
       // Show information in interactive mode
       if (promptPolicy.isInteractive(options)) {
-        this.displayExtensionInfo(extensionId, versions, versionsToShow, infoOptions);
+        this.displayExtensionInfo(extensionId, versions, mappedVersions, infoOptions);
       }
 
       // Create result

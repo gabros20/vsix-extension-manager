@@ -157,12 +157,11 @@ export class AddExecutor {
           items: [
             {
               id: parseExtensionUrl(url).itemName,
-              version: downloadResult.version,
+              version: downloadResult.resolvedVersion,
               status: "success",
               duration: Date.now() - startTime,
               details: {
                 path: downloadedPath,
-                size: downloadResult.size,
               },
             },
           ],
@@ -190,7 +189,7 @@ export class AddExecutor {
         items: [
           {
             id: parseExtensionUrl(url).itemName,
-            version: downloadResult.version,
+            version: downloadResult.resolvedVersion,
             status: installResult.success ? "success" : "failed",
             duration: Date.now() - startTime,
           },
@@ -340,28 +339,28 @@ export class AddExecutor {
     const installService = getInstallService();
     const editorInfo = await this.resolveEditor(options);
 
-    const results = await installService.installVsixFiles(
-      editorInfo.binaryPath,
-      scanResult.validVsixFiles.map((f) => f.path),
-      {
-        parallel: options.parallel || 1,
-        skipInstalled: options.skipInstalled,
-        forceReinstall: options.force,
-        timeout: options.timeout || 30000,
-        dryRun: options.dryRun,
-      },
-    );
+    const tasks = scanResult.validVsixFiles.map((f) => ({
+      vsixPath: f.path,
+      skipIfInstalled: options.skipInstalled || false,
+      forceReinstall: options.force || false,
+    }));
+
+    const results = await installService.installBulkVsix(editorInfo.binaryPath, tasks, {
+      parallel: options.parallel || 1,
+      timeout: options.timeout || 30000,
+      dryRun: options.dryRun || false,
+    });
 
     return {
       status: "ok",
       command: "add",
       summary: `Installed ${results.successful.length} of ${scanResult.validVsixFiles.length} extensions`,
-      items: results.results.map((r) => ({
+      items: results.results.map((r: any) => ({
         id: path.basename(r.vsixPath),
         status: r.success ? ("success" as const) : ("failed" as const),
         duration: r.duration || 0,
       })),
-      errors: results.failed.map((r) => ({
+      errors: results.failed.map((r: any) => ({
         code: "INSTALL_FAILED",
         message: r.error || "Unknown error",
         item: path.basename(r.vsixPath),
@@ -387,8 +386,8 @@ export class AddExecutor {
     const installFromListService = getInstallFromListService();
     const editorInfo = await this.resolveEditor(options);
 
-    const installOptions: InstallFromListOptions = {
-      listFilePath: listPath,
+    const installOptions: any = {
+      // Note: InstallFromListService.installFromList takes different params
       binaryPath: editorInfo.binaryPath,
       downloadDir: options.output || "./downloads",
       downloadOnly: options.downloadOnly,
@@ -406,7 +405,24 @@ export class AddExecutor {
       json: options.json,
     };
 
-    const result = await installFromListService.execute(installOptions);
+    // Call installFromList with proper parameters
+    const result = await installFromListService.installFromList(
+      editorInfo.binaryPath,
+      listPath,
+      [options.output || "./downloads"],
+      {
+        downloadMissing: !options.downloadOnly,
+        skipInstalled: options.skipInstalled || false,
+        checkCompatibility: options.checkCompat !== false,
+        parallel: options.parallel || 3,
+        installParallel: 1,
+        installTimeout: options.timeout || 30000,
+        installRetry: options.retry || 2,
+        source: options.source as any,
+        preRelease: options.preRelease || false,
+        dryRun: options.dryRun || false,
+      },
+    );
 
     return {
       status: "ok",
@@ -415,7 +431,7 @@ export class AddExecutor {
         ? `Downloaded ${result.downloadResult.successCount} extensions`
         : `Installed ${result.installResult?.successCount || 0} extensions`,
       items: result.extensions.map((ext) => ({
-        id: ext.id,
+        id: (ext as any).id,
         version: ext.version,
         status: ext.downloaded
           ? options.downloadOnly

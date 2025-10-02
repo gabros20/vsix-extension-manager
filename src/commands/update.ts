@@ -102,15 +102,11 @@ export class UpdateCommand extends BaseCommand {
       // Execute update
       const updateService = getUpdateInstalledService();
       const result = await updateService.updateInstalled({
-        editor: chosenEditor,
-        extensionIds,
-        downloadDir: options.output || "./downloads",
-        checkCompatibility: updateOptions.checkCompat !== false,
+        editor: chosenEditor as any,
+        selectedExtensions: extensionIds,
         parallel: options.parallel || 1,
-        installParallel: 1,
-        installTimeout: options.timeout || 30000,
-        installRetry: options.retry || 2,
-        source: options.source,
+        retry: options.retry || 2,
+        source: options.source as any,
         preRelease: options.preRelease,
         dryRun: options.dryRun,
         quiet: options.quiet,
@@ -121,49 +117,49 @@ export class UpdateCommand extends BaseCommand {
         spinner.stop("Update check complete");
       }
 
-      // Format results
-      const items = result.extensions.map((ext) => ({
-        id: ext.id,
-        version: ext.newVersion || ext.currentVersion,
-        status: ext.updated
-          ? ("success" as const)
-          : ext.skipped
-            ? ("skipped" as const)
-            : ("failed" as const),
-        duration: 0,
+      // Format results using UpdateSummary structure
+      const items = result.items.map((item: any) => ({
+        id: item.id,
+        version: item.targetVersion || item.currentVersion,
+        status:
+          item.status === "updated"
+            ? ("success" as const)
+            : item.status === "up-to-date" || item.status === "skipped"
+              ? ("skipped" as const)
+              : ("failed" as const),
+        duration: item.elapsedMs || 0,
         details: {
-          oldVersion: ext.currentVersion,
-          newVersion: ext.newVersion,
-          updateAvailable: ext.updateAvailable,
+          oldVersion: item.currentVersion,
+          newVersion: item.targetVersion,
         },
       }));
 
-      const errors = result.extensions
-        .filter((ext) => !ext.updated && !ext.skipped)
-        .map((ext) => ({
+      const errors = result.items
+        .filter((item: any) => item.status === "failed")
+        .map((item: any) => ({
           code: "UPDATE_FAILED",
-          message: ext.error || "Update failed",
-          item: ext.id,
+          message: item.error || "Update failed",
+          item: item.id,
         }));
 
       // Show summary
       if (promptPolicy.isInteractive(options)) {
-        if (result.updatedCount > 0) {
-          ui.log.success(`✅ Updated ${result.updatedCount} extension(s)`);
+        if (result.updated > 0) {
+          ui.log.success(`✅ Updated ${result.updated} extension(s)`);
         }
 
-        if (result.skippedCount > 0) {
-          ui.log.info(`⏭️  Skipped ${result.skippedCount} extension(s) (already up-to-date)`);
+        if (result.skipped > 0) {
+          ui.log.info(`⏭️  Skipped ${result.skipped} extension(s) (already up-to-date)`);
         }
 
-        if (result.failedCount > 0) {
-          ui.log.error(`❌ Failed ${result.failedCount} extension(s)`);
+        if (result.failed > 0) {
+          ui.log.error(`❌ Failed ${result.failed} extension(s)`);
         }
 
         ui.showResultSummary({
-          success: result.updatedCount,
-          failed: result.failedCount,
-          skipped: result.skippedCount,
+          success: result.updated,
+          failed: result.failed,
+          skipped: result.skipped,
           duration: this.getDuration(context),
         });
 
@@ -171,41 +167,47 @@ export class UpdateCommand extends BaseCommand {
           ui.note(errors.map((e) => `❌ ${e.item}: ${e.message}`).join("\n"), "Failed Updates");
         }
 
-        // Show backup ID if created
-        if (result.backupId) {
+        // Show backup IDs if created
+        if (result.backups && result.backups.length > 0) {
+          const backupId = result.backups[0].backupId;
           ui.note(
-            `Backup created: ${result.backupId}\n` +
-              `Rollback with: vsix rollback --backup-id ${result.backupId}`,
+            `Backup created: ${backupId}\n` +
+              `Rollback with: vsix rollback --backup-id ${backupId}`,
             "💾 Backup Info",
           );
         }
       }
 
-      const allSucceeded = result.failedCount === 0;
+      const allSucceeded = result.failed === 0;
       ui.outro(
         allSucceeded
-          ? `✅ Update complete: ${result.updatedCount} updated, ${result.skippedCount} skipped`
-          : `⚠️  Update incomplete: ${result.updatedCount} updated, ${result.failedCount} failed`,
+          ? `✅ Update complete: ${result.updated} updated, ${result.skipped} skipped`
+          : `⚠️  Update incomplete: ${result.updated} updated, ${result.failed} failed`,
       );
 
       return {
         status: allSucceeded ? "ok" : "error",
         command: "update",
-        summary: `Updated ${result.updatedCount} of ${extensionIds.length} extensions`,
+        summary: `Updated ${result.updated} of ${extensionIds.length} extensions`,
         items,
         errors,
         warnings:
-          result.skippedCount > 0
-            ? [`${result.skippedCount} extensions skipped (already up-to-date)`]
+          result.skipped > 0
+            ? [
+                {
+                  code: "SKIPPED",
+                  message: `${result.skipped} extensions skipped (already up-to-date)`,
+                },
+              ]
             : [],
         totals: {
-          success: result.updatedCount,
-          failed: result.failedCount,
-          skipped: result.skippedCount,
+          success: result.updated,
+          failed: result.failed,
+          skipped: result.skipped,
           duration: this.getDuration(context),
         },
         metadata: {
-          backupId: result.backupId,
+          backupIds: result.backups.map((b: any) => b.backupId),
         },
       };
     } catch (error) {

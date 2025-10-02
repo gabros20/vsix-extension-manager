@@ -96,11 +96,10 @@ export class RemoveCommand extends BaseCommand {
 
       // Execute removal
       const uninstallService = getUninstallExtensionsService();
-      const result = await uninstallService.uninstall({
-        extensionIds,
-        editor: chosenEditor,
+      const result = await uninstallService.uninstallExtensions({
+        selectedExtensions: extensionIds,
+        editor: chosenEditor as any,
         parallel: options.parallel || 2,
-        timeout: options.timeout || 30000,
         retry: options.retry || 1,
         retryDelay: options.retryDelay || 1000,
         dryRun: options.dryRun,
@@ -111,15 +110,15 @@ export class RemoveCommand extends BaseCommand {
       }
 
       // Format results
-      const items = result.results.map((r) => ({
+      const items = result.results.map((r: any) => ({
         id: r.extensionId,
         status: r.success ? ("success" as const) : ("failed" as const),
-        duration: r.duration || 0,
+        duration: r.elapsedMs || 0,
       }));
 
       const errors = result.results
-        .filter((r) => !r.success)
-        .map((r) => ({
+        .filter((r: any) => !r.success)
+        .map((r: any) => ({
           code: "UNINSTALL_FAILED",
           message: r.error || "Unknown error",
           item: r.extensionId,

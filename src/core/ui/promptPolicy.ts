@@ -59,6 +59,7 @@ export class PromptPolicy {
       `${fieldName} is required but not provided.\n` +
         `In ${mode} mode, you must specify ${flagName} flag.\n` +
         `Example: ${context.command} ${flagName} <value>`,
+      "REQUIRED_INPUT",
     );
   }
 
@@ -106,6 +107,7 @@ export class PromptPolicy {
       throw new UserInputError(
         `Missing required options in ${mode} mode:\n${missingList}\n\n` +
           `These must be specified when running in non-interactive mode.`,
+        "REQUIRED_OPTIONS",
       );
     }
   }

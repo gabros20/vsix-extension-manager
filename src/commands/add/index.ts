@@ -22,6 +22,7 @@ export class AddCommand extends BaseCommand {
     if (args.length === 0) {
       throw new UserInputError(
         "No input provided. Expected URL, extension ID, file path, directory, or list file.",
+        "NO_INPUT",
       );
     }
 

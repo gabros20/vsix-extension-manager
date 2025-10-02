@@ -110,6 +110,7 @@ export class InputDetector {
         `  - Path to .vsix file\n` +
         `  - Path to directory with .vsix files\n` +
         `  - Path to extension list (.json or .txt)`,
+      "UNKNOWN_INPUT_TYPE",
     );
   }
 
