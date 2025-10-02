@@ -224,7 +224,7 @@ Quick Actions:
 
 From implementation plan:
 ```bash
-vsix search <query>
+vsix-extension-manager search <query>
 # Search marketplace for extensions
 ```
 
@@ -244,9 +244,9 @@ These are advanced features from the implementation plan that can be added in v2
 
 ### Workspace Management ⏳
 ```bash
-vsix workspace init
-vsix workspace install
-vsix workspace add <extension>
+vsix-extension-manager workspace init
+vsix-extension-manager workspace install
+vsix-extension-manager workspace add <extension>
 ```
 - Project-specific extension management
 - `.vsix/workspace.yml` configuration
@@ -257,8 +257,8 @@ vsix workspace add <extension>
 
 ### Template System ⏳
 ```bash
-vsix templates
-vsix templates use <template-id>
+vsix-extension-manager templates
+vsix-extension-manager templates use <template-id>
 ```
 - Curated extension packs
 - Bundled templates (web-frontend, python-data, etc.)

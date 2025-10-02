@@ -105,73 +105,73 @@ The `add` command is your one-stop solution for all extension operations:
 
 ```bash
 # Install from marketplace URL
-vsix add "https://marketplace.visualstudio.com/items?itemName=ms-python.python"
+vsix-extension-manager add "https://marketplace.visualstudio.com/items?itemName=ms-python.python"
 
 # Install by extension ID
-vsix add ms-python.python
+vsix-extension-manager add ms-python.python
 
 # Install from local VSIX file
-vsix add ./extension.vsix
+vsix-extension-manager add ./extension.vsix
 
 # Install all VSIX files from a directory
-vsix add ./downloads
+vsix-extension-manager add ./downloads
 
 # Install from extension list
-vsix add extensions.txt
+vsix-extension-manager add extensions.txt
 
 # Download only (no install)
-vsix add ms-python.python --download-only
+vsix-extension-manager add ms-python.python --download-only
 
 # Specify editor explicitly
-vsix add ms-python.python --editor cursor
+vsix-extension-manager add ms-python.python --editor cursor
 
 # Silent mode for CI/CD
-vsix add extensions.txt --quiet --json
+vsix-extension-manager add extensions.txt --quiet --json
 ```
 
 #### List & Manage Extensions
 
 ```bash
 # List installed extensions
-vsix list
+vsix-extension-manager list
 
 # Export to file
-vsix list --output my-extensions.txt
+vsix-extension-manager list --output my-extensions.txt
 
 # Export as JSON
-vsix list --format json --output extensions.json
+vsix-extension-manager list --format json --output extensions.json
 
 # Export as YAML
-vsix list --format yaml --output extensions.yml
+vsix-extension-manager list --format yaml --output extensions.yml
 
 # Detailed information
-vsix list --detailed
+vsix-extension-manager list --detailed
 ```
 
 #### Update Extensions
 
 ```bash
 # Update all extensions
-vsix update
+vsix-extension-manager update
 
 # Update specific extension
-vsix update ms-python.python
+vsix-extension-manager update ms-python.python
 
 # Check for updates without installing
-vsix update --dry-run
+vsix-extension-manager update --dry-run
 
 # Update with parallel downloads
-vsix update --parallel 5
+vsix-extension-manager update --parallel 5
 ```
 
 #### Health Check
 
 ```bash
 # Run health check
-vsix doctor
+vsix-extension-manager doctor
 
 # Auto-fix detected issues
-vsix doctor --fix
+vsix-extension-manager doctor --fix
 ```
 
 ### v2.0 Commands Reference
@@ -182,7 +182,7 @@ Smart command that automatically detects input type and executes the appropriate
 
 **Usage:**
 ```bash
-vsix add <input> [options]
+vsix-extension-manager add <input> [options]
 ```
 
 **Input Types** (automatically detected):
@@ -195,34 +195,34 @@ vsix add <input> [options]
 **Examples:**
 ```bash
 # From URL (auto-downloads and installs)
-vsix add "https://marketplace.visualstudio.com/items?itemName=ms-python.python"
+vsix-extension-manager add "https://marketplace.visualstudio.com/items?itemName=ms-python.python"
 
 # From extension ID (resolves latest version)
-vsix add ms-python.python
+vsix-extension-manager add ms-python.python
 
 # Pre-release version
-vsix add ms-python.python --pre-release
+vsix-extension-manager add ms-python.python --pre-release
 
 # From local file
-vsix add python-2024.1.0.vsix
+vsix-extension-manager add python-2024.1.0.vsix
 
 # From directory
-vsix add ./my-extensions
+vsix-extension-manager add ./my-extensions
 
 # From list (downloads missing, installs all)
-vsix add extensions.txt
+vsix-extension-manager add extensions.txt
 
 # Download only (no install)
-vsix add ms-python.python --download-only --output ./downloads
+vsix-extension-manager add ms-python.python --download-only --output ./downloads
 
 # Specific editor
-vsix add ms-python.python --editor cursor
+vsix-extension-manager add ms-python.python --editor cursor
 
 # Force reinstall
-vsix add ms-python.python --force
+vsix-extension-manager add ms-python.python --force
 
 # Multiple parallel downloads
-vsix add extensions.txt --parallel 5
+vsix-extension-manager add extensions.txt --parallel 5
 ```
 
 **Common Options:**
@@ -241,99 +241,99 @@ vsix add extensions.txt --parallel 5
 
 ```bash
 # Remove single extension
-vsix remove ms-python.python
+vsix-extension-manager remove ms-python.python
 
 # Remove multiple extensions
-vsix remove ms-python.python dbaeumer.vscode-eslint
+vsix-extension-manager remove ms-python.python dbaeumer.vscode-eslint
 
 # Remove all extensions (with confirmation)
-vsix remove --all
+vsix-extension-manager remove --all
 
 # Silent mode
-vsix remove ms-python.python --quiet --yes
+vsix-extension-manager remove ms-python.python --quiet --yes
 ```
 
 #### `update` - Update Extensions
 
 ```bash
 # Update all installed extensions
-vsix update
+vsix-extension-manager update
 
 # Update specific extensions
-vsix update ms-python.python
+vsix-extension-manager update ms-python.python
 
 # Include pre-release versions
-vsix update --pre-release
+vsix-extension-manager update --pre-release
 
 # Check for updates without installing
-vsix update --dry-run
+vsix-extension-manager update --dry-run
 
 # Parallel updates
-vsix update --parallel 3
+vsix-extension-manager update --parallel 3
 ```
 
 #### `list` - List Installed
 
 ```bash
 # List in table format (default)
-vsix list
+vsix-extension-manager list
 
 # Export to file
-vsix list --output extensions.txt
+vsix-extension-manager list --output extensions.txt
 
 # JSON format
-vsix list --format json --output extensions.json
+vsix-extension-manager list --format json --output extensions.json
 
 # YAML format
-vsix list --format yaml --output extensions.yml
+vsix-extension-manager list --format yaml --output extensions.yml
 
 # CSV format
-vsix list --format csv --output extensions.csv
+vsix-extension-manager list --format csv --output extensions.csv
 
 # Detailed information
-vsix list --detailed
+vsix-extension-manager list --detailed
 ```
 
 #### `info` - Extension Details
 
 ```bash
 # Show extension information
-vsix info ms-python.python
+vsix-extension-manager info ms-python.python
 
 # Show all available versions
-vsix info ms-python.python --all
+vsix-extension-manager info ms-python.python --all
 
 # Limit versions shown
-vsix info ms-python.python --limit 5
+vsix-extension-manager info ms-python.python --limit 5
 
 # JSON output
-vsix info ms-python.python --json
+vsix-extension-manager info ms-python.python --json
 ```
 
 #### `doctor` - Health Check
 
 ```bash
 # Run diagnostics
-vsix doctor
+vsix-extension-manager doctor
 
 # Auto-fix detected issues
-vsix doctor --fix
+vsix-extension-manager doctor --fix
 
 # JSON output for scripts
-vsix doctor --json
+vsix-extension-manager doctor --json
 ```
 
 #### `setup` - Configuration Wizard
 
 ```bash
 # Run interactive setup wizard
-vsix setup
+vsix-extension-manager setup
 
 # Quick setup with minimal prompts
-vsix setup --quick
+vsix-extension-manager setup --quick
 
 # Force reconfiguration
-vsix setup --force
+vsix-extension-manager setup --force
 ```
 
 #### `rollback` - Restore Backups
@@ -1410,7 +1410,7 @@ Switch between different configurations:
 
 ```bash
 # Use specific profile
-vsix add extensions.txt --profile development
+vsix-extension-manager add extensions.txt --profile development
 
 # Set active profile in config.yml
 active-profile: development
@@ -1425,7 +1425,7 @@ export VSIX_EDITOR=cursor
 export VSIX_PARALLEL_DOWNLOADS=5
 export VSIX_AUTO_BACKUP=true
 
-vsix add ms-python.python  # Uses environment settings
+vsix-extension-manager add ms-python.python  # Uses environment settings
 ```
 
 #### Precedence Rules
@@ -1446,7 +1446,7 @@ On first run, v2.0 automatically detects and migrates v1.x configuration files:
 
 ```bash
 # First run of v2.0
-vsix add ms-python.python
+vsix-extension-manager add ms-python.python
 
 # Output:
 ✅ Configuration migrated to v2.0 format
@@ -1458,15 +1458,15 @@ Old config is backed up as `.v1.backup`.
 
 | v1.x Command | v2.0 Command | Notes |
 |--------------|--------------|-------|
-| `download --url <url>` | `vsix add <url>` | Simplified |
-| `quick-install --url <url>` | `vsix add <url>` | Now default behavior |
-| `install --vsix <file>` | `vsix add <file>` | Auto-detects file |
-| `install --vsix-dir <dir>` | `vsix add <dir>` | Auto-detects directory |
-| `from-list --file <list>` | `vsix add <list>` | Auto-detects list |
-| `export-installed -o <file>` | `vsix list --output <file>` | Enhanced formats |
-| `update-installed` | `vsix update` | Simplified |
-| `uninstall <id>` | `vsix remove <id>` | Renamed |
-| `versions <id>` | `vsix info <id>` | Enhanced details |
+| `download --url <url>` | `vsix-extension-manager add <url>` | Simplified |
+| `quick-install --url <url>` | `vsix-extension-manager add <url>` | Now default behavior |
+| `install --vsix <file>` | `vsix-extension-manager add <file>` | Auto-detects file |
+| `install --vsix-dir <dir>` | `vsix-extension-manager add <dir>` | Auto-detects directory |
+| `from-list --file <list>` | `vsix-extension-manager add <list>` | Auto-detects list |
+| `export-installed -o <file>` | `vsix-extension-manager list --output <file>` | Enhanced formats |
+| `update-installed` | `vsix-extension-manager update` | Simplified |
+| `uninstall <id>` | `vsix-extension-manager remove <id>` | Renamed |
+| `versions <id>` | `vsix-extension-manager info <id>` | Enhanced details |
 
 #### Flag Migration
 
@@ -1488,37 +1488,37 @@ Old config is backed up as `.v1.backup`.
 # v1.x
 vsix-extension-manager download --url "https://..." --version latest
 # v2.0
-vsix add "https://..."
+vsix-extension-manager add "https://..."
 
 # v1.x
 vsix-extension-manager quick-install --url "..." --editor cursor
 # v2.0
-vsix add "..." --editor cursor
+vsix-extension-manager add "..." --editor cursor
 
 # v1.x
 vsix-extension-manager install --vsix ./extension.vsix
 # v2.0
-vsix add ./extension.vsix
+vsix-extension-manager add ./extension.vsix
 
 # v1.x
 vsix-extension-manager from-list --file extensions.txt --install-after
 # v2.0
-vsix add extensions.txt
+vsix-extension-manager add extensions.txt
 
 # v1.x
 vsix-extension-manager export-installed -o list.txt
 # v2.0
-vsix list --output list.txt
+vsix-extension-manager list --output list.txt
 
 # v1.x
 vsix-extension-manager update-installed
 # v2.0
-vsix update
+vsix-extension-manager update
 
 # v1.x
 vsix-extension-manager uninstall ms-python.python
 # v2.0
-vsix remove ms-python.python
+vsix-extension-manager remove ms-python.python
 ```
 
 For complete migration documentation, see [MIGRATION.md](./MIGRATION.md).

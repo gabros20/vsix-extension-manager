@@ -109,14 +109,14 @@ See [MIGRATION.md](./MIGRATION.md) for complete migration documentation.
 **Quick Reference:**
 ```bash
 # v1.x → v2.0 command mapping
-vsix-extension-manager download --url <url>           → vsix add <url>
-vsix-extension-manager quick-install --url <url>      → vsix add <url>
-vsix-extension-manager install --vsix <file>          → vsix add <file>
-vsix-extension-manager from-list --file <list>        → vsix add <list>
-vsix-extension-manager export-installed -o list.txt   → vsix list --output list.txt
-vsix-extension-manager update-installed               → vsix update
-vsix-extension-manager uninstall <id>                 → vsix remove <id>
-vsix-extension-manager versions <id>                  → vsix info <id>
+vsix-extension-manager download --url <url>           → vsix-extension-manager add <url>
+vsix-extension-manager quick-install --url <url>      → vsix-extension-manager add <url>
+vsix-extension-manager install --vsix <file>          → vsix-extension-manager add <file>
+vsix-extension-manager from-list --file <list>        → vsix-extension-manager add <list>
+vsix-extension-manager export-installed -o list.txt   → vsix-extension-manager list --output list.txt
+vsix-extension-manager update-installed               → vsix-extension-manager update
+vsix-extension-manager uninstall <id>                 → vsix-extension-manager remove <id>
+vsix-extension-manager versions <id>                  → vsix-extension-manager info <id>
 ```
 
 ---

@@ -494,9 +494,9 @@ Quick Tips:
   • Use arrow keys to navigate
   • Press Ctrl+C to cancel at any time
   • Tab completes file paths
-  • Run 'vsix <command> --help' for details
+  • Run 'vsix-extension-manager <command> --help' for details
 
-Documentation: https://github.com/...`,
+Documentation: https://github.com/gabros20/vsix-extension-manager`,
     "VSIX Extension Manager v2.0"
   );
 }

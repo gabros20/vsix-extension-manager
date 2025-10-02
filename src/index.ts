@@ -292,14 +292,16 @@ async function checkForUpdatesInBackground(): Promise<void> {
   try {
     const { UpdateChecker } = await import("./core/updates/UpdateChecker");
     const checker = new UpdateChecker();
-    
+
     // Check with weekly frequency (respects cache)
     const result = await checker.checkForUpdates("weekly");
-    
+
     // Only show notification if updates are available
     if (result.updates.length > 0) {
       console.log(""); // Empty line for spacing
-      console.log(`💡 ${result.updates.length} extension update${result.updates.length > 1 ? "s" : ""} available`);
+      console.log(
+        `💡 ${result.updates.length} extension update${result.updates.length > 1 ? "s" : ""} available`,
+      );
       console.log(`   Run 'vsix update' to review and install`);
       console.log(""); // Empty line for spacing
     }
@@ -314,38 +316,38 @@ async function checkForUpdatesInBackground(): Promise<void> {
     // ============================================================================
     // Startup: First-Run Detection (Clean Slate v2.0)
     // ============================================================================
-    
+
     // Check for first run and offer setup wizard
     // Only run if not executing setup command explicitly
     const args = process.argv.slice(2);
     const isSetupCommand = args.includes("setup");
     const isHelpFlag = args.includes("--help") || args.includes("-h");
     const isVersionFlag = args.includes("--version") || args.includes("-V");
-    
+
     if (!isSetupCommand && !isHelpFlag && !isVersionFlag) {
       const { handleFirstRun } = await import("./core/setup/firstRun");
-      
+
       // Get global options to check for quiet/json modes
       const globalOpts = program.opts();
       const quiet = globalOpts.quiet || args.includes("--quiet");
       const json = globalOpts.json || args.includes("--json");
-      
-      const ranWizard = await handleFirstRun({ 
+
+      const ranWizard = await handleFirstRun({
         skip: quiet || json,
         quiet: quiet || json,
       });
-      
+
       // If wizard ran, we might want to reload config
       // but for now we'll let each command load its own config
     }
-    
+
     // Background update check (non-blocking, fires and forgets)
     // Only check if not in quiet/json mode and not help/version
     if (!isHelpFlag && !isVersionFlag) {
       const globalOpts = program.opts();
       const quiet = globalOpts.quiet || args.includes("--quiet");
       const json = globalOpts.json || args.includes("--json");
-      
+
       if (!quiet && !json) {
         // Fire and forget - don't wait for update check
         checkForUpdatesInBackground().catch(() => {
@@ -353,11 +355,11 @@ async function checkForUpdatesInBackground(): Promise<void> {
         });
       }
     }
-    
+
     // ============================================================================
     // Command Registration
     // ============================================================================
-    
+
     // Core v2.0 commands
     await wireV2Command("add", ["get"]); // Universal entry point
     await wireV2Command("remove", ["rm"]); // Enhanced uninstall
@@ -378,7 +380,7 @@ async function checkForUpdatesInBackground(): Promise<void> {
     // ============================================================================
     // Parse & Execute
     // ============================================================================
-    
+
     // Parse arguments after all commands are registered
     await program.parseAsync();
   } catch (error) {

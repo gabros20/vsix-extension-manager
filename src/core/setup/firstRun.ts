@@ -44,7 +44,7 @@ export async function handleFirstRun(options: FirstRunOptions = {}): Promise<boo
   );
 
   if (!shouldSetup) {
-    ui.log.info("You can run setup later with: vsix setup");
+    ui.log.info("You can run setup later with: vsix-extension-manager setup");
     return false;
   }
 
@@ -63,16 +63,16 @@ export function showFirstRunHints(): void {
     `Quick start guide:
 
 1. Run setup wizard:
-   vsix setup
+   vsix-extension-manager setup
 
 2. Add an extension:
-   vsix add <url|id|file>
+   vsix-extension-manager add <url|id|file>
 
 3. List installed extensions:
-   vsix list
+   vsix-extension-manager list
 
 4. Get help:
-   vsix --help`,
+   vsix-extension-manager --help`,
     "Getting Started",
   );
 }

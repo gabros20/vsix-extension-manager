@@ -667,14 +667,14 @@ src/core/planning/
 
 ```bash
 # Automatically detects input type
-vsix add <url|id|file|directory|list>
+vsix-extension-manager add <url|id|file|directory|list>
 
 # Examples:
-vsix add https://marketplace.visualstudio.com/.../python
-vsix add ms-python.python
-vsix add ./extension.vsix
-vsix add ./downloads
-vsix add extensions.txt
+vsix-extension-manager add https://marketplace.visualstudio.com/.../python
+vsix-extension-manager add ms-python.python
+vsix-extension-manager add ./extension.vsix
+vsix-extension-manager add ./downloads
+vsix-extension-manager add extensions.txt
 
 # Flags:
 --download-only         # Download without installing
@@ -690,12 +690,12 @@ vsix add extensions.txt
 **✅ remove** - Uninstall extensions (enhanced from uninstall)
 
 ```bash
-vsix remove <extension-ids...>
+vsix-extension-manager remove <extension-ids...>
 
 # Examples:
-vsix remove ms-python.python
-vsix remove ms-python.python dbaeumer.vscode-eslint
-vsix remove --all
+vsix-extension-manager remove ms-python.python
+vsix-extension-manager remove ms-python.python dbaeumer.vscode-eslint
+vsix-extension-manager remove --all
 
 # Flags:
 --all                  # Remove all installed extensions
@@ -706,12 +706,12 @@ vsix remove --all
 **✅ update** - Update extensions (enhanced from update-installed)
 
 ```bash
-vsix update [extension-ids...]
+vsix-extension-manager update [extension-ids...]
 
 # Examples:
-vsix update                    # Update all (interactive)
-vsix update --all             # Update all (non-interactive)
-vsix update ms-python.python
+vsix-extension-manager update                    # Update all (interactive)
+vsix-extension-manager update --all             # Update all (non-interactive)
+vsix-extension-manager update ms-python.python
 
 # Flags:
 --all                  # Update all installed extensions
@@ -724,13 +724,13 @@ vsix update ms-python.python
 **✅ list** - List installed extensions (enhanced from export-installed)
 
 ```bash
-vsix list [options]
+vsix-extension-manager list [options]
 
 # Examples:
-vsix list
-vsix list --format json
-vsix list --format yaml --output extensions.yml
-vsix list --format csv --detailed
+vsix-extension-manager list
+vsix-extension-manager list --format json
+vsix-extension-manager list --format yaml --output extensions.yml
+vsix-extension-manager list --format csv --detailed
 
 # Formats:
 table  # Interactive display (default)
@@ -748,11 +748,11 @@ csv    # CSV format
 **✅ info** - Show extension details (enhanced from versions)
 
 ```bash
-vsix info <extension-id>
+vsix-extension-manager info <extension-id>
 
 # Examples:
-vsix info ms-python.python
-vsix info ms-python.python --all
+vsix-extension-manager info ms-python.python
+vsix-extension-manager info ms-python.python --all
 
 # Flags:
 --all                  # Show all available versions
@@ -771,8 +771,8 @@ vsix search <query>
 **🔜 doctor** - Health check and auto-fix
 
 ```bash
-vsix doctor
-vsix doctor --fix
+vsix-extension-manager doctor
+vsix-extension-manager doctor --fix
 ```
 
 **🔜 workspace** - Project-specific extensions (Phase 3)
@@ -865,11 +865,11 @@ vsix-extension-manager from-list --file <list>
 
 ```bash
 # One command for all input types
-vsix add <url>
-vsix add <file>
-vsix add <directory>
-vsix add <list>
-vsix add <extension-id>
+vsix-extension-manager add <url>
+vsix-extension-manager add <file>
+vsix-extension-manager add <directory>
+vsix-extension-manager add <list>
+vsix-extension-manager add <extension-id>
 ```
 
 ### Listing Extensions
@@ -884,10 +884,10 @@ vsix-extension-manager export-installed --format extensions.json
 **v2.0:**
 
 ```bash
-vsix list --output extensions.txt
-vsix list --format json --output extensions.json
-vsix list --format yaml --output extensions.yml
-vsix list --format csv --detailed
+vsix-extension-manager list --output extensions.txt
+vsix-extension-manager list --format json --output extensions.json
+vsix-extension-manager list --format yaml --output extensions.yml
+vsix-extension-manager list --format csv --detailed
 ```
 
 ### Updating Extensions
@@ -901,8 +901,8 @@ vsix-extension-manager update-installed --editor cursor
 **v2.0:**
 
 ```bash
-vsix update --editor cursor
-vsix update --all
+vsix-extension-manager update --editor cursor
+vsix-extension-manager update --all
 ```
 
 ### Removing Extensions
@@ -916,9 +916,9 @@ vsix-extension-manager uninstall --ids ms-python.python
 **v2.0:**
 
 ```bash
-vsix remove ms-python.python
-vsix remove ms-python.python dbaeumer.vscode-eslint
-vsix remove --all
+vsix-extension-manager remove ms-python.python
+vsix-extension-manager remove ms-python.python dbaeumer.vscode-eslint
+vsix-extension-manager remove --all
 ```
 
 ### Flag Migrations
