@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
-import { loadConfig, convertCliToConfig, type Config } from "./config/constants";
 import { initializeErrorHandler, handleErrorAndExit } from "./core/errors";
 import packageJson from "../package.json";
 import { outputFormatter } from "./core/output";
 import type { CommandResult, GlobalOptions } from "./commands/base/types";
 import type { BaseCommand } from "./commands/base/BaseCommand";
+import type { ConfigV2 } from "./config/constants";
 
 /**
  * Wrap v2.0 command action with CommandResult handling and output formatting
@@ -78,34 +78,7 @@ async function withV2CommandHandling(
   }
 }
 
-/**
- * Wrap command action with configuration loading and error handling
- * Legacy wrapper for v1.x commands (preserved during migration)
- */
-async function withConfigAndErrorHandling<T extends Record<string, unknown>>(
-  action: (config: Config, options: T) => Promise<void>,
-  options: T,
-): Promise<void> {
-  try {
-    // Get global config file path if set
-    const globalOpts = program.opts();
-    const configFilePath = globalOpts.config;
-
-    // Convert CLI options to config format
-    const cliConfig = convertCliToConfig(options);
-
-    // Load full configuration (CLI > ENV > FILE > DEFAULTS)
-    const config = await loadConfig(cliConfig, configFilePath);
-
-    // Update error handler with config settings
-    initializeErrorHandler(config.quiet, config.json);
-
-    // Execute command with loaded config
-    await action(config, options);
-  } catch (error) {
-    handleErrorAndExit(error instanceof Error ? error : new Error(String(error)));
-  }
-}
+// Legacy wrapper removed - v2.0 uses BaseCommand pattern for all commands
 
 const program = new Command();
 
@@ -163,34 +136,18 @@ program
 // Legacy v1.x commands have been removed. All functionality is now available
 // through the v2.0 command structure below.
 
-program
-  .command("rollback")
-  .description("Rollback extensions from backups")
-  .option("--extension-id <id>", "Extension ID to rollback")
-  .option("-e, --editor <editor>", "Filter by editor: vscode|cursor")
-  .option("--backup-id <id>", "Specific backup ID to restore")
-  .option("--latest", "Restore latest backup for the extension", false)
-  .option("--list", "List available backups", false)
-  .option("--force", "Force restore even if extension exists", false)
-  .option("--cleanup", "Clean up old backups", false)
-  .option("--keep-count <n>", "Number of backups to keep per extension (default: 3)")
-  .option("--quiet", "Reduce output", false)
-  .option("--json", "Machine-readable output", false)
-  .option("--backup-dir <path>", "Custom backup directory (default: ~/.vsix-backups)")
-  .action(async (opts) => {
-    await withConfigAndErrorHandling(async (config, options) => {
-      const { rollback } = await import("./commands/rollback");
-      // Don't merge config for rollback - it has different options
-      await rollback(options);
-    }, opts);
-  });
+// TODO: Convert rollback to BaseCommand pattern (currently disabled)
+// program
+//   .command("rollback")
+//   .description("Rollback extensions from backups")
+//   ... (temporarily commented out until conversion)
 
 // Default action when no command specified - show interactive menu
 program.action(async () => {
-  await withConfigAndErrorHandling(async (config) => {
-    const { runInteractive } = await import("./commands/interactive");
-    await runInteractive(config);
-  }, {});
+  // TODO: Implement proper v2.0 interactive mode
+  const { runInteractive } = await import("./commands/interactive");
+  const { DEFAULT_CONFIG_V2 } = await import("./config/constants");
+  await runInteractive(DEFAULT_CONFIG_V2);
 });
 
 // =============================================================================
@@ -355,18 +312,8 @@ async function checkForUpdatesInBackground(): Promise<void> {
 (async () => {
   try {
     // ============================================================================
-    // Startup: Config v2 Integration & First-Run Detection
+    // Startup: First-Run Detection (Clean Slate v2.0)
     // ============================================================================
-    
-    // Check for configuration migration (v1 → v2)
-    const { ConfigMigrator } = await import("./config/migrator");
-    const migrator = new ConfigMigrator();
-    const migrated = await migrator.autoMigrate();
-    
-    if (migrated) {
-      console.log("✅ Configuration migrated to v2.0 format");
-      console.log("");
-    }
     
     // Check for first run and offer setup wizard
     // Only run if not executing setup command explicitly

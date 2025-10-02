@@ -8,7 +8,13 @@ import * as path from "path";
 import * as yaml from "yaml";
 import { ConfigV2Schema, DEFAULT_CONFIG_V2, type ConfigV2, type PartialConfigV2 } from "./schemaV2";
 import { CONFIG_V2_FILE_NAMES, getConfigSearchPaths, ENV_VAR_MAP_V2 } from "./schemaV2";
-import { ConfigError } from "./loader"; // Reuse existing error class
+// ConfigError class definition (moved from deleted loader.ts)
+export class ConfigError extends Error {
+  constructor(message: string, public readonly cause?: Error, public readonly code?: string) {
+    super(message);
+    this.name = "ConfigError";
+  }
+}
 
 /**
  * Configuration loader for v2

@@ -1,5 +1,5 @@
 /**
- * Integration tests for configuration system
+ * Integration tests for configuration system (v2.0 - Clean Slate)
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
@@ -7,20 +7,17 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import * as os from "os";
 import { ConfigLoaderV2 } from "../../src/config/loaderV2";
-import { ConfigMigrator } from "../../src/config/migrator";
 import type { ConfigV2 } from "../../src/config/schemaV2";
 
-describe("Configuration System Integration", () => {
+describe("Configuration System Integration (v2.0)", () => {
   let testDir: string;
   let configLoader: ConfigLoaderV2;
-  let configMigrator: ConfigMigrator;
 
   beforeEach(async () => {
     testDir = path.join(os.tmpdir(), `vsix-test-${Date.now()}`);
     await fs.ensureDir(testDir);
 
     configLoader = new ConfigLoaderV2();
-    configMigrator = new ConfigMigrator();
   });
 
   afterEach(async () => {
@@ -85,35 +82,7 @@ active-profile: development
     });
   });
 
-  describe("Configuration Migration", () => {
-    it("should migrate v1 config to v2", async () => {
-      const v1Config = {
-        editor: "cursor",
-        parallel: 3,
-        skipInstalled: true,
-        checkCompatibility: true,
-      };
-
-      const v2Config = await configMigrator.migrateFromV1(v1Config as any);
-
-      expect(v2Config.editor.prefer).toBe("cursor");
-      expect(v2Config.performance.parallelDownloads).toBe(3);
-      expect(v2Config.behavior.skipInstalled).toBe("always");
-      expect(v2Config.safety.checkCompatibility).toBe(true);
-    });
-
-    it("should preserve unknown v1 settings in metadata", async () => {
-      const v1Config = {
-        editor: "cursor",
-        customSetting: "value",
-      };
-
-      const v2Config = await configMigrator.migrateFromV1(v1Config as any);
-
-      // Should have migrated successfully despite unknown settings
-      expect(v2Config.editor.prefer).toBe("cursor");
-    });
-  });
+  // Migration tests removed - v2.0 is a clean slate without v1.x compatibility
 
   describe("Profile System", () => {
     it("should switch profiles correctly", async () => {

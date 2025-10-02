@@ -1,7 +1,7 @@
 import * as p from "@clack/prompts";
-import type { Config } from "../config/constants";
+import type { ConfigV2 } from "../config/constants";
 
-export async function runInteractive(config: Config) {
+export async function runInteractive(config: ConfigV2) {
   console.clear();
   p.intro("🔽 VSIX Extension Manager v2.0");
 

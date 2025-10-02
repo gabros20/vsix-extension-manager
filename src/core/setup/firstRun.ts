@@ -77,13 +77,4 @@ export function showFirstRunHints(): void {
   );
 }
 
-/**
- * Check if configuration migration is needed
- */
-export async function checkMigrationNeeded(): Promise<boolean> {
-  const { configMigrator } = await import("../../config/migrator");
-
-  // This would check for v1 config files
-  // For now, just return false
-  return false;
-}
+// Migration code removed - v2.0 is a clean slate without v1.x compatibility
