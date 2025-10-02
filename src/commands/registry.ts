@@ -15,22 +15,24 @@ type CommandLoader = () => Promise<{ default: BaseCommand }>;
  * Commands are lazy-loaded on first use
  */
 export const COMMANDS: Record<string, CommandLoader> = {
+  // Core commands (implemented)
+  add: async () => await import("./add"),
+  remove: async () => await import("./remove"),
+  update: async () => await import("./update"),
+  list: async () => await import("./list"),
+  info: async () => await import("./info"),
+
   // Core commands (to be implemented)
-  add: async () => ({ default: (await import("./add")).AddCommand }),
-  remove: async () => ({ default: (await import("./remove")).RemoveCommand }),
-  update: async () => ({ default: (await import("./update")).UpdateCommand }),
-  list: async () => ({ default: (await import("./list")).ListCommand }),
-  search: async () => ({ default: (await import("./search")).SearchCommand }),
-  info: async () => ({ default: (await import("./info")).InfoCommand }),
-  doctor: async () => ({ default: (await import("./doctor")).DoctorCommand }),
+  search: async () => await import("./search"),
+  doctor: async () => await import("./doctor"),
 
-  // Specialized commands (to be implemented)
-  workspace: async () => ({ default: (await import("./workspace")).WorkspaceCommand }),
-  templates: async () => ({ default: (await import("./templates")).TemplatesCommand }),
+  // Specialized commands (to be implemented - Phase 3)
+  workspace: async () => await import("./workspace"),
+  templates: async () => await import("./templates"),
 
-  // Preserved commands
-  rollback: async () => ({ default: (await import("./rollback")).RollbackCommand }),
-  interactive: async () => ({ default: (await import("./interactive")).InteractiveCommand }),
+  // Preserved commands (to be integrated)
+  rollback: async () => await import("./rollback"),
+  interactive: async () => await import("./interactive"),
 };
 
 /**
