@@ -289,7 +289,10 @@ async function checkForUpdatesInBackground(): Promise<void> {
 
     // Background update check (non-blocking, fires and forgets)
     // Only check if not in quiet/json mode and not help/version
-    if (!isHelpFlag && !isVersionFlag) {
+    // Also skip if no command specified (interactive mode)
+    const hasCommand = args.length > 0 && !args[0].startsWith("-");
+    
+    if (!isHelpFlag && !isVersionFlag && hasCommand) {
       const globalOpts = program.opts();
       const quiet = globalOpts.quiet || args.includes("--quiet");
       const json = globalOpts.json || args.includes("--json");
