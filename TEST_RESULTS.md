@@ -101,7 +101,7 @@ if (!process.stdout.isTTY) {
 
 ## 📋 Test Coverage
 
-### Commands Tested
+### Commands Tested (Safe - Host System)
 - [x] `--version` - Version display
 - [x] `--help` - Help output
 - [x] `add --help` - Command-specific help
@@ -111,11 +111,15 @@ if (!process.stdout.isTTY) {
 - [x] `list --editor <name> --json` - JSON list
 - [x] `doctor` - Health check
 - [x] `doctor --json` - JSON diagnostics
-- [x] `add <id> --download-only` - Download mode
+- [x] `add <id> --download-only` - Download mode (single)
+- [x] `add <list> --download-only` - Batch download
+- [x] `add <id> --dry-run` - Dry-run mode
+- [x] `add <id> --plan` - Plan preview
+- [x] `update --dry-run` - Update simulation
 
-### Commands Not Yet Tested (Need Interactive TTY or Installation)
+### Commands Ready for Docker Testing (Need Installation)
 - [ ] `add <id>` - Real installation
-- [ ] `remove <id>` - Uninstallation
+- [ ] `remove <id>` - Uninstallation  
 - [ ] `update` - Update extensions
 - [ ] `setup` - Configuration wizard
 - [ ] `rollback` - Restore from backup
@@ -164,7 +168,14 @@ Use Docker container for isolated testing of:
 
 ## 📊 Summary
 
-**Safe Testing Status:** ✅ 9/9 tests passed
+**Safe Testing Status:** ✅ 14/14 tests passed
+
+**Additional Tests:**
+- ✅ Dry-run mode (add command)
+- ✅ Plan preview mode
+- ✅ Batch download from list
+- ✅ Update dry-run mode
+- ✅ Rollback list (no backups found - expected)
 
 **Bugs Found:** 1 (TTY error)  
 **Bugs Fixed:** 1 (TTY error)

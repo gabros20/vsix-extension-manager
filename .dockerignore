@@ -1,0 +1,16 @@
+# Don't copy these to Docker image
+node_modules
+dist
+downloads
+.git
+.vscode
+*.log
+*.md
+.env
+
+# Keep only essential files
+!package.json
+!package-lock.json
+!tsconfig.json
+!src
+!tests

@@ -1,0 +1,65 @@
+# Dockerfile for safe isolated testing of vsix-extension-manager
+# This creates a complete test environment with VS Code installed
+
+FROM ubuntu:22.04
+
+# Avoid prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install basic dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    gnupg2 \
+    software-properties-common \
+    apt-transport-https \
+    ca-certificates \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js 18.x
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g npm@latest
+
+# Install VS Code
+RUN wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg \
+    && install -o root -g root -m 644 microsoft.gpg /etc/apt/trusted.gpg.d/ \
+    && sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/code stable main" > /etc/apt/sources.list.d/vscode.list' \
+    && apt-get update \
+    && apt-get install -y code \
+    && rm -f microsoft.gpg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user for testing
+RUN useradd -m -s /bin/bash testuser && \
+    mkdir -p /home/testuser/.vscode/extensions && \
+    chown -R testuser:testuser /home/testuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files first (for better caching)
+COPY package*.json ./
+
+# Install dependencies as root
+RUN npm ci
+
+# Copy rest of application
+COPY . .
+
+# Build the project
+RUN npm run build
+
+# Change ownership to testuser
+RUN chown -R testuser:testuser /app
+
+# Switch to non-root user
+USER testuser
+
+# Set up VS Code for testuser
+RUN code --version || true
+
+# Default command - interactive bash
+CMD ["/bin/bash"]
