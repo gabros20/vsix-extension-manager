@@ -96,14 +96,6 @@ program
 // All commands are registered dynamically via wireV2Command() below
 // No manual command registration needed
 
-// Default action when no command specified - show interactive menu
-program.action(async () => {
-  // TODO: Implement proper v2.0 interactive mode
-  const { runInteractive } = await import("./commands/interactive");
-  const { DEFAULT_CONFIG_V2 } = await import("./config/constants");
-  await runInteractive(DEFAULT_CONFIG_V2);
-});
-
 // =============================================================================
 // v2.0 COMMAND STRUCTURE (New commands with smart routing)
 // =============================================================================
@@ -328,6 +320,14 @@ async function checkForUpdatesInBackground(): Promise<void> {
     // await wireV2Command('search');
     // await wireV2Command('workspace');
     // await wireV2Command('templates');
+
+    // Default action when no command specified - show interactive menu
+    // IMPORTANT: Must be set AFTER all commands are registered
+    program.action(async () => {
+      const { runInteractive } = await import("./commands/interactive");
+      const { DEFAULT_CONFIG_V2 } = await import("./config/constants");
+      await runInteractive(DEFAULT_CONFIG_V2);
+    });
 
     // ============================================================================
     // Parse & Execute
