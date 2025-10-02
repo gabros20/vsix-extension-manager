@@ -26,7 +26,6 @@ export interface RemoveOptions extends GlobalOptions {
 export class RemoveCommand extends BaseCommand {
   async execute(args: string[], options: GlobalOptions): Promise<CommandResult> {
     const builder = new CommandResultBuilder("remove");
-    const context = this.createContext(options);
     const removeOptions = options as RemoveOptions;
 
     ui.intro("🗑️  Remove Extensions");
@@ -106,7 +105,13 @@ export class RemoveCommand extends BaseCommand {
       }
 
       // Add results to builder
-      result.results.forEach((r: any) => {
+      interface UninstallResult {
+        success: boolean;
+        extensionId: string;
+        error?: string;
+      }
+      
+      result.results.forEach((r: UninstallResult) => {
         if (r.success) {
           builder.addSuccess({
             id: r.extensionId,

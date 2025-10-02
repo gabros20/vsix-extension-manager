@@ -13,7 +13,7 @@ import { loadCommand } from "./registry";
  */
 export async function runInteractive(_config: ConfigV2) {
   console.clear();
-  
+
   p.intro("🔽 VSIX Extension Manager v2.0");
 
   let shouldContinue = true;
@@ -74,7 +74,7 @@ export async function runInteractive(_config: ConfigV2) {
       }
     } catch (error) {
       p.log.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
-      
+
       const retry = await p.confirm({
         message: "Return to main menu?",
         initialValue: true,
@@ -291,9 +291,9 @@ async function handleDoctor() {
 
     if (result.status === "ok") {
       p.log.success(result.summary);
-      
+
       // Offer to auto-fix if issues found
-      if (result.items && result.items.some(item => item.status === "failed")) {
+      if (result.items && result.items.some((item) => item.status === "failed")) {
         const shouldFix = await p.confirm({
           message: "Would you like to auto-fix issues?",
           initialValue: true,
@@ -301,7 +301,7 @@ async function handleDoctor() {
 
         if (!p.isCancel(shouldFix) && shouldFix) {
           s.start("Applying fixes...");
-          
+
           // Run doctor with --fix flag
           const fixOptions: GlobalOptions = {
             quiet: false,
@@ -309,9 +309,9 @@ async function handleDoctor() {
             fix: true,
           };
           const fixResult = await doctorCommand.execute([], fixOptions);
-          
+
           s.stop("Done!");
-          
+
           if (fixResult.status === "ok") {
             p.log.success("Fixes applied successfully");
           } else {
@@ -511,6 +511,6 @@ Quick Tips:
   • Run 'vsix-extension-manager <command> --help' for details
 
 Documentation: https://github.com/gabros20/vsix-extension-manager`,
-    "VSIX Extension Manager v2.0"
+    "VSIX Extension Manager v2.0",
   );
 }

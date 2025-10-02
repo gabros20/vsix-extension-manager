@@ -3,10 +3,6 @@
 import { Command } from "commander";
 import { initializeErrorHandler, handleErrorAndExit } from "./core/errors";
 import packageJson from "../package.json";
-import { outputFormatter } from "./core/output";
-import type { CommandResult, GlobalOptions } from "./commands/base/types";
-import type { BaseCommand } from "./commands/base/BaseCommand";
-import type { ConfigV2 } from "./config/constants";
 
 const program = new Command();
 
@@ -179,7 +175,7 @@ async function checkForUpdatesInBackground(): Promise<void> {
       console.log(`   Run 'vsix update' to review and install`);
       console.log(""); // Empty line for spacing
     }
-  } catch (error) {
+  } catch {
     // Silently fail - don't interrupt user workflow
   }
 }
@@ -206,20 +202,17 @@ async function checkForUpdatesInBackground(): Promise<void> {
       const quiet = globalOpts.quiet || args.includes("--quiet");
       const json = globalOpts.json || args.includes("--json");
 
-      const ranWizard = await handleFirstRun({
+      await handleFirstRun({
         skip: quiet || json,
         quiet: quiet || json,
       });
-
-      // If wizard ran, we might want to reload config
-      // but for now we'll let each command load its own config
     }
 
     // Background update check (non-blocking, fires and forgets)
     // Only check if not in quiet/json mode and not help/version
     // Also skip if no command specified (interactive mode)
     const hasCommand = args.length > 0 && !args[0].startsWith("-");
-    
+
     if (!isHelpFlag && !isVersionFlag && hasCommand) {
       const globalOpts = program.opts();
       const quiet = globalOpts.quiet || args.includes("--quiet");

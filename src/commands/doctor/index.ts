@@ -23,7 +23,6 @@ export interface DoctorOptions extends GlobalOptions {
 class DoctorCommand extends BaseCommand {
   async execute(_args: string[], options: GlobalOptions): Promise<CommandResult> {
     const builder = new CommandResultBuilder("doctor");
-    const context = this.createContext(options);
     const doctorOptions = options as DoctorOptions;
 
     ui.intro("🏥 VSIX Extension Manager Health Check");

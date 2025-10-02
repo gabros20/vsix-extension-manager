@@ -92,7 +92,7 @@ class RollbackCommand extends BaseCommand {
     // Show in UI if interactive
     if (promptPolicy.isInteractive(options)) {
       ui.intro("📦 Available Backups");
-      
+
       for (const backup of backups) {
         const date = new Date(backup.timestamp);
         ui.log.info(

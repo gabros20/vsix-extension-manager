@@ -13,7 +13,6 @@ import type { DetectionResult } from "./inputDetector";
 import {
   downloadSingleExtension,
   type SingleDownloadRequest,
-  type SingleDownloadResult,
 } from "../../features/download";
 import {
   getEditorService,
@@ -22,6 +21,7 @@ import {
   getInstallFromListService,
   type EditorInfo,
   type ScanResult,
+  type InstallTaskResult,
 } from "../../features/install";
 import { FileExistsAction } from "../../core/filesystem";
 import type { EditorType, SourceRegistry } from "../../core/types";
@@ -126,7 +126,7 @@ export class AddExecutor {
       const downloadResult = await smartRetryService.executeWithRetry(
         {
           name: `Download ${extensionId}`,
-          run: async (context) => {
+          run: async () => {
             const request: SingleDownloadRequest = {
               url,
               requestedVersion: options.version || "latest",
@@ -179,7 +179,7 @@ export class AddExecutor {
       const installResult = await smartRetryService.executeWithRetry(
         {
           name: `Install ${extensionId}`,
-          run: async (context) => {
+          run: async () => {
             return await this.installSingleFile(downloadedPath, options);
           },
         },
@@ -265,7 +265,7 @@ export class AddExecutor {
     const installResult = await smartRetryService.executeWithRetry(
       {
         name: `Install ${fileName}`,
-        run: async (context) => {
+        run: async () => {
           return await this.installSingleFile(filePath, options);
         },
       },
@@ -342,21 +342,22 @@ export class AddExecutor {
     });
 
     // Add results to builder
-    (results.results || []).forEach((r: any) => {
+    (results.results || []).forEach((r: InstallTaskResult) => {
+      const vsixPath = r.task.vsixFile.path;
       if (r.success) {
         builder.addSuccess({
-          id: path.basename(r.vsixPath),
-          name: path.basename(r.vsixPath),
+          id: path.basename(vsixPath),
+          name: path.basename(vsixPath),
         });
       } else {
         builder.addFailure({
-          id: path.basename(r.vsixPath),
-          name: path.basename(r.vsixPath),
+          id: path.basename(vsixPath),
+          name: path.basename(vsixPath),
         });
         builder.addError({
           code: "INSTALL_FAILED",
           message: r.error || "Unknown error",
-          item: path.basename(r.vsixPath),
+          item: path.basename(vsixPath),
         });
       }
     });
@@ -387,7 +388,7 @@ export class AddExecutor {
         downloadMissing: !options.downloadOnly,
         downloadOptions: {
           parallel: options.parallel || 3,
-          source: options.source as any,
+          source: options.source || "auto",
           preRelease: options.preRelease || false,
         },
         installOptions: {
@@ -407,7 +408,6 @@ export class AddExecutor {
     const failed = options.downloadOnly
       ? result.downloadResult?.failed || 0
       : result.installResult?.failed || 0;
-    const skipped = result.installResult?.skipped || 0;
 
     // Add a single aggregate item to represent the batch operation
     if (successful > 0) {

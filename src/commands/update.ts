@@ -27,7 +27,6 @@ export interface UpdateOptions extends GlobalOptions {
 export class UpdateCommand extends BaseCommand {
   async execute(args: string[], options: GlobalOptions): Promise<CommandResult> {
     const builder = new CommandResultBuilder("update");
-    const context = this.createContext(options);
     const updateOptions = options as UpdateOptions;
 
     ui.intro("⬆️  Update Extensions");
@@ -114,7 +113,15 @@ export class UpdateCommand extends BaseCommand {
       }
 
       // Add results to builder
-      result.items.forEach((item: any) => {
+      interface UpdateItem {
+        id: string;
+        status: string;
+        targetVersion?: string;
+        currentVersion?: string;
+        error?: string;
+      }
+      
+      result.items.forEach((item: UpdateItem) => {
         const itemData = {
           id: item.id,
           name: item.id,
