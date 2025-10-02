@@ -26,6 +26,11 @@ export async function handleFirstRun(options: FirstRunOptions = {}): Promise<boo
     return false;
   }
 
+  // Skip if not running in TTY (piped output, scripts, etc.)
+  if (!process.stdout.isTTY) {
+    return false;
+  }
+
   // Check if this is first run
   const isFirstRun = await setupWizard.isFirstRun();
 
