@@ -4,9 +4,11 @@ This project uses semantic-release for fully automated versioning and publishing
 
 ## How it works
 
-1. Push Conventional Commits to `main` (feat, fix, perf, BREAKING CHANGE, etc.)
-2. CI builds and runs `semantic-release`
-3. semantic-release:
+1. Development happens on `dev` branch with feature branches
+2. When ready for release, create a release PR from `dev` to `main`
+3. Merge the release PR to `main`
+4. CI builds and runs `semantic-release`
+5. semantic-release:
    - Determines next version (no manual bumping)
    - Updates/creates `CHANGELOG.md`
    - Publishes to npm
@@ -21,7 +23,10 @@ This project uses semantic-release for fully automated versioning and publishing
 
 ## Usage
 
-- Just commit following Conventional Commits and push to `main`.
+- Develop on feature branches off `dev`
+- Merge feature branches to `dev`
+- When ready to release, create a PR from `dev` to `main`
+- Merge to `main` triggers the release
 - To run locally (diagnostics):
 
   ```bash

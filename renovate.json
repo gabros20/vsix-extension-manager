@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:base", "helpers:pinGitHubActionsDigests"],
+  "baseBranches": ["dev"],
   "schedule": ["on monday at 9am"],
   "timezone": "UTC",
   "prConcurrentLimit": 5,
