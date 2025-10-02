@@ -301,8 +301,22 @@ async function handleDoctor() {
 
         if (!p.isCancel(shouldFix) && shouldFix) {
           s.start("Applying fixes...");
-          // TODO: Run doctor with --fix flag
-          s.stop("Fixes applied!");
+          
+          // Run doctor with --fix flag
+          const fixOptions: GlobalOptions = {
+            quiet: false,
+            yes: false,
+            fix: true,
+          };
+          const fixResult = await doctorCommand.execute([], fixOptions);
+          
+          s.stop("Done!");
+          
+          if (fixResult.status === "ok") {
+            p.log.success("Fixes applied successfully");
+          } else {
+            p.log.error("Some fixes could not be applied");
+          }
         }
       }
     } else {

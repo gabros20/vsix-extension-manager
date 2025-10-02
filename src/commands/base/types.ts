@@ -57,6 +57,7 @@ export interface GlobalOptions {
   dryRun?: boolean;
   profile?: string;
   config?: string;
+  fix?: boolean; // For doctor command auto-fix
 }
 
 /**
