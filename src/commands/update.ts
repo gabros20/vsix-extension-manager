@@ -68,9 +68,11 @@ export class UpdateCommand extends BaseCommand {
         ui.log.info("No extensions selected for update");
         return this.createSuccessResult("No extensions updated", {
           totals: {
-            success: 0,
+        total: 0,
+            successful: 0,
             failed: 0,
             skipped: 0,
+        warnings: 0,
             duration: this.getDuration(context),
           },
         });
@@ -157,9 +159,11 @@ export class UpdateCommand extends BaseCommand {
         }
 
         ui.showResultSummary({
-          success: result.updated,
+        total: 0,
+          successful: result.updated,
           failed: result.failed,
           skipped: result.skipped,
+        warnings: 0,
           duration: this.getDuration(context),
         });
 
@@ -201,9 +205,11 @@ export class UpdateCommand extends BaseCommand {
               ]
             : [],
         totals: {
-          success: result.updated,
+        total: 0,
+          successful: result.updated,
           failed: result.failed,
           skipped: result.skipped,
+        warnings: 0,
           duration: this.getDuration(context),
         },
         metadata: {
@@ -220,9 +226,11 @@ export class UpdateCommand extends BaseCommand {
       return this.createErrorResult(message, {
         errors: [{ code: "UPDATE_FAILED", message }],
         totals: {
-          success: 0,
+        total: 0,
+          successful: 0,
           failed: 1,
           skipped: 0,
+        warnings: 0,
           duration: this.getDuration(context),
         },
       });

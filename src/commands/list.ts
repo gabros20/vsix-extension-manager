@@ -80,9 +80,11 @@ export class ListCommand extends BaseCommand {
         return this.createSuccessResult("No extensions found", {
           items: [],
           totals: {
-            success: 0,
+        total: 0,
+            successful: 0,
             failed: 0,
             skipped: 0,
+        warnings: 0,
             duration: this.getDuration(context),
           },
         });
@@ -143,9 +145,11 @@ export class ListCommand extends BaseCommand {
           },
         })),
         totals: {
-          success: extensions.length,
+        total: 0,
+          successful: extensions.length,
           failed: 0,
           skipped: 0,
+        warnings: 0,
           duration: this.getDuration(context),
         },
       };
@@ -159,9 +163,11 @@ export class ListCommand extends BaseCommand {
       return this.createErrorResult(message, {
         errors: [{ code: "LIST_FAILED", message }],
         totals: {
-          success: 0,
+        total: 0,
+          successful: 0,
           failed: 1,
           skipped: 0,
+        warnings: 0,
           duration: this.getDuration(context),
         },
       });

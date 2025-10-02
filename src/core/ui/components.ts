@@ -260,17 +260,20 @@ export class UIComponents {
 
   /**
    * Show command result summary
+   * Integration Phase: Now accepts Phase 2 ResultTotals type
    */
   showResultSummary(result: {
-    success: number;
+    total?: number;
+    successful: number;
     failed: number;
     skipped: number;
+    warnings?: number;
     duration: number;
   }): void {
     const lines: string[] = [];
 
-    if (result.success > 0) {
-      lines.push(`✅ Success: ${result.success}`);
+    if (result.successful > 0) {
+      lines.push(`✅ Success: ${result.successful}`);
     }
 
     if (result.failed > 0) {
@@ -279,6 +282,10 @@ export class UIComponents {
 
     if (result.skipped > 0) {
       lines.push(`⏭️  Skipped: ${result.skipped}`);
+    }
+
+    if (result.warnings && result.warnings > 0) {
+      lines.push(`⚠️  Warnings: ${result.warnings}`);
     }
 
     lines.push(`⏱️  Duration: ${this.formatDuration(result.duration)}`);

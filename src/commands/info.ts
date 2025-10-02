@@ -51,9 +51,11 @@ export class InfoCommand extends BaseCommand {
         return this.createSuccessResult("No versions found", {
           items: [],
           totals: {
-            success: 0,
+        total: 0,
+            successful: 0,
             failed: 0,
             skipped: 0,
+        warnings: 0,
             duration: this.getDuration(context),
           },
         });
@@ -98,9 +100,11 @@ export class InfoCommand extends BaseCommand {
         summary: `Found ${versions.length} versions`,
         items,
         totals: {
-          success: versions.length,
+        total: 0,
+          successful: versions.length,
           failed: 0,
           skipped: 0,
+        warnings: 0,
           duration: this.getDuration(context),
         },
         metadata: {
@@ -120,9 +124,11 @@ export class InfoCommand extends BaseCommand {
       return this.createErrorResult(message, {
         errors: [{ code: "INFO_FAILED", message }],
         totals: {
-          success: 0,
+        total: 0,
+          successful: 0,
           failed: 1,
           skipped: 0,
+        warnings: 0,
           duration: this.getDuration(context),
         },
       });

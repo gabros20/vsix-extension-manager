@@ -55,9 +55,11 @@ class SetupCommand extends BaseCommand {
           summary: "Setup cancelled or skipped",
           items: [],
           totals: {
-            success: 0,
+        total: 0,
+            successful: 0,
             failed: 0,
             skipped: 1,
+        warnings: 0,
             duration: this.getDuration(context),
           },
         };
@@ -80,9 +82,11 @@ class SetupCommand extends BaseCommand {
           },
         ],
         totals: {
-          success: 1,
+        total: 0,
+          successful: 1,
           failed: 0,
           skipped: 0,
+        warnings: 0,
           duration: this.getDuration(context),
         },
       };
@@ -105,9 +109,11 @@ class SetupCommand extends BaseCommand {
           },
         ],
         totals: {
-          success: 0,
+        total: 0,
+          successful: 0,
           failed: 1,
           skipped: 0,
+        warnings: 0,
           duration: this.getDuration(context),
         },
       };

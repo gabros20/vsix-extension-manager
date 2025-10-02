@@ -1,6 +1,18 @@
 /**
  * Type definitions for the v2.0 command framework
+ * 
+ * Integration Phase: Now imports standardized output types from Phase 2
  */
+
+// Import Phase 2 standardized output types
+export type {
+  CommandResult,
+  CommandStatus,
+  ResultItem,
+  ErrorItem,
+  WarningItem,
+  ResultTotals,
+} from "../../core/output/types";
 
 /**
  * Global options available to all commands
@@ -45,55 +57,6 @@ export interface GlobalOptions {
   dryRun?: boolean;
   profile?: string;
   config?: string;
-}
-
-/**
- * Result of a command execution
- */
-export interface CommandResult {
-  status: "ok" | "error";
-  command: string;
-  summary: string;
-  items?: ResultItem[];
-  errors?: ErrorItem[];
-  warnings?: WarningItem[];
-  totals?: {
-    success: number;
-    failed: number;
-    skipped: number;
-    duration: number;
-  };
-  metadata?: Record<string, unknown>;
-}
-
-/**
- * Individual result item
- */
-export interface ResultItem {
-  id: string;
-  version?: string;
-  status: "success" | "failed" | "skipped";
-  duration: number;
-  details?: Record<string, unknown>;
-}
-
-/**
- * Error item
- */
-export interface ErrorItem {
-  code: string;
-  message: string;
-  item?: string;
-  context?: Record<string, unknown>;
-}
-
-/**
- * Warning item
- */
-export interface WarningItem {
-  code: string;
-  message: string;
-  item?: string;
 }
 
 /**

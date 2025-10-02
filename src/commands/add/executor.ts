@@ -1,6 +1,8 @@
 /**
  * Add command executor - handles all input types using existing services
  * Consolidates logic from quickInstall, fromList, install, and download commands
+ * 
+ * Integration Phase: Now uses CommandResultBuilder and SmartRetryService
  */
 
 import * as fs from "fs-extra";
@@ -24,6 +26,8 @@ import {
 import { FileExistsAction } from "../../core/filesystem";
 import type { EditorType, SourceRegistry } from "../../core/types";
 import { parseExtensionUrl } from "../../core/registry";
+import { CommandResultBuilder } from "../../core/output/CommandResultBuilder";
+import { smartRetryService } from "../../core/retry";
 
 /**
  * Options for the add command
@@ -70,60 +74,46 @@ export interface AddOptions {
 export class AddExecutor {
   /**
    * Execute add command based on detected input type
+   * Integration Phase: Uses CommandResultBuilder for consistent output
    */
   async execute(detection: DetectionResult, options: AddOptions): Promise<CommandResult> {
-    const startTime = Date.now();
-
     try {
       switch (detection.type) {
         case "url":
-          return await this.executeUrlFlow(detection.value, options, startTime);
+          return await this.executeUrlFlow(detection.value, options);
 
         case "extension-id":
-          return await this.executeExtensionIdFlow(detection.value, options, startTime);
+          return await this.executeExtensionIdFlow(detection.value, options);
 
         case "vsix-file":
-          return await this.executeFileFlow(detection.value, options, startTime);
+          return await this.executeFileFlow(detection.value, options);
 
         case "vsix-directory":
-          return await this.executeDirectoryFlow(detection.value, options, startTime);
+          return await this.executeDirectoryFlow(detection.value, options);
 
         case "extension-list":
-          return await this.executeListFlow(detection.value, options, startTime);
+          return await this.executeListFlow(detection.value, options);
 
         default:
           throw new Error(`Unsupported input type: ${detection.type}`);
       }
     } catch (error) {
-      return {
-        status: "error",
-        command: "add",
-        summary: `Failed: ${error instanceof Error ? error.message : String(error)}`,
-        errors: [
-          {
-            code: "EXECUTION_FAILED",
-            message: error instanceof Error ? error.message : String(error),
-          },
-        ],
-        totals: {
-          success: 0,
-          failed: 1,
-          skipped: 0,
-          duration: Date.now() - startTime,
-        },
-      };
+      return CommandResultBuilder.fromError("add", error instanceof Error ? error : new Error(String(error)));
     }
   }
 
   /**
    * Handle URL input (marketplace/open-vsx)
    * Refactored from quickInstall.ts
+   * Integration Phase: Uses CommandResultBuilder + SmartRetryService
    */
   private async executeUrlFlow(
     url: string,
     options: AddOptions,
-    startTime: number,
   ): Promise<CommandResult> {
+    const builder = new CommandResultBuilder("add");
+    const extensionId = parseExtensionUrl(url).itemName;
+
     // Create temp directory for download
     const tempDirName = `vsix-add-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const tempDir = path.join(os.tmpdir(), tempDirName);
@@ -132,77 +122,103 @@ export class AddExecutor {
     await fs.ensureDir(outputDir);
 
     try {
-      // Download extension
-      const request: SingleDownloadRequest = {
-        url,
-        requestedVersion: options.version || "latest",
-        preferPreRelease: Boolean(options.preRelease),
-        source: options.source,
-        outputDir,
-        fileExistsAction: options.force ? FileExistsAction.OVERWRITE : FileExistsAction.SKIP,
-        quiet: Boolean(options.quiet),
-      };
+      // Download extension with retry
+      const downloadResult = await smartRetryService.executeWithRetry(
+        {
+          name: `Download ${extensionId}`,
+          run: async (context) => {
+            const request: SingleDownloadRequest = {
+              url,
+              requestedVersion: options.version || "latest",
+              preferPreRelease: Boolean(options.preRelease),
+              source: options.source,
+              outputDir,
+              fileExistsAction: options.force ? FileExistsAction.OVERWRITE : FileExistsAction.SKIP,
+              quiet: Boolean(options.quiet),
+            };
+            return await downloadSingleExtension(request);
+          },
+        },
+        {
+          maxAttempts: options.retry || 3,
+          timeout: options.timeout,
+          metadata: { quiet: options.quiet },
+        }
+      );
 
-      const downloadResult: SingleDownloadResult = await downloadSingleExtension(request);
+      if (!downloadResult.success) {
+        builder.addFailure({
+          id: extensionId,
+          name: extensionId,
+        });
+        builder.addError({
+          code: "DOWNLOAD_FAILED",
+          message: downloadResult.error?.message || "Download failed",
+        });
+        return builder.setSummary(`Failed to download ${extensionId}`).build();
+      }
+
+      const downloadData = downloadResult.data!;
       const downloadedPath =
-        downloadResult.filePath || path.join(downloadResult.outputDir, downloadResult.filename);
+        downloadData.filePath || path.join(downloadData.outputDir, downloadData.filename);
 
       // If download-only, stop here
       if (options.downloadOnly) {
-        return {
-          status: "ok",
-          command: "add",
-          summary: `Downloaded ${downloadResult.filename}`,
-          items: [
-            {
-              id: parseExtensionUrl(url).itemName,
-              version: downloadResult.resolvedVersion,
-              status: "success",
-              duration: Date.now() - startTime,
-              details: {
-                path: downloadedPath,
-              },
-            },
-          ],
-          totals: {
-            success: 1,
-            failed: 0,
-            skipped: 0,
-            duration: Date.now() - startTime,
+        builder.addSuccess({
+          id: extensionId,
+          name: extensionId,
+          version: downloadData.resolvedVersion,
+          details: {
+            path: downloadedPath,
           },
-        };
+        });
+        return builder.setSummary(`Downloaded ${downloadData.filename}`).build();
       }
 
-      // Install extension
-      const installResult = await this.installSingleFile(downloadedPath, options);
+      // Install extension with retry
+      const installResult = await smartRetryService.executeWithRetry(
+        {
+          name: `Install ${extensionId}`,
+          run: async (context) => {
+            return await this.installSingleFile(downloadedPath, options);
+          },
+        },
+        {
+          maxAttempts: options.retry || 3,
+          timeout: options.timeout,
+          metadata: { 
+            quiet: options.quiet,
+            supportsDownloadOnly: true,
+            downloadedPath 
+          },
+        }
+      );
 
       // Cleanup temp directory if used
       if (outputDir === tempDir) {
         await fs.remove(tempDir);
       }
 
-      return {
-        status: "ok",
-        command: "add",
-        summary: `Installed ${downloadResult.filename}`,
-        items: [
-          {
-            id: parseExtensionUrl(url).itemName,
-            version: downloadResult.resolvedVersion,
-            status: installResult.success ? "success" : "failed",
-            duration: Date.now() - startTime,
-          },
-        ],
-        errors: installResult.success
-          ? []
-          : [{ code: "INSTALL_FAILED", message: installResult.error || "Unknown error" }],
-        totals: {
-          success: installResult.success ? 1 : 0,
-          failed: installResult.success ? 0 : 1,
-          skipped: 0,
-          duration: Date.now() - startTime,
-        },
-      };
+      if (!installResult.success || !installResult.data?.success) {
+        builder.addFailure({
+          id: extensionId,
+          name: extensionId,
+          version: downloadData.resolvedVersion,
+        });
+        builder.addError({
+          code: "INSTALL_FAILED",
+          message: installResult.error?.message || installResult.data?.error || "Install failed",
+        });
+        return builder.setSummary(`Failed to install ${downloadData.filename}`).build();
+      }
+
+      builder.addSuccess({
+        id: extensionId,
+        name: extensionId,
+        version: downloadData.resolvedVersion,
+      });
+      return builder.setSummary(`Installed ${downloadData.filename}`).build();
+
     } finally {
       // Ensure cleanup even on error
       if (outputDir === tempDir && (await fs.pathExists(tempDir))) {
@@ -218,7 +234,6 @@ export class AddExecutor {
   private async executeExtensionIdFlow(
     extensionId: string,
     options: AddOptions,
-    startTime: number,
   ): Promise<CommandResult> {
     // Convert extension ID to marketplace URL
     const source = options.source || "marketplace";
@@ -227,119 +242,102 @@ export class AddExecutor {
         ? `https://open-vsx.org/extension/${extensionId.split(".")[0]}/${extensionId.split(".")[1]}`
         : `https://marketplace.visualstudio.com/items?itemName=${extensionId}`;
 
-    return this.executeUrlFlow(url, options, startTime);
+    return this.executeUrlFlow(url, options);
   }
 
   /**
    * Handle VSIX file input
    * Refactored from install.ts
+   * Integration Phase: Uses CommandResultBuilder + SmartRetryService
    */
   private async executeFileFlow(
     filePath: string,
     options: AddOptions,
-    startTime: number,
   ): Promise<CommandResult> {
+    const builder = new CommandResultBuilder("add");
+    const fileName = path.basename(filePath);
+
     if (options.downloadOnly) {
-      return {
-        status: "ok",
-        command: "add",
-        summary: "File already exists (download-only mode)",
-        items: [
-          {
-            id: path.basename(filePath),
-            status: "skipped",
-            duration: 0,
-          },
-        ],
-        totals: {
-          success: 0,
-          failed: 0,
-          skipped: 1,
-          duration: Date.now() - startTime,
-        },
-      };
+      builder.addSkipped({
+        id: fileName,
+        name: fileName,
+      });
+      return builder.setSummary("File already exists (download-only mode)").build();
     }
 
-    const installResult = await this.installSingleFile(filePath, options);
-
-    return {
-      status: installResult.success ? "ok" : "error",
-      command: "add",
-      summary: installResult.success
-        ? `Installed ${path.basename(filePath)}`
-        : `Failed to install ${path.basename(filePath)}`,
-      items: [
-        {
-          id: path.basename(filePath),
-          status: installResult.success ? "success" : "failed",
-          duration: Date.now() - startTime,
+    // Install file with retry
+    const installResult = await smartRetryService.executeWithRetry(
+      {
+        name: `Install ${fileName}`,
+        run: async (context) => {
+          return await this.installSingleFile(filePath, options);
         },
-      ],
-      errors: installResult.success
-        ? []
-        : [{ code: "INSTALL_FAILED", message: installResult.error || "Unknown error" }],
-      totals: {
-        success: installResult.success ? 1 : 0,
-        failed: installResult.success ? 0 : 1,
-        skipped: 0,
-        duration: Date.now() - startTime,
       },
-    };
+      {
+        maxAttempts: options.retry || 3,
+        timeout: options.timeout,
+        metadata: { quiet: options.quiet },
+      }
+    );
+
+    if (!installResult.success || !installResult.data?.success) {
+      builder.addFailure({
+        id: fileName,
+        name: fileName,
+      });
+      builder.addError({
+        code: "INSTALL_FAILED",
+        message: installResult.error?.message || installResult.data?.error || "Install failed",
+      });
+      return builder.setSummary(`Failed to install ${fileName}`).build();
+    }
+
+    builder.addSuccess({
+      id: fileName,
+      name: fileName,
+    });
+    return builder.setSummary(`Installed ${fileName}`).build();
   }
 
   /**
    * Handle directory with VSIX files
    * Refactored from install.ts
+   * Integration Phase: Uses CommandResultBuilder (retry handled by bulk install service)
    */
   private async executeDirectoryFlow(
     dirPath: string,
     options: AddOptions,
-    startTime: number,
   ): Promise<CommandResult> {
+    const builder = new CommandResultBuilder("add");
+
     // Scan directory for VSIX files
     const scanner = getVsixScanner();
     const scanResult: ScanResult = await scanner.scanDirectory(dirPath, { recursive: false });
 
     if (scanResult.validVsixFiles.length === 0) {
-      return {
-        status: "error",
-        command: "add",
-        summary: "No valid VSIX files found",
-        errors: [{ code: "NO_FILES", message: "No valid VSIX files found in directory" }],
-        totals: {
-          success: 0,
-          failed: 0,
-          skipped: 0,
-          duration: Date.now() - startTime,
-        },
-      };
+      builder.addError({
+        code: "NO_FILES",
+        message: "No valid VSIX files found in directory",
+      });
+      return builder.setSummary("No valid VSIX files found").build();
     }
 
     if (options.downloadOnly) {
-      return {
-        status: "ok",
-        command: "add",
-        summary: `Found ${scanResult.validVsixFiles.length} VSIX files (download-only mode)`,
-        items: scanResult.validVsixFiles.map((file) => ({
+      scanResult.validVsixFiles.forEach((file) => {
+        builder.addSkipped({
           id: path.basename(file.path),
-          status: "skipped" as const,
-          duration: 0,
-        })),
-        totals: {
-          success: 0,
-          failed: 0,
-          skipped: scanResult.validVsixFiles.length,
-          duration: Date.now() - startTime,
-        },
-      };
+          name: path.basename(file.path),
+        });
+      });
+      return builder.setSummary(`Found ${scanResult.validVsixFiles.length} VSIX files (download-only mode)`).build();
     }
 
-    // Install all VSIX files
+    // Install all VSIX files (bulk install service has its own retry logic)
     const installService = getInstallService();
     const editorInfo = await this.resolveEditor(options);
 
     const tasks = scanResult.validVsixFiles.map((f) => ({
-      vsixFile: f, // InstallTask requires vsixFile property
+      vsixFile: f,
     }));
 
     const results = await installService.installBulkVsix(editorInfo.binaryPath, tasks, {
@@ -348,47 +346,43 @@ export class AddExecutor {
       dryRun: options.dryRun || false,
     });
 
-    return {
-      status: "ok",
-      command: "add",
-      summary: `Installed ${results.successful} of ${scanResult.validVsixFiles.length} extensions`,
-      items: (results.results || []).map((r: any) => ({
-        id: path.basename(r.vsixPath),
-        status: r.success ? ("success" as const) : ("failed" as const),
-        duration: r.duration || 0,
-      })),
-      errors: Array.isArray(results.failed)
-        ? results.failed.map((r: any) => ({
-            code: "INSTALL_FAILED",
-            message: r.error || "Unknown error",
-            item: path.basename(r.vsixPath),
-          }))
-        : [],
-      totals: {
-        success: results.successful,
-        failed: Array.isArray(results.failed) ? results.failed.length : results.failed,
-        skipped: results.skipped,
-        duration: Date.now() - startTime,
-      },
-    };
+    // Add results to builder
+    (results.results || []).forEach((r: any) => {
+      if (r.success) {
+        builder.addSuccess({
+          id: path.basename(r.vsixPath),
+          name: path.basename(r.vsixPath),
+        });
+      } else {
+        builder.addFailure({
+          id: path.basename(r.vsixPath),
+          name: path.basename(r.vsixPath),
+        });
+        builder.addError({
+          code: "INSTALL_FAILED",
+          message: r.error || "Unknown error",
+          item: path.basename(r.vsixPath),
+        });
+      }
+    });
+
+    return builder.setSummary(`Installed ${results.successful} of ${scanResult.validVsixFiles.length} extensions`).build();
   }
 
   /**
    * Handle extension list input
    * Refactored from fromList.ts
+   * Integration Phase: Uses CommandResultBuilder (retry handled by bulk services)
    */
   private async executeListFlow(
     listPath: string,
     options: AddOptions,
-    startTime: number,
   ): Promise<CommandResult> {
+    const builder = new CommandResultBuilder("add");
     const installFromListService = getInstallFromListService();
     const editorInfo = await this.resolveEditor(options);
 
-    // Note: installFromList takes complex nested options structure
-    // Options are configured directly in the call below
-
-    // Call installFromList with proper parameters
+    // Call installFromList with proper parameters (has built-in retry for downloads and installs)
     const result = await installFromListService.installFromList(
       editorInfo.binaryPath,
       listPath,
@@ -409,24 +403,36 @@ export class AddExecutor {
       },
     );
 
-    return {
-      status: "ok",
-      command: "add",
-      summary: options.downloadOnly
-        ? `Downloaded ${result.downloadResult?.successful || 0} extensions`
-        : `Installed ${result.installResult?.successful || 0} extensions`,
-      items: [], // TODO: InstallFromListResult doesn't have extensions array to map
-      totals: {
-        success: options.downloadOnly
-          ? result.downloadResult?.successful || 0
-          : result.installResult?.successful || 0,
-        failed: options.downloadOnly
-          ? result.downloadResult?.failed || 0
-          : result.installResult?.failed || 0,
-        skipped: result.installResult?.skipped || 0,
-        duration: Date.now() - startTime,
-      },
-    };
+    // Note: InstallFromListResult doesn't expose individual extension results
+    // We can only report aggregate counts
+    const successful = options.downloadOnly
+      ? result.downloadResult?.successful || 0
+      : result.installResult?.successful || 0;
+    const failed = options.downloadOnly
+      ? result.downloadResult?.failed || 0
+      : result.installResult?.failed || 0;
+    const skipped = result.installResult?.skipped || 0;
+
+    // Add a single aggregate item to represent the batch operation
+    if (successful > 0) {
+      builder.addSuccess({
+        id: path.basename(listPath),
+        name: `${successful} extensions from list`,
+      });
+    }
+
+    if (failed > 0) {
+      builder.addFailure({
+        id: path.basename(listPath),
+        name: `${failed} extensions failed`,
+      });
+    }
+
+    const summary = options.downloadOnly
+      ? `Downloaded ${successful} of ${successful + failed} extensions`
+      : `Installed ${successful} of ${successful + failed} extensions`;
+
+    return builder.setSummary(summary).build();
   }
 
   /**

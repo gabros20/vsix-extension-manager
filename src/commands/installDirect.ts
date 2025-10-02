@@ -110,14 +110,14 @@ export function createInstallDirectCommand(): Command {
 
           results.push({
             vsixFile,
-            success: result.success,
+            successful: result.success,
             error: result.error,
           });
         }
 
         const duration = Date.now() - startTime;
-        const successful = results.filter((r) => r.success).length;
-        const failed = results.filter((r) => !r.success).length;
+        const successful = results.filter((r) => r.successful).length;
+        const failed = results.filter((r) => !r.successful).length;
 
         if (options.json) {
           console.log(
@@ -142,7 +142,7 @@ export function createInstallDirectCommand(): Command {
           if (failed > 0) {
             p.log.warn(`❌ Failed installations:`);
             results
-              .filter((r) => !r.success)
+              .filter((r) => !r.successful)
               .forEach((r) => {
                 p.log.warn(`  • ${path.basename(r.vsixFile)}: ${r.error}`);
               });

@@ -7,7 +7,8 @@ import * as fs from "fs-extra";
 import type { HealthCheck } from "./healthChecker";
 
 export interface FixResult {
-  success: boolean;
+        total: 0,
+  successful: boolean;
   message: string;
   details?: string;
 }
@@ -22,7 +23,8 @@ export class AutoFixService {
   async applyFix(issue: HealthCheck): Promise<FixResult> {
     if (!issue.fixable || !issue.fixCommand) {
       return {
-        success: false,
+        total: 0,
+        successful: false,
         message: "Issue cannot be automatically fixed",
       };
     }
@@ -39,7 +41,8 @@ export class AutoFixService {
 
       default:
         return {
-          success: false,
+        total: 0,
+          successful: false,
           message: `Unknown fix command: ${issue.fixCommand}`,
         };
     }
@@ -51,7 +54,8 @@ export class AutoFixService {
   private async createDirectory(issue: HealthCheck): Promise<FixResult> {
     if (!issue.details) {
       return {
-        success: false,
+        total: 0,
+        successful: false,
         message: "No directory path provided",
       };
     }
@@ -59,12 +63,14 @@ export class AutoFixService {
     try {
       await fs.ensureDir(issue.details);
       return {
-        success: true,
+        total: 0,
+        successful: true,
         message: `Created directory: ${issue.details}`,
       };
     } catch (error) {
       return {
-        success: false,
+        total: 0,
+        successful: false,
         message: "Failed to create directory",
         details: error instanceof Error ? error.message : String(error),
       };
@@ -78,7 +84,8 @@ export class AutoFixService {
     // This would require more context about which extensions are corrupted
     // For now, return a message that manual intervention is needed
     return {
-      success: false,
+        total: 0,
+      successful: false,
       message: "Manual cleanup recommended",
       details:
         "Use 'vsix list' to identify extensions and 'vsix remove <id>' to uninstall corrupted ones",
@@ -91,7 +98,8 @@ export class AutoFixService {
   private async fixPermissions(issue: HealthCheck): Promise<FixResult> {
     if (!issue.details) {
       return {
-        success: false,
+        total: 0,
+        successful: false,
         message: "No directory path provided",
       };
     }
@@ -100,13 +108,15 @@ export class AutoFixService {
       // This is platform-specific and may require sudo
       // For now, just inform the user
       return {
-        success: false,
+        total: 0,
+        successful: false,
         message: "Permission fix requires manual intervention",
         details: `Run: chmod 755 ${issue.details}`,
       };
     } catch (error) {
       return {
-        success: false,
+        total: 0,
+        successful: false,
         message: "Failed to fix permissions",
         details: error instanceof Error ? error.message : String(error),
       };

@@ -55,9 +55,11 @@ export abstract class BaseCommand {
       errors: [],
       warnings: [],
       totals: {
-        success: 0,
+        total: 0,
+        successful: 0,
         failed: 0,
         skipped: 0,
+        warnings: 0,
         duration: 0,
       },
       ...data,

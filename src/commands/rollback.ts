@@ -166,7 +166,7 @@ export async function rollback(options: RollbackOptions) {
       console.log(
         JSON.stringify(
           {
-            success: true,
+            successful: true,
             restored: backupToRestore,
           },
           null,
@@ -183,7 +183,7 @@ export async function rollback(options: RollbackOptions) {
       console.log(
         JSON.stringify(
           {
-            success: false,
+            successful: false,
             error: error instanceof Error ? error.message : String(error),
           },
           null,

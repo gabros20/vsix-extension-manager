@@ -60,9 +60,11 @@ class DoctorCommand extends BaseCommand {
           },
         })),
         totals: {
-          success: report.summary.passed,
+        total: 0,
+          successful: report.summary.passed,
           failed: report.summary.failed,
           skipped: report.summary.warnings,
+        warnings: 0,
           duration: this.getDuration(context),
         },
       };
@@ -85,9 +87,11 @@ class DoctorCommand extends BaseCommand {
           },
         ],
         totals: {
-          success: 0,
+        total: 0,
+          successful: 0,
           failed: 1,
           skipped: 0,
+        warnings: 0,
           duration: this.getDuration(context),
         },
       };
@@ -181,7 +185,7 @@ class DoctorCommand extends BaseCommand {
     // Display fix results
     if (promptPolicy.isInteractive(options)) {
       for (const [name, result] of results) {
-        if (result.success) {
+        if (result.successful) {
           ui.log.success(`✓ ${name}: ${result.message}`);
         } else {
           ui.log.warning(`⚠ ${name}: ${result.message}`);
@@ -191,7 +195,7 @@ class DoctorCommand extends BaseCommand {
         }
       }
 
-      const successCount = Array.from(results.values()).filter((r) => r.success).length;
+      const successCount = Array.from(results.values()).filter((r) => r.successful).length;
 
       console.log(""); // Empty line
       ui.log.info(`Fixed ${successCount} of ${fixableIssues.length} issue(s)`);

@@ -36,9 +36,11 @@ export class RemoveCommand extends BaseCommand {
         ui.log.info("No extensions selected for removal");
         return this.createSuccessResult("No extensions removed", {
           totals: {
-            success: 0,
+        total: 0,
+            successful: 0,
             failed: 0,
             skipped: 0,
+        warnings: 0,
             duration: this.getDuration(context),
           },
         });
@@ -127,9 +129,11 @@ export class RemoveCommand extends BaseCommand {
       // Show summary in interactive mode
       if (promptPolicy.isInteractive(options)) {
         ui.showResultSummary({
-          success: result.uninstalled,
+        total: 0,
+          successful: result.uninstalled,
           failed: result.failed,
           skipped: 0,
+        warnings: 0,
           duration: this.getDuration(context),
         });
 
@@ -152,9 +156,11 @@ export class RemoveCommand extends BaseCommand {
         items,
         errors,
         totals: {
-          success: result.uninstalled,
+        total: 0,
+          successful: result.uninstalled,
           failed: result.failed,
           skipped: 0,
+        warnings: 0,
           duration: this.getDuration(context),
         },
       };
@@ -168,9 +174,11 @@ export class RemoveCommand extends BaseCommand {
       return this.createErrorResult(message, {
         errors: [{ code: "REMOVE_FAILED", message }],
         totals: {
-          success: 0,
+        total: 0,
+          successful: 0,
           failed: 1,
           skipped: 0,
+        warnings: 0,
           duration: this.getDuration(context),
         },
       });
