@@ -108,7 +108,10 @@ export class PlanDisplay {
     }
 
     lines.push(`   Binary: ${plan.target.binaryPath}`);
-    lines.push(`   Extensions: ${plan.target.extensionsPath}`);
+
+    if (plan.target.extensionsPath) {
+      lines.push(`   Extensions: ${plan.target.extensionsPath}`);
+    }
 
     return lines.join("\n");
   }

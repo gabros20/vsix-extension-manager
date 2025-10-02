@@ -136,9 +136,9 @@ export class UIComponents {
    * Group multiple prompts together
    */
   async group<T extends Record<string, unknown>>(
-    prompts: Record<string, (results: Partial<T>) => Promise<unknown> | unknown>,
+    prompts: Record<string, (results: any) => Promise<unknown> | unknown>,
   ): Promise<T> {
-    const result = await p.group(prompts, {
+    const result = await p.group(prompts as any, {
       onCancel: () => {
         this.cancel();
       },
@@ -192,9 +192,10 @@ export class UIComponents {
     // Show editor selection
     const options = editors.map((editor) => {
       const isPreferred = editor.name === preferredName;
+      const versionStr = editor.version ? ` (v${editor.version})` : "";
       return {
         value: editor.name,
-        label: `${editor.name === "cursor" ? "Cursor" : "VS Code"} ${editor.version ? `(${editor.version})` : ""}`,
+        label: `${editor.name === "cursor" ? "Cursor" : "VS Code"}${versionStr}`,
         hint: isPreferred ? "Recommended" : undefined,
       };
     });

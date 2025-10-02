@@ -71,7 +71,10 @@ export class InputDetector {
           };
         }
 
-        throw new UserInputError(`Unsupported file type: ${ext}. Expected .vsix, .json, or .txt`);
+        throw new UserInputError(
+          `Unsupported file type: ${ext}. Expected .vsix, .json, or .txt`,
+          "UNSUPPORTED_FILE_TYPE",
+        );
       }
 
       // Directory containing VSIX files
@@ -80,7 +83,7 @@ export class InputDetector {
         const vsixFiles = files.filter((f) => path.extname(f).toLowerCase() === ".vsix");
 
         if (vsixFiles.length === 0) {
-          throw new UserInputError(`No VSIX files found in directory: ${input}`);
+          throw new UserInputError(`No VSIX files found in directory: ${input}`, "NO_VSIX_FILES");
         }
 
         return {

@@ -20,7 +20,6 @@ import {
   getInstallFromListService,
   type EditorInfo,
   type ScanResult,
-  type InstallFromListOptions,
 } from "../../features/install";
 import { FileExistsAction } from "../../core/filesystem";
 import type { EditorType, SourceRegistry } from "../../core/types";
@@ -358,14 +357,16 @@ export class AddExecutor {
         status: r.success ? ("success" as const) : ("failed" as const),
         duration: r.duration || 0,
       })),
-      errors: results.failed.map((r: any) => ({
-        code: "INSTALL_FAILED",
-        message: r.error || "Unknown error",
-        item: path.basename(r.vsixPath),
-      })),
+      errors: Array.isArray(results.failed)
+        ? results.failed.map((r: any) => ({
+            code: "INSTALL_FAILED",
+            message: r.error || "Unknown error",
+            item: path.basename(r.vsixPath),
+          }))
+        : [],
       totals: {
         success: results.successful,
-        failed: results.failed,
+        failed: Array.isArray(results.failed) ? results.failed.length : results.failed,
         skipped: results.skipped,
         duration: Date.now() - startTime,
       },
@@ -384,24 +385,8 @@ export class AddExecutor {
     const installFromListService = getInstallFromListService();
     const editorInfo = await this.resolveEditor(options);
 
-    const installOptions: any = {
-      // Note: InstallFromListService.installFromList takes different params
-      binaryPath: editorInfo.binaryPath,
-      downloadDir: options.output || "./downloads",
-      downloadOnly: options.downloadOnly,
-      skipInstalled: options.skipInstalled,
-      checkCompatibility: options.checkCompat !== false,
-      robust: false, // Can be made configurable
-      parallel: options.parallel || 3,
-      installParallel: 1,
-      installTimeout: options.timeout || 30000,
-      installRetry: options.retry || 2,
-      source: options.source,
-      preRelease: options.preRelease,
-      dryRun: options.dryRun,
-      quiet: options.quiet,
-      json: options.json,
-    };
+    // Note: installFromList takes complex nested options structure
+    // Options are configured directly in the call below
 
     // Call installFromList with proper parameters
     const result = await installFromListService.installFromList(
@@ -410,15 +395,17 @@ export class AddExecutor {
       [options.output || "./downloads"],
       {
         downloadMissing: !options.downloadOnly,
-        // skipInstalled option removed from InstallFromListOptions
-        checkCompatibility: options.checkCompat !== false,
-        parallel: options.parallel || 3,
-        installParallel: 1,
-        installTimeout: options.timeout || 30000,
-        installRetry: options.retry || 2,
-        source: options.source as any,
-        preRelease: options.preRelease || false,
-        dryRun: options.dryRun || false,
+        downloadOptions: {
+          parallel: options.parallel || 3,
+          source: options.source as any,
+          preRelease: options.preRelease || false,
+        },
+        installOptions: {
+          parallel: 1,
+          timeout: options.timeout || 30000,
+          retry: options.retry || 2,
+          dryRun: options.dryRun || false,
+        },
       },
     );
 

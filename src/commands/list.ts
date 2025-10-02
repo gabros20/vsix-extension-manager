@@ -139,7 +139,7 @@ export class ListCommand extends BaseCommand {
           details: {
             displayName: ext.displayName,
             publisher: ext.publisher,
-            enabled: !ext.disabled,
+            enabled: true, // InstalledExtension doesn't have disabled property
           },
         })),
         totals: {
@@ -295,7 +295,7 @@ export class ListCommand extends BaseCommand {
 
       for (const ext of extensions) {
         const name = (ext.displayName || ext.id).substring(0, maxNameLen);
-        const status = ext.disabled ? "disabled" : "enabled";
+        const status = "enabled"; // Default to enabled as InstalledExtension doesn't track disabled state
         lines.push(
           `${ext.id.padEnd(maxIdLen)}  ${ext.version.padEnd(maxVersionLen)}  ${name.padEnd(maxNameLen)}  ${status}`,
         );

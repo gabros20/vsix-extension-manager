@@ -8,6 +8,8 @@ export interface EditorInfo {
   displayName: string;
   binaryPath: string;
   isAvailable: boolean;
+  version?: string;
+  extensionsPath?: string;
 }
 
 export interface InstalledExtension {

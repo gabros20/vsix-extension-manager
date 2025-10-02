@@ -63,16 +63,20 @@ export class InfoCommand extends BaseCommand {
       const limit = infoOptions.limit || (infoOptions.all ? versions.length : 10);
       const versionsToShow = versions.slice(0, limit);
 
-      // Map to ensure compatible types (ExtensionVersionInfo only has version + published)
-      const mappedVersions = versionsToShow.map((v) => ({
-        version: v.version,
-        isPreRelease: false, // ExtensionVersionInfo doesn't have this property
-        lastUpdated: v.published,
-      }));
-
       // Show information in interactive mode
       if (promptPolicy.isInteractive(options)) {
-        this.displayExtensionInfo(extensionId, versions, mappedVersions, infoOptions);
+        // Map ExtensionVersionInfo[] to format expected by displayExtensionInfo
+        const mappedAll = versions.map((v) => ({
+          version: v.version,
+          isPreRelease: false,
+          lastUpdated: v.published,
+        }));
+        const mappedToShow = versionsToShow.map((v) => ({
+          version: v.version,
+          isPreRelease: false,
+          lastUpdated: v.published,
+        }));
+        this.displayExtensionInfo(extensionId, mappedAll, mappedToShow, infoOptions);
       }
 
       // Create result

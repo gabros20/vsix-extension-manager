@@ -122,7 +122,7 @@ export class PlanGenerator {
     // Fetch versions to get latest
     const versions = await fetchExtensionVersions(parsed.itemName);
     const requestedVersion = options.version || "latest";
-    const preferPreRelease = options.preRelease || false;
+    // const preferPreRelease = options.preRelease || false; // TODO: Use for filtering
 
     // ExtensionVersionInfo doesn't have isPreRelease, just use first version or requested
     let version: string;
