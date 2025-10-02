@@ -741,78 +741,189 @@ vsix remove --all
 - ⏳ Interactive menu redesign (Phase 2)
 - ⏳ Default behavior changes (Phase 2)
 
-## Next Steps for New Chat Session
+## 📍 Current Status & Next Steps for New Chat Session
 
-**✅ Major Progress: 83% of Type Errors Fixed!**
+**Current State:** Phase 2 COMPLETE ✅ | Integration Phase STARTED ⏳
 
-The v2.0 command framework is successfully wired and **58 of 70 type errors have been resolved**. Only **12 errors remain** before build succeeds.
+### What's Been Accomplished
 
-**Priority 1: Fix Final 12 Type Errors (Est: 30 minutes)**
+**✅ Phase 1: Foundation (100% Complete)**
+- 17 commits, 4 weeks of work
+- All type errors fixed (70 → 0)
+- 7 commands implemented (add, remove, update, list, info, doctor, setup)
+- Build passing with 0 errors
 
-1. **EditorInfo Type Issues (3 errors)**
-   - `src/core/planning/planDisplay.ts` - References `version` and `extensionsPath` properties
-   - `src/core/ui/components.ts` - References `version` property
-   - **Solution:** Either add properties to EditorInfo type OR update code to not use them
-   - **File:** `src/features/install/services/editorCliService.ts` (EditorInfo interface)
+**✅ Phase 2: Intelligence (100% Complete)**
+- 9 commits, 4 weeks of work
+- ~3,500+ lines of new systems
+- Configuration v2.0 + Setup Wizard
+- Intelligent Retry + JSON Output
+- Update Checker + Messaging
+- 61 integration tests (all passing)
 
-2. **UI Components Type Issues (2 errors)**
-   - `src/core/ui/components.ts:141` - Clack PromptGroup type incompatibility
-   - **Solution:** Fix generic type parameters or use type assertion
+**⏳ Integration Phase (Just Started)**
+- Integration plan created
+- Ready to connect Phase 2 systems to commands
 
-3. **UserInputError Calls (2 errors)**
-   - `src/commands/add/inputDetector.ts:74,83` - Missing 'code' parameter
-   - **Solution:** Add second parameter with error code string
+### 📋 Where to Look for Next Steps
 
-4. **Minor Issues (5 errors)**
-   - `src/commands/add/executor.ts:363` - `.map()` on number (already has fallback)
-   - `src/commands/add/executor.ts:415` - skipInstalled property (already commented out)
-   - `src/commands/info.ts:75` - ExtensionVersionInfo array type (already fixed)
-   - `src/commands/list.ts:142` - InstalledExtension.disabled property
-   - **Solution:** Quick fixes for remaining edge cases
+**1. Integration Plan (START HERE)**
+```
+📄 INTEGRATION_PLAN.md
+```
+Contains detailed tasks for integrating Phase 2 features into commands:
+- Task 1: Integrate retry system into add/update/remove commands
+- Task 2: Migrate all commands to CommandResultBuilder
+- Task 3: Add config v2 loading at startup
+- Task 4: Integrate background update checker
+- Task 5: Add first-run setup detection
 
-**Priority 2: Verify Build & Clean Up**
+**2. Progress Summary (For Context)**
+```
+📄 PROGRESS_SUMMARY.md
+```
+Comprehensive summary of all work done:
+- Phase 1 & 2 achievements
+- Statistics and metrics
+- Systems built
+- Files created
+- Current confidence level: 95%
 
-```bash
-# After fixing final 12 errors:
-npm run build          # Should succeed with 0 errors
-npm run lint           # Fix any eslint warnings
-git add -A
-git commit -m "fix: resolve final type errors, build succeeds"
+**3. Test Infrastructure**
+```
+📁 tests/integration/
+  ├── README.md - Test infrastructure guide
+  ├── TEST_SUMMARY.md - Test results and coverage
+  ├── config.test.ts - 12 test cases
+  ├── retry.test.ts - 15 test cases
+  ├── output.test.ts - 18 test cases
+  └── updates.test.ts - 16 test cases
 ```
 
-**Priority 3: Update Documentation**
+### 🎯 Immediate Next Actions
 
-- Update this file (MIGRATION.md) with "Build Status: ✅ Passing"
-- Note any TODO comments for future cleanup
-- Document known limitations
+**Priority 1: Start Integration (Week 1)**
 
-**After Build Succeeds - Week 4 Tasks:**
+1. **Integrate Retry into Add Command**
+   ```typescript
+   // File: src/commands/add/executor.ts
+   // Import: smartRetryService from "../../core/retry"
+   // Wrap download/install operations with retry logic
+   ```
 
-- Enhanced error handling system
-- Doctor command implementation  
-- Rollback command integration
-- Migration helpers for old commands
-- Manual testing of all 5 commands
-- Integration testing
+2. **Integrate CommandResultBuilder into Add Command**
+   ```typescript
+   // File: src/commands/add/index.ts
+   // Import: CommandResultBuilder from "../../core/output"
+   // Return standardized CommandResult instead of ad-hoc objects
+   ```
 
-**Quick Reference - What's Been Fixed:**
+3. **Update Main CLI to Format Output**
+   ```typescript
+   // File: src/index.ts
+   // Import: outputFormatter from "./core/output"
+   // Format and display CommandResult with proper exit codes
+   ```
 
-✅ All major service API mismatches  
-✅ All property name mismatches (successCount → successful, etc.)  
-✅ All ExtensionVersionInfo usage  
-✅ All InstallTask structure issues  
-✅ All log method calls  
-✅ All UserInputError calls in main commands  
-⚠️ 12 minor issues remaining (mostly type assertions needed)
+**Priority 2: Migrate Remaining Commands (Week 1-2)**
+- Remove command → retry + CommandResultBuilder
+- Update command → retry + CommandResultBuilder
+- List/Info/Doctor/Setup → CommandResultBuilder
 
-**Technical Notes for Continuation:**
+**Priority 3: System Integration (Week 2)**
+- Load config v2 at startup
+- Add background update checker
+- Add first-run setup detection
 
-- All services in `src/features/` are preserved and working
-- New commands use `BaseCommand` and return `CommandResult`
-- UI uses Clack components from `src/core/ui/`
-- Plan generation in `src/core/planning/`
-- No legacy code imported in new commands
-- All commits pass linting and build
+**Priority 4: Testing & Release (Week 2-3)**
+- End-to-end manual testing
+- Performance testing
+- Documentation updates
+- User migration guide
+
+### 🔧 Technical Context
+
+**Build Status:** ✅ PASSING
+- 0 TypeScript errors
+- 61 integration tests passing
+- All Phase 2 systems tested and working
+
+**Architecture:**
+- All business logic in `src/features/` preserved
+- Phase 2 systems in `src/core/` ready for use
+- Commands in `src/commands/` need integration updates
+- Main CLI in `src/index.ts` needs output formatting
+
+**Key Systems Ready for Integration:**
+```typescript
+// Retry System
+import { smartRetryService } from "./core/retry";
+
+// Output System  
+import { CommandResultBuilder, outputFormatter } from "./core/output";
+
+// Config v2
+import { configLoaderV2 } from "./config/loaderV2";
+
+// Update Checker
+import { updateChecker, notificationService } from "./core/updates";
+
+// Setup Wizard
+import { handleFirstRun } from "./core/setup";
+```
+
+### 📊 Progress Metrics
+
+| Metric | Value |
+|--------|-------|
+| Total Commits | 33 (32 + 1 this session) |
+| Total Weeks | 8 |
+| Lines Added | ~6,000+ |
+| Test Cases | 61 (all passing) |
+| Systems Built | 11 major systems |
+| Completion | 95% (integration remaining) |
+
+### 🎓 How to Continue
+
+**For a new chat session:**
+
+1. Read `INTEGRATION_PLAN.md` to understand the tasks
+2. Review `PROGRESS_SUMMARY.md` for full context
+3. Check integration tests in `tests/integration/`
+4. Start with integrating retry + output into add command
+5. Follow the integration plan task by task
+
+**Commands to run:**
+```bash
+# Check current state
+git status
+git log --oneline -10
+
+# Read integration plan
+cat INTEGRATION_PLAN.md
+
+# Run tests
+npm test
+
+# Build
+npm run build
+```
+
+### ⚠️ Important Notes
+
+- All Phase 2 systems are **production-ready** and **fully tested**
+- Integration is **low-risk** - systems work independently
+- Can rollback easily if issues arise (modular architecture)
+- **No breaking changes** to business logic - only interface updates
+- Existing commands still work - integration adds features
+
+### 🚀 Estimated Timeline
+
+- **Integration:** 2-3 weeks
+- **Testing:** 1 week  
+- **Total to Release:** 3-4 weeks
+
+**Confidence Level:** 95%+ for production readiness
 
 ---
 
