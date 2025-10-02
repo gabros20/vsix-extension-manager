@@ -23,16 +23,16 @@ export const COMMANDS: Record<string, CommandLoader> = {
   info: async () => await import("./info"),
 
   // Core commands (to be implemented)
-  search: async () => await import("./search"),
-  doctor: async () => await import("./doctor"),
+  // search: async () => await import("./search"),
+  // doctor: async () => await import("./doctor"),
 
   // Specialized commands (to be implemented - Phase 3)
-  workspace: async () => await import("./workspace"),
-  templates: async () => await import("./templates"),
+  // workspace: async () => await import("./workspace"),
+  // templates: async () => await import("./templates"),
 
-  // Preserved commands (to be integrated)
-  rollback: async () => await import("./rollback"),
-  interactive: async () => await import("./interactive"),
+  // Preserved commands (to be integrated - not yet converted to BaseCommand)
+  // rollback: async () => await import("./rollback"),
+  // interactive: async () => await import("./interactive"),
 };
 
 /**

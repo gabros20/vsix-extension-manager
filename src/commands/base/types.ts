@@ -33,6 +33,7 @@ export interface GlobalOptions {
   skipInstalled?: boolean;
   force?: boolean;
   output?: string;
+  downloadOnly?: boolean;
 
   // Safety
   checkCompat?: boolean;

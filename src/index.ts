@@ -303,4 +303,158 @@ program.action(async () => {
   }, {});
 });
 
-program.parse();
+// =============================================================================
+// v2.0 COMMAND STRUCTURE (New commands with smart routing)
+// =============================================================================
+
+/**
+ * Wire a v2.0 command into Commander
+ * Loads command from registry and sets up proper option handling
+ */
+async function wireV2Command(commandName: string, aliases: string[] = []): Promise<Command | null> {
+  try {
+    const { loadCommand, hasCommand } = await import("./commands/registry");
+
+    if (!hasCommand(commandName)) {
+      return null;
+    }
+
+    const commandInstance = await loadCommand(commandName);
+    const help = commandInstance.getHelp();
+
+    const cmd = program.command(help.name).description(help.description);
+
+    // Add aliases
+    aliases.forEach((alias) => cmd.alias(alias));
+
+    // Add arguments if specified in usage
+    if (help.usage && help.usage !== help.name) {
+      const usageParts = help.usage.split(" ").slice(1); // Remove command name
+      usageParts.forEach((part) => {
+        if (part.startsWith("<") && part.endsWith(">")) {
+          cmd.argument(part, "");
+        } else if (part.startsWith("[") && part.endsWith("]")) {
+          cmd.argument(part, "", undefined); // Optional argument
+        }
+      });
+    }
+
+    // Add all standard global options
+    cmd
+      .option("-e, --editor <type>", "Target editor (cursor|vscode|auto)")
+      .option("--code-bin <path>", "VS Code binary path")
+      .option("--cursor-bin <path>", "Cursor binary path")
+      .option("--allow-mismatch", "Allow binary mismatch")
+      .option("--source <registry>", "Registry (marketplace|open-vsx|auto)")
+      .option("-v, --version <version>", "Specific version")
+      .option("--pre-release", "Use pre-release version")
+      .option("--parallel <n>", "Parallel operations", parseInt)
+      .option("--timeout <sec>", "Timeout in seconds", parseInt)
+      .option("--retry <n>", "Retry attempts", parseInt)
+      .option("--retry-delay <ms>", "Delay between retries (ms)", parseInt)
+      .option("--skip-installed", "Skip already installed")
+      .option("--force", "Force reinstall/overwrite")
+      .option("-o, --output <path>", "Output directory or file")
+      .option("--check-compat", "Check compatibility")
+      .option("--no-backup", "Skip automatic backup")
+      .option("--verify-checksum", "Verify checksums")
+      .option("--plan", "Show execution plan only")
+      .option("--dry-run", "Validate only")
+      .option("-y, --yes", "Auto-confirm prompts")
+      .option("--quiet", "Minimal output")
+      .option("--json", "JSON output")
+      .option("--debug", "Debug logging");
+
+    // Add command-specific options if defined
+    if (help.options) {
+      help.options.forEach((opt) => {
+        cmd.option(opt.flag, opt.description, opt.defaultValue);
+      });
+    }
+
+    cmd.action(async (...args) => {
+      try {
+        // Last argument is the Command object, second-to-last is options
+        const options = args[args.length - 2];
+        const positionalArgs = args.slice(0, -2);
+
+        // Convert Commander options to GlobalOptions
+        const globalOptions = {
+          editor: options.editor,
+          codeBin: options.codeBin,
+          cursorBin: options.cursorBin,
+          allowMismatch: options.allowMismatch,
+          source: options.source,
+          version: options.version,
+          preRelease: options.preRelease,
+          parallel: options.parallel,
+          timeout: options.timeout,
+          retry: options.retry,
+          retryDelay: options.retryDelay,
+          skipInstalled: options.skipInstalled,
+          force: options.force,
+          output: options.output,
+          checkCompat: options.checkCompat,
+          noBackup: options.noBackup,
+          verifyChecksum: options.verifyChecksum,
+          plan: options.plan,
+          dryRun: options.dryRun,
+          yes: options.yes,
+          quiet: options.quiet,
+          json: options.json,
+          debug: options.debug,
+          downloadOnly: options.downloadOnly,
+        };
+
+        // Initialize error handler
+        initializeErrorHandler(globalOptions.quiet || false, globalOptions.json || false);
+
+        // Execute command
+        const result = await commandInstance.execute(positionalArgs, globalOptions);
+
+        // Handle result
+        if (globalOptions.json) {
+          console.log(JSON.stringify(result, null, 2));
+        } else if (result.status === "ok") {
+          // Success message already shown by command
+        } else {
+          handleErrorAndExit(new Error(result.summary));
+        }
+      } catch (error) {
+        handleErrorAndExit(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+
+    return cmd;
+  } catch (error) {
+    console.error(`Failed to load v2.0 command '${commandName}':`, error);
+    return null;
+  }
+}
+
+// Wire v2.0 commands and parse arguments
+(async () => {
+  try {
+    // Core v2.0 commands
+    await wireV2Command("add", ["get"]); // Universal entry point
+    await wireV2Command("remove", ["rm"]); // Enhanced uninstall
+    await wireV2Command("list", ["ls"]); // Enhanced export
+    await wireV2Command("info"); // Enhanced versions
+
+    // Note: update command conflicts with existing "update-installed" alias
+    // We'll keep old "update-installed" for now and add "upgrade" alias for new command
+    await wireV2Command("update", ["upgrade"]);
+
+    // TODO: Add remaining v2.0 commands as they're implemented
+    // await wireV2Command('search');
+    // await wireV2Command('doctor');
+    // await wireV2Command('workspace');
+    // await wireV2Command('templates');
+
+    // Parse arguments after all commands are registered
+    await program.parseAsync();
+  } catch (error) {
+    console.error("Failed to initialize CLI:", error);
+    process.exit(1);
+  }
+})();
