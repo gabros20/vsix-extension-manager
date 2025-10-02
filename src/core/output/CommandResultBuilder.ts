@@ -77,7 +77,8 @@ export class CommandResultBuilder<T = any> {
     const successful = this.items.filter((i) => i.status === "success").length;
     const failed = this.items.filter((i) => i.status === "failed").length;
     const skipped = this.items.filter((i) => i.status === "skipped").length;
-    const warningCount = this.warnings.length + this.items.filter((i) => i.status === "warning").length;
+    const warningCount =
+      this.warnings.length + this.items.filter((i) => i.status === "warning").length;
 
     return {
       total: this.items.length,
@@ -94,9 +95,7 @@ export class CommandResultBuilder<T = any> {
     const status = this.calculateStatus();
 
     // Auto-generate summary if not provided
-    const summary =
-      this.result.summary ||
-      this.generateSummary(status, totals);
+    const summary = this.result.summary || this.generateSummary(status, totals);
 
     return {
       status,

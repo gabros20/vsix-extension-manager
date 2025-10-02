@@ -88,12 +88,7 @@ export class UpdateChecker {
       // Check each extension for updates
       for (const extension of installed) {
         try {
-          const latestVersion = await resolveVersion(
-            extension.id,
-            "latest",
-            false,
-            "auto",
-          );
+          const latestVersion = await resolveVersion(extension.id, "latest", false, "auto");
 
           if (this.isNewerVersion(latestVersion, extension.version)) {
             updates.push({

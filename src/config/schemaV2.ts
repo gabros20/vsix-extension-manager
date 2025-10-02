@@ -169,12 +169,7 @@ export const CONFIG_V2_FILE_NAMES = [
  */
 export function getConfigSearchPaths(): string[] {
   const homeDir = process.env.HOME || process.env.USERPROFILE || "~";
-  return [
-    process.cwd(),
-    `${homeDir}/.vsix`,
-    `${homeDir}/.config/vsix-extension-manager`,
-    homeDir,
-  ];
+  return [process.cwd(), `${homeDir}/.vsix`, `${homeDir}/.config/vsix-extension-manager`, homeDir];
 }
 
 /**

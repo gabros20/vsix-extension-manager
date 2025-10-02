@@ -44,7 +44,7 @@ export class UserInterventionStrategy extends BaseRetryStrategy {
     context: RetryContext,
   ): Promise<"retry" | "skip" | "abort"> {
     const message = `Operation "${task.name}" failed: ${error.message}\n\nHow would you like to proceed?`;
-    
+
     const result = await ui.select<"retry" | "skip" | "abort">({
       message,
       options: [

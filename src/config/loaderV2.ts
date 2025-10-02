@@ -268,11 +268,13 @@ export class ConfigLoaderV2 {
   /**
    * Get effective configuration (resolved with profile)
    */
-  async getEffectiveConfig(options: {
-    configPath?: string;
-    profile?: string;
-    cliOverrides?: PartialConfigV2;
-  } = {}): Promise<ConfigV2> {
+  async getEffectiveConfig(
+    options: {
+      configPath?: string;
+      profile?: string;
+      cliOverrides?: PartialConfigV2;
+    } = {},
+  ): Promise<ConfigV2> {
     return await this.loadConfig(options.cliOverrides || {}, {
       configPath: options.configPath,
       profile: options.profile,

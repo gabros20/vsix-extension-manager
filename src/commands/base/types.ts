@@ -1,6 +1,6 @@
 /**
  * Type definitions for the v2.0 command framework
- * 
+ *
  * Integration Phase: Now imports standardized output types from Phase 2
  */
 

@@ -138,10 +138,7 @@ export class SmartRetryService {
     return true;
   }
 
-  async executeBatch<T>(
-    tasks: Task<T>[],
-    options: RetryOptions = {},
-  ): Promise<RetryResult<T>[]> {
+  async executeBatch<T>(tasks: Task<T>[], options: RetryOptions = {}): Promise<RetryResult<T>[]> {
     const results: RetryResult<T>[] = [];
 
     for (const task of tasks) {

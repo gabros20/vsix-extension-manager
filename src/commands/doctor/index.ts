@@ -60,11 +60,11 @@ class DoctorCommand extends BaseCommand {
           },
         })),
         totals: {
-        total: 0,
+          total: 0,
           successful: report.summary.passed,
           failed: report.summary.failed,
           skipped: report.summary.warnings,
-        warnings: 0,
+          warnings: 0,
           duration: this.getDuration(context),
         },
       };
@@ -87,11 +87,11 @@ class DoctorCommand extends BaseCommand {
           },
         ],
         totals: {
-        total: 0,
+          total: 0,
           successful: 0,
           failed: 1,
           skipped: 0,
-        warnings: 0,
+          warnings: 0,
           duration: this.getDuration(context),
         },
       };

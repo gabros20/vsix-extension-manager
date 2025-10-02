@@ -7,7 +7,7 @@ import * as fs from "fs-extra";
 import type { HealthCheck } from "./healthChecker";
 
 export interface FixResult {
-        total: 0,
+  total: 0;
   successful: boolean;
   message: string;
   details?: string;
@@ -41,7 +41,7 @@ export class AutoFixService {
 
       default:
         return {
-        total: 0,
+          total: 0,
           successful: false,
           message: `Unknown fix command: ${issue.fixCommand}`,
         };
@@ -84,7 +84,7 @@ export class AutoFixService {
     // This would require more context about which extensions are corrupted
     // For now, return a message that manual intervention is needed
     return {
-        total: 0,
+      total: 0,
       successful: false,
       message: "Manual cleanup recommended",
       details:

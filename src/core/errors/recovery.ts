@@ -97,11 +97,7 @@ export class ErrorRecoveryService {
    */
   private sourceFallbackStrategy: RecoveryStrategy = async (error, context) => {
     const errorMsg = error.message.toLowerCase();
-    if (
-      !errorMsg.includes("403") &&
-      !errorMsg.includes("404") &&
-      !errorMsg.includes("network")
-    ) {
+    if (!errorMsg.includes("403") && !errorMsg.includes("404") && !errorMsg.includes("network")) {
       return null;
     }
 

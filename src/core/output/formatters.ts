@@ -1,9 +1,18 @@
 /**
  * Output formatters for different display modes
+ * Integration Phase: Temporarily without chalk until dependency is added
  */
 
 import type { CommandResult, OutputOptions, FormattedOutput } from "./types";
-import chalk from "chalk";
+
+// Simple color helper (ANSI codes)
+const color = {
+  green: (text: string) => `\x1b[32m${text}\x1b[0m`,
+  red: (text: string) => `\x1b[31m${text}\x1b[0m`,
+  yellow: (text: string) => `\x1b[33m${text}\x1b[0m`,
+  gray: (text: string) => `\x1b[90m${text}\x1b[0m`,
+  cyan: (text: string) => `\x1b[36m${text}\x1b[0m`,
+};
 
 export class OutputFormatter {
   /**
@@ -90,11 +99,11 @@ export class OutputFormatter {
   private getStatusIcon(status: string): string {
     switch (status) {
       case "ok":
-        return chalk.green("✓");
+        return color.green("✓");
       case "partial":
-        return chalk.yellow("⚠");
+        return color.yellow("⚠");
       case "error":
-        return chalk.red("✗");
+        return color.red("✗");
       default:
         return "•";
     }
@@ -104,19 +113,19 @@ export class OutputFormatter {
     const parts: string[] = [];
 
     if (totals.successful > 0) {
-      parts.push(chalk.green(`${totals.successful} successful`));
+      parts.push(color.green(`${totals.successful} successful`));
     }
 
     if (totals.failed > 0) {
-      parts.push(chalk.red(`${totals.failed} failed`));
+      parts.push(color.red(`${totals.failed} failed`));
     }
 
     if (totals.skipped > 0) {
-      parts.push(chalk.gray(`${totals.skipped} skipped`));
+      parts.push(color.gray(`${totals.skipped} skipped`));
     }
 
     if (totals.warnings > 0) {
-      parts.push(chalk.yellow(`${totals.warnings} warnings`));
+      parts.push(color.yellow(`${totals.warnings} warnings`));
     }
 
     const duration = totals.duration ? ` (${(totals.duration / 1000).toFixed(1)}s)` : "";
@@ -130,8 +139,8 @@ export class OutputFormatter {
     for (const item of items) {
       const icon = this.getStatusIcon(item.status);
       const name = item.name || item.id;
-      const version = item.version ? chalk.gray(` v${item.version}`) : "";
-      const message = item.message ? chalk.gray(` - ${item.message}`) : "";
+      const version = item.version ? color.gray(` v${item.version}`) : "";
+      const message = item.message ? color.gray(` - ${item.message}`) : "";
 
       lines.push(`  ${icon} ${name}${version}${message}`);
     }
@@ -140,12 +149,12 @@ export class OutputFormatter {
   }
 
   private formatWarnings(warnings: any[]): string {
-    const lines: string[] = [chalk.yellow("Warnings:")];
+    const lines: string[] = [color.yellow("Warnings:")];
 
     for (const warning of warnings) {
-      lines.push(chalk.yellow(`  ⚠ ${warning.message}`));
+      lines.push(color.yellow(`  ⚠ ${warning.message}`));
       if (warning.context) {
-        lines.push(chalk.gray(`    Context: ${warning.context}`));
+        lines.push(color.gray(`    Context: ${warning.context}`));
       }
     }
 
@@ -153,21 +162,21 @@ export class OutputFormatter {
   }
 
   private formatErrors(errors: any[], options: OutputOptions): string {
-    const lines: string[] = [chalk.red("Errors:")];
+    const lines: string[] = [color.red("Errors:")];
 
     for (const error of errors) {
-      lines.push(chalk.red(`  ✗ ${error.message}`));
+      lines.push(color.red(`  ✗ ${error.message}`));
 
       if (error.context) {
-        lines.push(chalk.gray(`    Context: ${error.context}`));
+        lines.push(color.gray(`    Context: ${error.context}`));
       }
 
       if (error.suggestion) {
-        lines.push(chalk.cyan(`    Suggestion: ${error.suggestion}`));
+        lines.push(color.cyan(`    Suggestion: ${error.suggestion}`));
       }
 
       if (options.includeStack && error.stack) {
-        lines.push(chalk.gray(`    Stack: ${error.stack}`));
+        lines.push(color.gray(`    Stack: ${error.stack}`));
       }
     }
 

@@ -1,7 +1,7 @@
 /**
  * Add command executor - handles all input types using existing services
  * Consolidates logic from quickInstall, fromList, install, and download commands
- * 
+ *
  * Integration Phase: Now uses CommandResultBuilder and SmartRetryService
  */
 
@@ -98,7 +98,10 @@ export class AddExecutor {
           throw new Error(`Unsupported input type: ${detection.type}`);
       }
     } catch (error) {
-      return CommandResultBuilder.fromError("add", error instanceof Error ? error : new Error(String(error)));
+      return CommandResultBuilder.fromError(
+        "add",
+        error instanceof Error ? error : new Error(String(error)),
+      );
     }
   }
 
@@ -107,10 +110,7 @@ export class AddExecutor {
    * Refactored from quickInstall.ts
    * Integration Phase: Uses CommandResultBuilder + SmartRetryService
    */
-  private async executeUrlFlow(
-    url: string,
-    options: AddOptions,
-  ): Promise<CommandResult> {
+  private async executeUrlFlow(url: string, options: AddOptions): Promise<CommandResult> {
     const builder = new CommandResultBuilder("add");
     const extensionId = parseExtensionUrl(url).itemName;
 
@@ -143,7 +143,7 @@ export class AddExecutor {
           maxAttempts: options.retry || 3,
           timeout: options.timeout,
           metadata: { quiet: options.quiet },
-        }
+        },
       );
 
       if (!downloadResult.success) {
@@ -186,12 +186,12 @@ export class AddExecutor {
         {
           maxAttempts: options.retry || 3,
           timeout: options.timeout,
-          metadata: { 
+          metadata: {
             quiet: options.quiet,
             supportsDownloadOnly: true,
-            downloadedPath 
+            downloadedPath,
           },
-        }
+        },
       );
 
       // Cleanup temp directory if used
@@ -218,7 +218,6 @@ export class AddExecutor {
         version: downloadData.resolvedVersion,
       });
       return builder.setSummary(`Installed ${downloadData.filename}`).build();
-
     } finally {
       // Ensure cleanup even on error
       if (outputDir === tempDir && (await fs.pathExists(tempDir))) {
@@ -250,10 +249,7 @@ export class AddExecutor {
    * Refactored from install.ts
    * Integration Phase: Uses CommandResultBuilder + SmartRetryService
    */
-  private async executeFileFlow(
-    filePath: string,
-    options: AddOptions,
-  ): Promise<CommandResult> {
+  private async executeFileFlow(filePath: string, options: AddOptions): Promise<CommandResult> {
     const builder = new CommandResultBuilder("add");
     const fileName = path.basename(filePath);
 
@@ -277,7 +273,7 @@ export class AddExecutor {
         maxAttempts: options.retry || 3,
         timeout: options.timeout,
         metadata: { quiet: options.quiet },
-      }
+      },
     );
 
     if (!installResult.success || !installResult.data?.success) {
@@ -304,10 +300,7 @@ export class AddExecutor {
    * Refactored from install.ts
    * Integration Phase: Uses CommandResultBuilder (retry handled by bulk install service)
    */
-  private async executeDirectoryFlow(
-    dirPath: string,
-    options: AddOptions,
-  ): Promise<CommandResult> {
+  private async executeDirectoryFlow(dirPath: string, options: AddOptions): Promise<CommandResult> {
     const builder = new CommandResultBuilder("add");
 
     // Scan directory for VSIX files
@@ -329,7 +322,9 @@ export class AddExecutor {
           name: path.basename(file.path),
         });
       });
-      return builder.setSummary(`Found ${scanResult.validVsixFiles.length} VSIX files (download-only mode)`).build();
+      return builder
+        .setSummary(`Found ${scanResult.validVsixFiles.length} VSIX files (download-only mode)`)
+        .build();
     }
 
     // Install all VSIX files (bulk install service has its own retry logic)
@@ -366,7 +361,11 @@ export class AddExecutor {
       }
     });
 
-    return builder.setSummary(`Installed ${results.successful} of ${scanResult.validVsixFiles.length} extensions`).build();
+    return builder
+      .setSummary(
+        `Installed ${results.successful} of ${scanResult.validVsixFiles.length} extensions`,
+      )
+      .build();
   }
 
   /**
@@ -374,10 +373,7 @@ export class AddExecutor {
    * Refactored from fromList.ts
    * Integration Phase: Uses CommandResultBuilder (retry handled by bulk services)
    */
-  private async executeListFlow(
-    listPath: string,
-    options: AddOptions,
-  ): Promise<CommandResult> {
+  private async executeListFlow(listPath: string, options: AddOptions): Promise<CommandResult> {
     const builder = new CommandResultBuilder("add");
     const installFromListService = getInstallFromListService();
     const editorInfo = await this.resolveEditor(options);

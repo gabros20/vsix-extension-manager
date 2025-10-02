@@ -42,10 +42,7 @@ behavior:
       );
 
       // Load with CLI overrides
-      const config = await configLoader.loadConfig(
-        { editor: { prefer: "vscode" } },
-        configPath,
-      );
+      const config = await configLoader.loadConfig({ editor: { prefer: "vscode" } }, configPath);
 
       // CLI should override file
       expect(config.editor.prefer).toBe("vscode");
@@ -80,10 +77,7 @@ active-profile: development
     });
 
     it("should handle missing config file gracefully", async () => {
-      const config = await configLoader.loadConfig(
-        {},
-        path.join(testDir, "nonexistent.yml"),
-      );
+      const config = await configLoader.loadConfig({}, path.join(testDir, "nonexistent.yml"));
 
       // Should return defaults
       expect(config.editor.prefer).toBe("auto");
@@ -140,10 +134,7 @@ profiles:
       );
 
       // Load with production profile
-      const prodConfig = await configLoader.loadConfig(
-        { activeProfile: "ci" },
-        configPath,
-      );
+      const prodConfig = await configLoader.loadConfig({ activeProfile: "ci" }, configPath);
 
       expect(prodConfig.performance.parallelDownloads).toBe(1);
       expect(prodConfig.behavior.updateCheck).toBe("never");
@@ -159,10 +150,7 @@ editor:
 `,
       );
 
-      const config = await configLoader.loadConfig(
-        { activeProfile: "nonexistent" },
-        configPath,
-      );
+      const config = await configLoader.loadConfig({ activeProfile: "nonexistent" }, configPath);
 
       // Should use base config
       expect(config.editor.prefer).toBe("cursor");

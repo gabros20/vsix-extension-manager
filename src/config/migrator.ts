@@ -97,10 +97,12 @@ export class ConfigMigrator {
   /**
    * Auto-migrate if v1 config exists and v2 doesn't
    */
-  async autoMigrateIfNeeded(options: {
-    interactive?: boolean;
-    dryRun?: boolean;
-  } = {}): Promise<boolean> {
+  async autoMigrateIfNeeded(
+    options: {
+      interactive?: boolean;
+      dryRun?: boolean;
+    } = {},
+  ): Promise<boolean> {
     const homeDir = process.env.HOME || process.env.USERPROFILE || "~";
 
     // Check for v1 config files
@@ -110,10 +112,7 @@ export class ConfigMigrator {
       path.join(homeDir, ".config", "vsix-extension-manager", "config.json"),
     ];
 
-    const v2Paths = [
-      path.join(homeDir, ".vsix", "config.yml"),
-      path.join(homeDir, ".vsix.yml"),
-    ];
+    const v2Paths = [path.join(homeDir, ".vsix", "config.yml"), path.join(homeDir, ".vsix.yml")];
 
     // Find existing v1 config
     let v1ConfigPath: string | null = null;
@@ -223,9 +222,7 @@ export class ConfigMigrator {
       } else {
         return {
           valid: false,
-          errors: result.error.issues.map(
-            (issue) => `${issue.path.join(".")}: ${issue.message}`,
-          ),
+          errors: result.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`),
         };
       }
     } catch (error) {
@@ -245,9 +242,6 @@ export const configMigrator = new ConfigMigrator();
 /**
  * Convenience function for auto-migration
  */
-export async function autoMigrateConfig(
-  interactive = false,
-  dryRun = false,
-): Promise<boolean> {
+export async function autoMigrateConfig(interactive = false, dryRun = false): Promise<boolean> {
   return await configMigrator.autoMigrateIfNeeded({ interactive, dryRun });
 }

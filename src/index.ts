@@ -5,9 +5,83 @@ import { downloadVsix } from "./commands/download";
 import { loadConfig, convertCliToConfig, type Config } from "./config/constants";
 import { initializeErrorHandler, handleErrorAndExit } from "./core/errors";
 import packageJson from "../package.json";
+import { outputFormatter } from "./core/output";
+import type { CommandResult, GlobalOptions } from "./commands/base/types";
+import type { BaseCommand } from "./commands/base/BaseCommand";
+
+/**
+ * Wrap v2.0 command action with CommandResult handling and output formatting
+ * Integration Phase: New wrapper for Phase 2 integrated commands
+ */
+async function withV2CommandHandling(
+  commandModule: () => Promise<{ default: BaseCommand }>,
+  args: string[],
+  options: Record<string, unknown>,
+): Promise<void> {
+  try {
+    // Import command dynamically
+    const { default: command } = await commandModule();
+
+    // Convert options to GlobalOptions
+    const globalOptions: GlobalOptions = {
+      editor: options.editor as any,
+      codeBin: options.codeBin as string,
+      cursorBin: options.cursorBin as string,
+      allowMismatch: options.allowMismatch as boolean,
+      quiet: options.quiet as boolean,
+      json: options.json as boolean,
+      yes: options.yes as boolean,
+      debug: options.debug as boolean,
+      source: options.source as any,
+      version: options.version as string,
+      preRelease: options.preRelease as boolean,
+      parallel: options.parallel ? parseInt(options.parallel as string) : undefined,
+      timeout: options.timeout ? parseInt(options.timeout as string) : undefined,
+      retry: options.retry ? parseInt(options.retry as string) : undefined,
+      retryDelay: options.retryDelay ? parseInt(options.retryDelay as string) : undefined,
+      skipInstalled: options.skipInstalled as boolean,
+      force: options.force as boolean,
+      output: options.output as string,
+      downloadOnly: options.downloadOnly as boolean,
+      checkCompat: options.checkCompat as boolean,
+      noBackup: options.noBackup as boolean,
+      verifyChecksum: options.verifyChecksum as boolean,
+      plan: options.plan as boolean,
+      dryRun: options.dryRun as boolean,
+      profile: options.profile as string,
+      config: options.config as string,
+    };
+
+    // Execute command
+    const result: CommandResult = await command.execute(args, globalOptions);
+
+    // Format output based on options
+    const formatted = outputFormatter.format(result, {
+      format: globalOptions.json ? "json-pretty" : "human",
+      quiet: globalOptions.quiet,
+      includeStack: globalOptions.debug,
+    });
+
+    // Output result
+    console.log(formatted.content);
+
+    // Exit with appropriate code
+    process.exit(formatted.exitCode);
+  } catch (error) {
+    // Handle unexpected errors
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (options.json) {
+      console.error(JSON.stringify({ status: "error", error: errorMessage }, null, 2));
+    } else {
+      console.error(`Error: ${errorMessage}`);
+    }
+    process.exit(1);
+  }
+}
 
 /**
  * Wrap command action with configuration loading and error handling
+ * Legacy wrapper for v1.x commands (preserved during migration)
  */
 async function withConfigAndErrorHandling<T extends Record<string, unknown>>(
   action: (config: Config, options: T) => Promise<void>,
@@ -43,6 +117,54 @@ program
   )
   .version(packageJson.version)
   .option("--config <path>", "Path to configuration file");
+
+// ============================================================================
+// V2.0 COMMANDS (Integration Phase)
+// ============================================================================
+
+/**
+ * add - Universal entry point for adding extensions
+ * Integration Phase: First v2.0 command with Phase 2 systems integrated
+ * Consolidates: download, quick-install, from-list, install, install-direct
+ */
+program
+  .command("add <input>")
+  .description("Add extensions (universal entry point) - detects input type automatically")
+  .option("-e, --editor <type>", "Target editor: cursor|vscode|auto (default: auto)")
+  .option("--code-bin <path>", "VS Code binary path")
+  .option("--cursor-bin <path>", "Cursor binary path")
+  .option("--allow-mismatch", "Allow binary mismatch")
+  .option("--download-only", "Download without installing")
+  .option("--source <registry>", "Registry: marketplace|open-vsx|auto (default: auto)")
+  .option("--version <version>", "Specific version")
+  .option("--pre-release", "Use pre-release version")
+  .option("--parallel <n>", "Parallel operations (1-10)", "3")
+  .option("--timeout <sec>", "Timeout in seconds", "30")
+  .option("--retry <n>", "Retry attempts", "3")
+  .option("--retry-delay <ms>", "Delay between retries (ms)", "1000")
+  .option("--force", "Force reinstall/overwrite")
+  .option("--skip-installed", "Skip already installed")
+  .option("--output <path>", "Output directory")
+  .option("--check-compat", "Check compatibility")
+  .option("--no-backup", "Skip automatic backup")
+  .option("--verify-checksum", "Verify download checksums")
+  .option("-y, --yes", "Auto-confirm all prompts")
+  .option("--quiet", "Minimal output")
+  .option("--json", "JSON output")
+  .option("--debug", "Debug logging")
+  .option("--plan", "Show execution plan without running")
+  .option("--dry-run", "Validate only, no execution")
+  .action(async (input, opts) => {
+    await withV2CommandHandling(
+      () => import("./commands/add"),
+      [input],
+      opts,
+    );
+  });
+
+// ============================================================================
+// V1.X COMMANDS (Legacy - preserved during migration)
+// ============================================================================
 
 program
   .command("download")

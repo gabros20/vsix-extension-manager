@@ -68,11 +68,15 @@ export class SetupWizard {
 
     // Save configuration if requested
     if (responses.configLocation !== "none") {
-      const configPath = await this.saveConfig(config, responses.configLocation, options.outputPath);
-      
+      const configPath = await this.saveConfig(
+        config,
+        responses.configLocation,
+        options.outputPath,
+      );
+
       if (configPath) {
         ui.log.success(`✓ Configuration saved to: ${configPath}`);
-        
+
         // Show next steps
         this.showNextSteps(configPath);
       }
@@ -90,7 +94,7 @@ export class SetupWizard {
    */
   private showWelcome(): void {
     ui.intro("👋 Welcome to VSIX Extension Manager v2.0!");
-    
+
     console.log("");
     ui.log.message("Let's set up your configuration (takes ~2 minutes)");
     ui.log.message("You can always change these settings later in your config file");
@@ -106,17 +110,17 @@ export class SetupWizard {
         ui.select({
           message: "Which editor do you use primarily?",
           options: [
-            { value: "auto", label: "Auto-detect (recommended)", hint: "Automatically detect Cursor or VS Code" },
+            {
+              value: "auto",
+              label: "Auto-detect (recommended)",
+              hint: "Automatically detect Cursor or VS Code",
+            },
             { value: "cursor", label: "Cursor", hint: "Use Cursor exclusively" },
             { value: "vscode", label: "VS Code", hint: "Use VS Code exclusively" },
           ],
         }),
 
-      safety: () =>
-        ui.confirm(
-          "Enable safety features? (Recommended)",
-          true,
-        ),
+      safety: () => ui.confirm("Enable safety features? (Recommended)", true),
 
       parallelDownloads: () =>
         ui.text({
@@ -135,7 +139,11 @@ export class SetupWizard {
         ui.select({
           message: "Where should we save your configuration?",
           options: [
-            { value: "home", label: "Home directory (~/.vsix/config.yml)", hint: "Global configuration" },
+            {
+              value: "home",
+              label: "Home directory (~/.vsix/config.yml)",
+              hint: "Global configuration",
+            },
             { value: "project", label: "Current project (.vsix.yml)", hint: "Project-specific" },
             { value: "none", label: "Don't save (use defaults)", hint: "No configuration file" },
           ],
@@ -145,11 +153,8 @@ export class SetupWizard {
         if (results.configLocation === "none") {
           return false;
         }
-        
-        return await ui.confirm(
-          "Create default profiles? (production, development)",
-          false,
-        );
+
+        return await ui.confirm("Create default profiles? (production, development)", false);
       },
     });
 
@@ -242,7 +247,9 @@ export class SetupWizard {
 
       return configPath;
     } catch (error) {
-      ui.log.error(`Failed to save configuration: ${error instanceof Error ? error.message : String(error)}`);
+      ui.log.error(
+        `Failed to save configuration: ${error instanceof Error ? error.message : String(error)}`,
+      );
       return null;
     }
   }
