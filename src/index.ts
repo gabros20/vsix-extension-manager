@@ -155,11 +155,7 @@ program
   .option("--plan", "Show execution plan without running")
   .option("--dry-run", "Validate only, no execution")
   .action(async (input, opts) => {
-    await withV2CommandHandling(
-      () => import("./commands/add"),
-      [input],
-      opts,
-    );
+    await withV2CommandHandling(() => import("./commands/add"), [input], opts);
   });
 
 // ============================================================================
@@ -453,6 +449,11 @@ async function wireV2Command(commandName: string, aliases: string[] = []): Promi
     if (help.usage && help.usage !== help.name) {
       const usageParts = help.usage.split(" ").slice(1); // Remove command name
       usageParts.forEach((part) => {
+        // Skip generic [options] placeholder
+        if (part.toLowerCase() === "[options]") {
+          return;
+        }
+        
         if (part.startsWith("<") && part.endsWith(">")) {
           cmd.argument(part, "");
         } else if (part.startsWith("[") && part.endsWith("]")) {
