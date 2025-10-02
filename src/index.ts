@@ -327,6 +327,30 @@ async function wireV2Command(commandName: string, aliases: string[] = []): Promi
   }
 }
 
+/**
+ * Background update checker - non-blocking
+ * Checks for extension updates and shows a subtle notification if available
+ */
+async function checkForUpdatesInBackground(): Promise<void> {
+  try {
+    const { UpdateChecker } = await import("./core/updates/UpdateChecker");
+    const checker = new UpdateChecker();
+    
+    // Check with weekly frequency (respects cache)
+    const result = await checker.checkForUpdates("weekly");
+    
+    // Only show notification if updates are available
+    if (result.updates.length > 0) {
+      console.log(""); // Empty line for spacing
+      console.log(`💡 ${result.updates.length} extension update${result.updates.length > 1 ? "s" : ""} available`);
+      console.log(`   Run 'vsix update' to review and install`);
+      console.log(""); // Empty line for spacing
+    }
+  } catch (error) {
+    // Silently fail - don't interrupt user workflow
+  }
+}
+
 // Wire v2.0 commands and parse arguments
 (async () => {
   try {
@@ -366,6 +390,21 @@ async function wireV2Command(commandName: string, aliases: string[] = []): Promi
       
       // If wizard ran, we might want to reload config
       // but for now we'll let each command load its own config
+    }
+    
+    // Background update check (non-blocking, fires and forgets)
+    // Only check if not in quiet/json mode and not help/version
+    if (!isHelpFlag && !isVersionFlag) {
+      const globalOpts = program.opts();
+      const quiet = globalOpts.quiet || args.includes("--quiet");
+      const json = globalOpts.json || args.includes("--json");
+      
+      if (!quiet && !json) {
+        // Fire and forget - don't wait for update check
+        checkForUpdatesInBackground().catch(() => {
+          // Silently fail - don't interrupt user workflow
+        });
+      }
     }
     
     // ============================================================================
