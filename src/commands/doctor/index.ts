@@ -5,6 +5,7 @@
 
 import { BaseCommand } from "../base/BaseCommand";
 import type { CommandResult, CommandHelp, GlobalOptions } from "../base/types";
+import { CommandResultBuilder } from "../../core/output/CommandResultBuilder";
 import { healthChecker } from "./healthChecker";
 import { autoFixService } from "./autoFix";
 import { ui, promptPolicy } from "../../core/ui";
@@ -21,6 +22,7 @@ export interface DoctorOptions extends GlobalOptions {
  */
 class DoctorCommand extends BaseCommand {
   async execute(_args: string[], options: GlobalOptions): Promise<CommandResult> {
+    const builder = new CommandResultBuilder("doctor");
     const context = this.createContext(options);
     const doctorOptions = options as DoctorOptions;
 
@@ -44,30 +46,27 @@ class DoctorCommand extends BaseCommand {
         await this.applyFixes(report, options);
       }
 
-      // Return result
-      return {
-        status: report.overall === "fail" ? "error" : "ok",
-        command: "doctor",
-        summary: this.getSummaryMessage(report),
-        items: report.checks.map((check) => ({
+      // Add checks to builder
+      report.checks.forEach((check) => {
+        const item = {
           id: check.name,
-          status: check.status === "pass" ? ("success" as const) : ("failed" as const),
-          duration: 0,
-          details: {
+          name: check.name,
+        };
+
+        if (check.status === "pass") {
+          builder.addSuccess(item);
+        } else if (check.status === "warning") {
+          builder.addSkipped(item);
+          builder.addWarningItem({
+            code: "CHECK_WARNING",
             message: check.message,
-            details: check.details,
-            fixable: check.fixable,
-          },
-        })),
-        totals: {
-          total: 0,
-          successful: report.summary.passed,
-          failed: report.summary.failed,
-          skipped: report.summary.warnings,
-          warnings: 0,
-          duration: this.getDuration(context),
-        },
-      };
+          });
+        } else {
+          builder.addFailure(item);
+        }
+      });
+
+      return builder.setSummary(this.getSummaryMessage(report)).build();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 
@@ -75,26 +74,7 @@ class DoctorCommand extends BaseCommand {
         ui.log.error(`Failed to run health check: ${message}`);
       }
 
-      return {
-        status: "error",
-        command: "doctor",
-        summary: `Health check failed: ${message}`,
-        items: [],
-        errors: [
-          {
-            code: "HEALTH_CHECK_FAILED",
-            message,
-          },
-        ],
-        totals: {
-          total: 0,
-          successful: 0,
-          failed: 1,
-          skipped: 0,
-          warnings: 0,
-          duration: this.getDuration(context),
-        },
-      };
+      return CommandResultBuilder.fromError("doctor", error instanceof Error ? error : new Error(message));
     }
   }
 

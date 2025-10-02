@@ -133,7 +133,10 @@ export class RemoveCommand extends BaseCommand {
         }
 
         if (builtResult.errors && builtResult.errors.length > 0) {
-          ui.note(builtResult.errors.map((e) => `❌ ${e.item}: ${e.message}`).join("\n"), "Failed Removals");
+          ui.note(
+            builtResult.errors.map((e) => `❌ ${e.item}: ${e.message}`).join("\n"),
+            "Failed Removals",
+          );
         }
       }
 
@@ -144,7 +147,9 @@ export class RemoveCommand extends BaseCommand {
           : `⚠️  Removed ${result.uninstalled} of ${extensionIds.length} extension(s)`,
       );
 
-      return builder.setSummary(`Removed ${result.uninstalled} of ${extensionIds.length} extensions`).build();
+      return builder
+        .setSummary(`Removed ${result.uninstalled} of ${extensionIds.length} extensions`)
+        .build();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 
@@ -152,7 +157,10 @@ export class RemoveCommand extends BaseCommand {
         ui.log.error(message);
       }
 
-      return CommandResultBuilder.fromError("remove", error instanceof Error ? error : new Error(message));
+      return CommandResultBuilder.fromError(
+        "remove",
+        error instanceof Error ? error : new Error(message),
+      );
     }
   }
 

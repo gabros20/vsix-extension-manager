@@ -453,7 +453,7 @@ async function wireV2Command(commandName: string, aliases: string[] = []): Promi
         if (part.toLowerCase() === "[options]") {
           return;
         }
-        
+
         if (part.startsWith("<") && part.endsWith(">")) {
           cmd.argument(part, "");
         } else if (part.startsWith("[") && part.endsWith("]")) {

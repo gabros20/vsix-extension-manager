@@ -155,7 +155,10 @@ export class UpdateCommand extends BaseCommand {
         }
 
         if (builtResult.errors && builtResult.errors.length > 0) {
-          ui.note(builtResult.errors.map((e) => `❌ ${e.item}: ${e.message}`).join("\n"), "Failed Updates");
+          ui.note(
+            builtResult.errors.map((e) => `❌ ${e.item}: ${e.message}`).join("\n"),
+            "Failed Updates",
+          );
         }
 
         // Show backup IDs if created
@@ -184,7 +187,9 @@ export class UpdateCommand extends BaseCommand {
         });
       }
 
-      return builder.setSummary(`Updated ${result.updated} of ${extensionIds.length} extensions`).build();
+      return builder
+        .setSummary(`Updated ${result.updated} of ${extensionIds.length} extensions`)
+        .build();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 
@@ -192,7 +197,10 @@ export class UpdateCommand extends BaseCommand {
         ui.log.error(message);
       }
 
-      return CommandResultBuilder.fromError("update", error instanceof Error ? error : new Error(message));
+      return CommandResultBuilder.fromError(
+        "update",
+        error instanceof Error ? error : new Error(message),
+      );
     }
   }
 

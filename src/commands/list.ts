@@ -139,7 +139,10 @@ export class ListCommand extends BaseCommand {
         ui.log.error(message);
       }
 
-      return CommandResultBuilder.fromError("list", error instanceof Error ? error : new Error(message));
+      return CommandResultBuilder.fromError(
+        "list",
+        error instanceof Error ? error : new Error(message),
+      );
     }
   }
 

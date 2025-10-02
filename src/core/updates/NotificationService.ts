@@ -7,7 +7,7 @@ export class NotificationService {
   showUpdateNotification(): void {
     // Stub - not yet implemented
   }
-  
+
   showUpdateHint(): void {
     // Stub - not yet implemented
   }

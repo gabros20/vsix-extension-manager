@@ -13,7 +13,7 @@ export interface Message {
 
 export class MessageQueue {
   private messages: Message[] = [];
-  
+
   add(level: MessageLevel, content: string): void {
     this.messages.push({
       level,
@@ -21,11 +21,11 @@ export class MessageQueue {
       timestamp: Date.now(),
     });
   }
-  
+
   getMessages(): Message[] {
     return this.messages;
   }
-  
+
   flush(): void {
     this.messages = [];
   }

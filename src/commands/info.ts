@@ -93,7 +93,10 @@ export class InfoCommand extends BaseCommand {
         ui.log.error(message);
       }
 
-      return CommandResultBuilder.fromError("info", error instanceof Error ? error : new Error(message));
+      return CommandResultBuilder.fromError(
+        "info",
+        error instanceof Error ? error : new Error(message),
+      );
     }
   }
 

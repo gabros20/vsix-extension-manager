@@ -5,6 +5,7 @@
 
 import { BaseCommand } from "./base/BaseCommand";
 import type { CommandResult, CommandHelp, GlobalOptions } from "./base/types";
+import { CommandResultBuilder } from "../core/output/CommandResultBuilder";
 import { setupWizard } from "../core/setup";
 import { ui } from "../core/ui";
 
@@ -22,6 +23,7 @@ export interface SetupOptions extends GlobalOptions {
  */
 class SetupCommand extends BaseCommand {
   async execute(_args: string[], options: GlobalOptions): Promise<CommandResult> {
+    const builder = new CommandResultBuilder("setup");
     const context = this.createContext(options);
     const setupOptions = options as SetupOptions;
 
@@ -49,47 +51,18 @@ class SetupCommand extends BaseCommand {
       }
 
       if (!result) {
-        return {
-          status: "ok",
-          command: "setup",
-          summary: "Setup cancelled or skipped",
-          items: [],
-          totals: {
-            total: 0,
-            successful: 0,
-            failed: 0,
-            skipped: 1,
-            warnings: 0,
-            duration: this.getDuration(context),
-          },
-        };
+        return builder.setSummary("Setup cancelled or skipped").addSkipped({
+          id: "config",
+          name: "configuration",
+        }).build();
       }
 
-      return {
-        status: "ok",
-        command: "setup",
-        summary: "Configuration created successfully",
-        items: [
-          {
-            id: "config",
-            status: "success" as const,
-            duration: this.getDuration(context),
-            details: {
-              editor: result.editor.prefer,
-              safety: result.safety["check-compatibility"],
-              performance: `${result.performance["parallel-downloads"]} parallel downloads`,
-            },
-          },
-        ],
-        totals: {
-          total: 0,
-          successful: 1,
-          failed: 0,
-          skipped: 0,
-          warnings: 0,
-          duration: this.getDuration(context),
-        },
-      };
+      builder.addSuccess({
+        id: "config",
+        name: "configuration",
+      });
+
+      return builder.setSummary("Configuration created successfully").build();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
 
@@ -97,26 +70,7 @@ class SetupCommand extends BaseCommand {
         ui.log.error(`Setup failed: ${message}`);
       }
 
-      return {
-        status: "error",
-        command: "setup",
-        summary: `Setup failed: ${message}`,
-        items: [],
-        errors: [
-          {
-            code: "SETUP_FAILED",
-            message,
-          },
-        ],
-        totals: {
-          total: 0,
-          successful: 0,
-          failed: 1,
-          skipped: 0,
-          warnings: 0,
-          duration: this.getDuration(context),
-        },
-      };
+      return CommandResultBuilder.fromError("setup", error instanceof Error ? error : new Error(message));
     }
   }
 
