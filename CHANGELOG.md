@@ -1,3 +1,126 @@
+# [2.0.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.16.0...v2.0.0) (2024-12-19)
+
+## 🚀 BREAKING CHANGES
+
+This is a **complete refactor** of the CLI interface. While all functionality is preserved, the command structure and flag names have changed significantly.
+
+### Command Structure Changes
+
+**Old (v1.x) → New (v2.0):**
+- `download`, `quick-install`, `from-list`, `install`, `install-direct` → **`add`** (universal entry point)
+- `uninstall` → **`remove`**
+- `update-installed` → **`update`**
+- `export-installed` → **`list`**
+- `versions` → **`info`**
+- New: **`doctor`** (health check and diagnostics)
+- New: **`setup`** (first-run configuration wizard)
+
+### Flag Changes
+
+**Simplified and standardized:**
+- `--verbose` → `--debug`
+- `--reinstall` → `--force`
+- `--check-compatibility` → `--check-compat`
+- `--allow-mismatched-binary` → `--allow-mismatch`
+- `--install-parallel` → `--parallel`
+- `--no-install` → `--download-only`
+- `--out-dir` → `--output`
+
+**Removed (use positional arguments):**
+- `--url`, `--vsix`, `--file`, `--dir`, `--id` → Use: `vsix add <input>`
+
+### Configuration Changes
+
+- **New:** YAML-based configuration (`.vsix/config.yml`)
+- **New:** Profile support for different environments
+- **Automatic migration** from v1.x config files
+- Enhanced configuration with more options and better organization
+
+### Features
+
+#### Universal `add` Command
+- **Smart input detection** - automatically determines input type (URL, file, directory, list, extension ID)
+- **Unified workflow** - one command for all installation scenarios
+- **Plan preview** - shows what will happen before executing
+- **Automatic retry** - intelligent retry with escalating strategies
+- **Enhanced error handling** - contextual suggestions and recovery options
+
+#### Configuration System v2.0
+- **YAML configuration** - human-readable, easy to edit
+- **Profile support** - switch between different configurations (production, development, CI)
+- **Automatic migration** - seamlessly upgrades v1.x configs to v2.0
+- **Enhanced precedence** - CLI > ENV > File > Defaults (clearly documented)
+- **First-run wizard** - interactive setup on first use
+
+#### Background Update Checker
+- **Non-blocking checks** - doesn't interrupt workflow
+- **Smart caching** - respects configured frequency (never, daily, weekly, always)
+- **Minimal notifications** - subtle hints about available updates
+- **Zero telemetry** - completely local checking
+
+#### Health Check & Diagnostics
+- **`doctor` command** - comprehensive health checks
+- **Auto-fix** - automatically repair common issues
+- **Proactive detection** - find problems before they cause failures
+- **Clear reports** - easy-to-understand diagnostic output
+
+#### Standardized Output
+- **Consistent JSON API** - machine-readable across all commands
+- **Multiple formats** - table, JSON, YAML, CSV, plain text
+- **Proper exit codes** - reliable for CI/CD integration
+- **Rich details** - comprehensive information in all modes
+
+#### Intelligent Retry System
+- **Automatic retry** - handles transient failures
+- **Escalating strategies** - timeout increase, direct install, download-only fallback
+- **User intervention** - prompts for decisions when automated recovery fails
+- **Batch context** - shared retry state across multiple operations
+
+### Improvements
+
+- **Code quality:** ~777 lines of boilerplate removed
+- **Build:** 0 TypeScript errors
+- **Architecture:** Clean separation of command layer and business logic
+- **Error handling:** Contextual suggestions and automated recovery
+- **User experience:** Progressive disclosure, smart defaults, fail-forward design
+- **Performance:** Optimized startup, efficient caching, parallel operations
+- **Testing:** 61 integration tests covering core workflows
+
+### Deprecated/Removed
+
+**Removed commands** (functionality moved to unified commands):
+- `download` - Use `add <input> --download-only`
+- `quick-install` - Use `add <url>`
+- `from-list` - Use `add <list-file>`
+- `install` - Use `add <file|directory>`
+- `install-direct` - Use `add` (auto-detects method)
+- `export-installed` - Use `list --output <file>`
+- `update-installed` - Use `update`
+- `uninstall` - Use `remove <id>`
+
+**Interactive mode temporarily disabled:**
+- Will be redesigned with v2.0 command structure
+- Use direct commands: `vsix add`, `vsix remove`, `vsix update`, `vsix list`, `vsix info`
+
+### Migration Guide
+
+See [MIGRATION.md](./MIGRATION.md) for complete migration documentation.
+
+**Quick Reference:**
+```bash
+# v1.x → v2.0 command mapping
+vsix-extension-manager download --url <url>           → vsix add <url>
+vsix-extension-manager quick-install --url <url>      → vsix add <url>
+vsix-extension-manager install --vsix <file>          → vsix add <file>
+vsix-extension-manager from-list --file <list>        → vsix add <list>
+vsix-extension-manager export-installed -o list.txt   → vsix list --output list.txt
+vsix-extension-manager update-installed               → vsix update
+vsix-extension-manager uninstall <id>                 → vsix remove <id>
+vsix-extension-manager versions <id>                  → vsix info <id>
+```
+
+---
+
 # [1.16.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.15.0...v1.16.0) (2025-10-01)
 
 ### Bug Fixes
