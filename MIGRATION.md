@@ -86,8 +86,8 @@ CLI flags > Environment variables (`VSIX_*`) > Config file > Defaults
 ## v2.0 Implementation Progress
 
 **Branch:** `feat/v2.0-refactor`  
-**Commits:** 26 commits  
-**Status:** Phase 2 - Week 6 Complete (Phase 1 COMPLETE ✅, 50% of Phase 2)  
+**Commits:** 28 commits  
+**Status:** Phase 2 - Week 7 Complete (Phase 1 COMPLETE ✅, 75% of Phase 2)  
 **Last Updated:** 2024-12-19  
 **Build Status:** ✅ PASSING (0 TypeScript errors)
 
@@ -201,7 +201,7 @@ CLI flags > Environment variables (`VSIX_*`) > Config file > Defaults
 ## Phase 2: Intelligence (Weeks 5-8) - IN PROGRESS
 
 **Goal:** Quality of life improvements and automation  
-**Status:** Week 6 Complete (50% of Phase 2)
+**Status:** Week 7 Complete (75% of Phase 2)
 
 #### ✅ Week 5: Configuration System & Setup Wizard (Complete)
 
@@ -257,11 +257,37 @@ CLI flags > Environment variables (`VSIX_*`) > Config file > Defaults
 - **Auto-Totals**: Automatic success/fail/skip/warning counting
 - **Rich Errors**: Structured errors with contextual suggestions
 
-#### 📋 Week 7: Update Notifications & Polish (Next)
+#### ✅ Week 7: Update Notifications & Polish (Complete)
 
-- Background update checker with configurable frequency
-- Consistent prompting system across all modes
-- Non-intrusive messaging
+- **Commit 20d86f1:** Background Update Checker & Messaging System
+
+**Task 7.1 - Background Update Checker:**
+
+- ✅ `src/core/updates/UpdateChecker.ts` - Update checking service (220 lines)
+- ✅ `src/core/updates/NotificationService.ts` - Non-intrusive notifications (120 lines)
+- ✅ Configurable check frequency (never, daily, weekly, always)
+- ✅ Smart caching to avoid excessive API calls
+
+**Task 7.2 - Messaging Polish:**
+
+- ✅ `src/core/messaging/MessageQueue.ts` - Message buffering for JSON mode (130 lines)
+- ✅ `src/core/messaging/types.ts` - Message types and levels
+- ✅ Enhanced existing promptPolicy for consistent behavior
+
+**New Features:**
+
+- **Background Updates**: Passive update checking without blocking workflow
+- **Smart Caching**: Cache respects intervals (daily: 24h, weekly: 7d)
+- **Non-Intrusive**: Minimal, informative notifications
+- **Multiple Styles**: Hint, standard, and detailed notification modes
+- **Message Buffering**: Queue messages for JSON output mode
+- **Graceful Failures**: Network errors don't interrupt user workflow
+
+#### 📋 Week 8: Integration Testing & Bug Fixes (Next)
+
+- Comprehensive integration test suite
+- Command workflow testing
+- Configuration system testing
 
 ### Files Created (21 new files)
 
@@ -716,6 +742,6 @@ git commit -m "fix: resolve final type errors, build succeeds"
 
 **Last Updated:** 2024-12-19  
 **Branch:** `feat/v2.0-refactor`  
-**Commits:** 26  
-**Phase:** 2 (Week 6, 50% COMPLETE)  
+**Commits:** 28  
+**Phase:** 2 (Week 7, 75% COMPLETE)  
 **Build Status:** ✅ PASSING (0 TypeScript errors)
