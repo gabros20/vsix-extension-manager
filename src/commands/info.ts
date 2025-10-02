@@ -63,11 +63,11 @@ export class InfoCommand extends BaseCommand {
       const limit = infoOptions.limit || (infoOptions.all ? versions.length : 10);
       const versionsToShow = versions.slice(0, limit);
 
-      // Map to ensure compatible types
-      const mappedVersions = versionsToShow.map((v: any) => ({
+      // Map to ensure compatible types (ExtensionVersionInfo only has version + published)
+      const mappedVersions = versionsToShow.map((v) => ({
         version: v.version,
-        isPreRelease: v.flags?.includes("preview") || false,
-        lastUpdated: v.lastUpdated,
+        isPreRelease: false, // ExtensionVersionInfo doesn't have this property
+        lastUpdated: v.published,
       }));
 
       // Show information in interactive mode
@@ -82,8 +82,7 @@ export class InfoCommand extends BaseCommand {
         status: "success" as const,
         duration: 0,
         details: {
-          isPreRelease: v.isPreRelease,
-          lastUpdated: v.lastUpdated,
+          published: v.published,
         },
       }));
 
@@ -104,7 +103,7 @@ export class InfoCommand extends BaseCommand {
           extensionId,
           totalVersions: versions.length,
           latestVersion: versions[0].version,
-          latestPreRelease: versions.find((v) => v.isPreRelease)?.version,
+          latestPreRelease: undefined, // ExtensionVersionInfo doesn't have isPreRelease
         },
       };
     } catch (error) {

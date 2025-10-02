@@ -76,7 +76,7 @@ export class ListCommand extends BaseCommand {
       }
 
       if (extensions.length === 0) {
-        ui.log.warn("No extensions found");
+        ui.log.warning("No extensions found");
         return this.createSuccessResult("No extensions found", {
           items: [],
           totals: {

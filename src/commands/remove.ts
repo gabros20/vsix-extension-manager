@@ -127,8 +127,8 @@ export class RemoveCommand extends BaseCommand {
       // Show summary in interactive mode
       if (promptPolicy.isInteractive(options)) {
         ui.showResultSummary({
-          success: result.successCount,
-          failed: result.failureCount,
+          success: result.uninstalled,
+          failed: result.failed,
           skipped: 0,
           duration: this.getDuration(context),
         });
@@ -138,22 +138,22 @@ export class RemoveCommand extends BaseCommand {
         }
       }
 
-      const allSucceeded = result.failureCount === 0;
+      const allSucceeded = result.failed === 0;
       ui.outro(
         allSucceeded
-          ? `✅ Successfully removed ${result.successCount} extension(s)`
-          : `⚠️  Removed ${result.successCount} of ${extensionIds.length} extension(s)`,
+          ? `✅ Successfully removed ${result.uninstalled} extension(s)`
+          : `⚠️  Removed ${result.uninstalled} of ${extensionIds.length} extension(s)`,
       );
 
       return {
         status: allSucceeded ? "ok" : "error",
         command: "remove",
-        summary: `Removed ${result.successCount} of ${extensionIds.length} extensions`,
+        summary: `Removed ${result.uninstalled} of ${extensionIds.length} extensions`,
         items,
         errors,
         totals: {
-          success: result.successCount,
-          failed: result.failureCount,
+          success: result.uninstalled,
+          failed: result.failed,
           skipped: 0,
           duration: this.getDuration(context),
         },
@@ -224,7 +224,7 @@ export class RemoveCommand extends BaseCommand {
     const installed = await getInstalledExtensions(editor);
 
     if (installed.length === 0) {
-      ui.log.warn("No extensions found");
+      ui.log.warning("No extensions found");
       return [];
     }
 

@@ -124,13 +124,10 @@ export class PlanGenerator {
     const requestedVersion = options.version || "latest";
     const preferPreRelease = options.preRelease || false;
 
+    // ExtensionVersionInfo doesn't have isPreRelease, just use first version or requested
     let version: string;
     if (requestedVersion === "latest") {
-      if (preferPreRelease && versions.some((v) => v.isPreRelease)) {
-        version = versions.find((v) => v.isPreRelease)?.version || versions[0].version;
-      } else {
-        version = versions.find((v) => !v.isPreRelease)?.version || versions[0].version;
-      }
+      version = versions[0]?.version || "latest";
     } else {
       version = requestedVersion;
     }

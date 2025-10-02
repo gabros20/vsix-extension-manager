@@ -169,7 +169,7 @@ export class UpdateCommand extends BaseCommand {
 
         // Show backup IDs if created
         if (result.backups && result.backups.length > 0) {
-          const backupId = result.backups[0].backupId;
+          const backupId = result.backups[0].id;
           ui.note(
             `Backup created: ${backupId}\n` +
               `Rollback with: vsix rollback --backup-id ${backupId}`,
@@ -264,7 +264,7 @@ export class UpdateCommand extends BaseCommand {
     const installed = await getInstalledExtensions(editor);
 
     if (installed.length === 0) {
-      ui.log.warn("No extensions found");
+      ui.log.warning("No extensions found");
       return [];
     }
 

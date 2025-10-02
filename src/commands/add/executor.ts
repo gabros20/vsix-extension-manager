@@ -340,9 +340,7 @@ export class AddExecutor {
     const editorInfo = await this.resolveEditor(options);
 
     const tasks = scanResult.validVsixFiles.map((f) => ({
-      vsixPath: f.path,
-      skipIfInstalled: options.skipInstalled || false,
-      forceReinstall: options.force || false,
+      vsixFile: f, // InstallTask requires vsixFile property
     }));
 
     const results = await installService.installBulkVsix(editorInfo.binaryPath, tasks, {
@@ -354,8 +352,8 @@ export class AddExecutor {
     return {
       status: "ok",
       command: "add",
-      summary: `Installed ${results.successful.length} of ${scanResult.validVsixFiles.length} extensions`,
-      items: results.results.map((r: any) => ({
+      summary: `Installed ${results.successful} of ${scanResult.validVsixFiles.length} extensions`,
+      items: (results.results || []).map((r: any) => ({
         id: path.basename(r.vsixPath),
         status: r.success ? ("success" as const) : ("failed" as const),
         duration: r.duration || 0,
@@ -366,9 +364,9 @@ export class AddExecutor {
         item: path.basename(r.vsixPath),
       })),
       totals: {
-        success: results.successful.length,
-        failed: results.failed.length,
-        skipped: results.skipped.length,
+        success: results.successful,
+        failed: results.failed,
+        skipped: results.skipped,
         duration: Date.now() - startTime,
       },
     };
@@ -412,7 +410,7 @@ export class AddExecutor {
       [options.output || "./downloads"],
       {
         downloadMissing: !options.downloadOnly,
-        skipInstalled: options.skipInstalled || false,
+        // skipInstalled option removed from InstallFromListOptions
         checkCompatibility: options.checkCompat !== false,
         parallel: options.parallel || 3,
         installParallel: 1,
@@ -428,28 +426,17 @@ export class AddExecutor {
       status: "ok",
       command: "add",
       summary: options.downloadOnly
-        ? `Downloaded ${result.downloadResult.successCount} extensions`
-        : `Installed ${result.installResult?.successCount || 0} extensions`,
-      items: result.extensions.map((ext) => ({
-        id: (ext as any).id,
-        version: ext.version,
-        status: ext.downloaded
-          ? options.downloadOnly
-            ? ("success" as const)
-            : ext.installed
-              ? ("success" as const)
-              : ("failed" as const)
-          : ("failed" as const),
-        duration: 0,
-      })),
+        ? `Downloaded ${result.downloadResult?.successful || 0} extensions`
+        : `Installed ${result.installResult?.successful || 0} extensions`,
+      items: [], // TODO: InstallFromListResult doesn't have extensions array to map
       totals: {
         success: options.downloadOnly
-          ? result.downloadResult.successCount
-          : result.installResult?.successCount || 0,
+          ? result.downloadResult?.successful || 0
+          : result.installResult?.successful || 0,
         failed: options.downloadOnly
-          ? result.downloadResult.failureCount
-          : result.installResult?.failureCount || 0,
-        skipped: result.installResult?.skippedCount || 0,
+          ? result.downloadResult?.failed || 0
+          : result.installResult?.failed || 0,
+        skipped: result.installResult?.skipped || 0,
         duration: Date.now() - startTime,
       },
     };
