@@ -21,10 +21,10 @@ export const COMMANDS: Record<string, CommandLoader> = {
   update: async () => await import("./update"),
   list: async () => await import("./list"),
   info: async () => await import("./info"),
+  doctor: async () => await import("./doctor"),
 
   // Core commands (to be implemented)
   // search: async () => await import("./search"),
-  // doctor: async () => await import("./doctor"),
 
   // Specialized commands (to be implemented - Phase 3)
   // workspace: async () => await import("./workspace"),

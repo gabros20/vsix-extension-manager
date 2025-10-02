@@ -9,3 +9,9 @@ export * from "./definitions";
 
 // Error handling utilities
 export * from "./handler";
+
+// Enhanced error handling with suggestions and recovery
+export * from "./enhancedHandler";
+export type { ErrorSuggestion, ErrorContext, SuggestedAction } from "./suggestions";
+export { errorSuggestionService, ErrorSuggestionService } from "./suggestions";
+export * from "./recovery";

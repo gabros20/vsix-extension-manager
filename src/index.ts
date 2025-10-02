@@ -444,10 +444,10 @@ async function wireV2Command(commandName: string, aliases: string[] = []): Promi
     // Note: update command conflicts with existing "update-installed" alias
     // We'll keep old "update-installed" for now and add "upgrade" alias for new command
     await wireV2Command("update", ["upgrade"]);
+    await wireV2Command("doctor"); // Health check & diagnostics
 
     // TODO: Add remaining v2.0 commands as they're implemented
     // await wireV2Command('search');
-    // await wireV2Command('doctor');
     // await wireV2Command('workspace');
     // await wireV2Command('templates');
 
