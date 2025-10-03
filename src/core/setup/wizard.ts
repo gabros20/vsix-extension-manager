@@ -7,7 +7,7 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import * as yaml from "yaml";
 import { ui } from "../ui";
-import type { ConfigV2, PartialConfigV2 } from "../../config/schemaV2";
+import type { ConfigV2 } from "../../config/schemaV2";
 import { DEFAULT_CONFIG_V2 } from "../../config/schemaV2";
 import { configLoaderV2 } from "../../config/loaderV2";
 

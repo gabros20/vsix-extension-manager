@@ -57,7 +57,7 @@ export class ErrorRecoveryService {
         if (result) {
           return { ...result, strategy: name };
         }
-      } catch (strategyError) {
+      } catch {
         // Strategy failed, try next
         continue;
       }

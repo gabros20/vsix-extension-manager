@@ -7,7 +7,6 @@ import * as fs from "fs-extra";
 import * as path from "path";
 import * as os from "os";
 import { ConfigLoaderV2 } from "../../src/config/loaderV2";
-import type { ConfigV2 } from "../../src/config/schemaV2";
 
 describe("Configuration System Integration (v2.0)", () => {
   let testDir: string;

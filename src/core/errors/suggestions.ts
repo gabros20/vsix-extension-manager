@@ -3,8 +3,6 @@
  * Provides contextual suggestions for common errors
  */
 
-import type { VsixError } from "./types";
-
 export interface ErrorSuggestion {
   title: string;
   actions: SuggestedAction[];
@@ -28,9 +26,8 @@ export interface ErrorContext {
  * Get contextual suggestions for errors
  */
 export class ErrorSuggestionService {
-  getSuggestion(error: Error, context: ErrorContext = {}): ErrorSuggestion {
+  getSuggestion(error: Error, _context: ErrorContext = {}): ErrorSuggestion {
     const errorMsg = error.message.toLowerCase();
-    const errorName = error.name;
 
     // Binary mismatch errors
     if (errorMsg.includes("binary mismatch") || errorMsg.includes("wrong editor")) {

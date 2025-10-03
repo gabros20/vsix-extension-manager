@@ -99,14 +99,14 @@ export class UpdateChecker {
               source: "marketplace",
             });
           }
-        } catch (error) {
+        } catch {
           // Skip extensions that fail to check (might be local-only)
           continue;
         }
       }
-    } catch (error) {
+    } catch (err) {
       // Silently fail - don't interrupt user workflow
-      console.error("Update check failed:", error instanceof Error ? error.message : String(error));
+      console.error("Update check failed:", err instanceof Error ? err.message : String(err));
     }
 
     return updates;
@@ -134,7 +134,7 @@ export class UpdateChecker {
           duration: 0, // Cached result
         };
       }
-    } catch (error) {
+    } catch {
       // Cache read error - fetch fresh
       return null;
     }
@@ -156,7 +156,7 @@ export class UpdateChecker {
       };
 
       await fs.writeJSON(this.cacheFile, cache, { spaces: 2 });
-    } catch (error) {
+    } catch {
       // Silently fail - caching is not critical
     }
   }
@@ -190,7 +190,7 @@ export class UpdateChecker {
 
       const cache: UpdateCache = await fs.readJSON(this.cacheFile);
       return cache.lastCheck;
-    } catch (error) {
+    } catch {
       return 0;
     }
   }
@@ -221,7 +221,7 @@ export class UpdateChecker {
       if (await fs.pathExists(this.cacheFile)) {
         await fs.remove(this.cacheFile);
       }
-    } catch (error) {
+    } catch {
       // Silently fail
     }
   }

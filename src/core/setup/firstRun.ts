@@ -4,7 +4,6 @@
  */
 
 import { setupWizard } from "./wizard";
-import { configLoaderV2 } from "../../config/loaderV2";
 import { ui } from "../ui";
 
 /**

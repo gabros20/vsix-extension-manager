@@ -136,7 +136,6 @@ describe("Retry System Integration", () => {
 
   describe("Strategy Priority", () => {
     it("should try strategies in priority order", async () => {
-      const strategiesUsed: string[] = [];
       let attempts = 0;
 
       const task: Task = {

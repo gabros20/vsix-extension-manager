@@ -41,7 +41,7 @@ export class UserInterventionStrategy extends BaseRetryStrategy {
   private async promptForAction(
     error: Error,
     task: Task,
-    context: RetryContext,
+    _context: RetryContext,
   ): Promise<"retry" | "skip" | "abort"> {
     const message = `Operation "${task.name}" failed: ${error.message}\n\nHow would you like to proceed?`;
 
@@ -57,7 +57,7 @@ export class UserInterventionStrategy extends BaseRetryStrategy {
     return result;
   }
 
-  getDescription(error: Error, context: RetryContext): string {
+  getDescription(_error: Error, _context: RetryContext): string {
     return "Requesting user intervention";
   }
 }

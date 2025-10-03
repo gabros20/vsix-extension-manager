@@ -104,23 +104,14 @@ export class AutoFixService {
       };
     }
 
-    try {
-      // This is platform-specific and may require sudo
-      // For now, just inform the user
-      return {
-        total: 0,
-        successful: false,
-        message: "Permission fix requires manual intervention",
-        details: `Run: chmod 755 ${issue.details}`,
-      };
-    } catch (error) {
-      return {
-        total: 0,
-        successful: false,
-        message: "Failed to fix permissions",
-        details: error instanceof Error ? error.message : String(error),
-      };
-    }
+    // This is platform-specific and may require sudo
+    // For now, just inform the user
+    return {
+      total: 0,
+      successful: false,
+      message: "Permission fix requires manual intervention",
+      details: `Run: chmod 755 ${issue.details}`,
+    };
   }
 
   /**
