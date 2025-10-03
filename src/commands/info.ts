@@ -24,7 +24,6 @@ export interface InfoOptions extends GlobalOptions {
 export class InfoCommand extends BaseCommand {
   async execute(args: string[], options: GlobalOptions): Promise<CommandResult> {
     const builder = new CommandResultBuilder("info");
-    const context = this.createContext(options);
     const infoOptions = options as InfoOptions;
 
     // Validate arguments

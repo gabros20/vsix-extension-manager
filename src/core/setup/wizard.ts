@@ -147,7 +147,6 @@ export class SetupWizard {
             { value: "none", label: "Don't save (use defaults)", hint: "No configuration file" },
           ],
         }),
-
     });
 
     return {

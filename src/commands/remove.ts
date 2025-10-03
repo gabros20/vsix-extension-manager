@@ -93,6 +93,7 @@ export class RemoveCommand extends BaseCommand {
       const uninstallService = getUninstallExtensionsService();
       const result = await uninstallService.uninstallExtensions({
         selectedExtensions: extensionIds,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         editor: chosenEditor as any,
         parallel: options.parallel || 2,
         retry: options.retry || 1,

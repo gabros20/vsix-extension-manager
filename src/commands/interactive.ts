@@ -4,14 +4,13 @@
  */
 
 import * as p from "@clack/prompts";
-import type { ConfigV2 } from "../config/constants";
 import type { GlobalOptions } from "./base/types";
 import { loadCommand } from "./registry";
 
 /**
  * Main interactive menu - Quick actions for common tasks
  */
-export async function runInteractive(_config: ConfigV2) {
+export async function runInteractive() {
   console.clear();
 
   p.intro("🔽 VSIX Extension Manager v2.0");
@@ -380,8 +379,11 @@ async function handleListExtensions() {
 
   try {
     const listCommand = await loadCommand("list");
-    const options: GlobalOptions = {
+    // Cast to any to pass format option (ListOptions extends GlobalOptions)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const options: any = {
       quiet: false,
+      format: format as "table" | "json" | "yaml" | "txt" | "csv",
       output: format !== "table" ? `extensions.${format}` : undefined,
     };
 

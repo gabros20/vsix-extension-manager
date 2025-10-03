@@ -479,7 +479,7 @@ export class HealthChecker {
           details: `${availableGB.toFixed(2)} GB free`,
         });
       }
-    } catch (error) {
+    } catch {
       checks.push({
         name: "Disk Space",
         status: "warning",

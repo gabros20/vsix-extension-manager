@@ -249,8 +249,7 @@ async function checkForUpdatesInBackground(): Promise<void> {
     // IMPORTANT: Must be set AFTER all commands are registered
     program.action(async () => {
       const { runInteractive } = await import("./commands/interactive");
-      const { DEFAULT_CONFIG_V2 } = await import("./config/constants");
-      await runInteractive(DEFAULT_CONFIG_V2);
+      await runInteractive();
     });
 
     // ============================================================================

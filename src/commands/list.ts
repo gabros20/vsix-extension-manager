@@ -29,7 +29,6 @@ export interface ListOptions extends GlobalOptions {
 export class ListCommand extends BaseCommand {
   async execute(_args: string[], options: GlobalOptions): Promise<CommandResult> {
     const builder = new CommandResultBuilder("list");
-    const context = this.createContext(options);
     const listOptions = options as ListOptions;
 
     ui.intro("📋 List Extensions");

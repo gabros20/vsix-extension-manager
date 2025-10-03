@@ -80,7 +80,7 @@ export class AutoFixService {
   /**
    * Clean corrupted extensions
    */
-  private async cleanCorruptedExtensions(issue: HealthCheck): Promise<FixResult> {
+  private async cleanCorruptedExtensions(_issue: HealthCheck): Promise<FixResult> {
     // This would require more context about which extensions are corrupted
     // For now, return a message that manual intervention is needed
     return {

@@ -24,7 +24,6 @@ export interface SetupOptions extends GlobalOptions {
 class SetupCommand extends BaseCommand {
   async execute(_args: string[], options: GlobalOptions): Promise<CommandResult> {
     const builder = new CommandResultBuilder("setup");
-    const context = this.createContext(options);
     const setupOptions = options as SetupOptions;
 
     try {
