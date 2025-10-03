@@ -33,10 +33,8 @@ export class PlanGenerator {
   private vsixScanner = getVsixScanner();
   private installService = getInstallService();
   // Compatibility service not exported from install index - using simplified checks
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private preflightService: any = null; // TODO: Fix after services are properly exported
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private compatibilityService: any = null; // TODO: Fix after services are properly exported
+  private preflightService: unknown = null; // TODO: Fix after services are properly exported
+  private compatibilityService: unknown = null; // TODO: Fix after services are properly exported
 
   /**
    * Generate a complete installation plan
@@ -256,24 +254,41 @@ export class PlanGenerator {
     });
 
     // 2. Extensions directory check (using existing preflight service)
-    try {
-      const preflightResult = await this.preflightService.runPreflightChecks(target.name);
-      checks.push({
-        name: "Extensions Directory",
-        status: preflightResult.valid ? "pass" : "fail",
-        message: preflightResult.valid
-          ? "Extensions directory ready"
-          : preflightResult.errors[0] || "Directory check failed",
-        details: {
-          warnings: preflightResult.warnings,
-          suggestions: preflightResult.suggestions,
-        },
-      });
-    } catch (error) {
+    if (this.preflightService) {
+      try {
+        // Type assertion needed since service isn't properly exported yet
+        const service = this.preflightService as {
+          runPreflightChecks: (name: string) => Promise<{
+            valid: boolean;
+            errors: string[];
+            warnings: string[];
+            suggestions: string[];
+          }>;
+        };
+        const preflightResult = await service.runPreflightChecks(target.name);
+        checks.push({
+          name: "Extensions Directory",
+          status: preflightResult.valid ? "pass" : "fail",
+          message: preflightResult.valid
+            ? "Extensions directory ready"
+            : preflightResult.errors[0] || "Directory check failed",
+          details: {
+            warnings: preflightResult.warnings,
+            suggestions: preflightResult.suggestions,
+          },
+        });
+      } catch (error) {
+        checks.push({
+          name: "Extensions Directory",
+          status: "warning",
+          message: `Preflight check skipped: ${error instanceof Error ? error.message : String(error)}`,
+        });
+      }
+    } else {
       checks.push({
         name: "Extensions Directory",
         status: "warning",
-        message: `Preflight check skipped: ${error instanceof Error ? error.message : String(error)}`,
+        message: "Preflight service not available",
       });
     }
 
@@ -281,10 +296,27 @@ export class PlanGenerator {
     if (
       extension.source !== "local" &&
       extension.id !== "multiple" &&
-      options.checkCompat !== false
+      options.checkCompat !== false &&
+      this.compatibilityService
     ) {
       try {
-        const compatResult = await this.compatibilityService.checkCompatibility(
+        // Type assertion needed since service isn't properly exported yet
+        const service = this.compatibilityService as {
+          checkCompatibility: (
+            id: string,
+            version: string,
+            binaryPath: string,
+            source: "marketplace" | "open-vsx",
+          ) => Promise<{
+            compatible: boolean;
+            result: {
+              reason?: string;
+              editorVersion?: string;
+              requiredVersion?: string;
+            };
+          }>;
+        };
+        const compatResult = await service.checkCompatibility(
           extension.id,
           extension.version,
           target.binaryPath,
@@ -310,6 +342,16 @@ export class PlanGenerator {
           message: "Compatibility check unavailable",
         });
       }
+    } else if (
+      extension.source !== "local" &&
+      extension.id !== "multiple" &&
+      options.checkCompat !== false
+    ) {
+      checks.push({
+        name: "Compatibility",
+        status: "warning",
+        message: "Compatibility service not available",
+      });
     }
 
     // 4. Disk space check (basic)

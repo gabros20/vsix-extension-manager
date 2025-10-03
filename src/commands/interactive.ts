@@ -379,9 +379,11 @@ async function handleListExtensions() {
 
   try {
     const listCommand = await loadCommand("list");
-    // Cast to any to pass format option (ListOptions extends GlobalOptions)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const options: any = {
+    // Type-safe options that satisfy both GlobalOptions and list command requirements
+    const options: GlobalOptions & {
+      format?: "table" | "json" | "yaml" | "txt" | "csv";
+      output?: string;
+    } = {
       quiet: false,
       format: format as "table" | "json" | "yaml" | "txt" | "csv",
       output: format !== "table" ? `extensions.${format}` : undefined,
