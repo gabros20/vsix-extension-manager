@@ -6,6 +6,86 @@
 import * as p from "@clack/prompts";
 import type { GlobalOptions } from "./base/types";
 import { loadCommand } from "./registry";
+import { configLoaderV2 } from "../config/loaderV2";
+
+/**
+ * Helper: Select editor with config preference (Approach 1)
+ *
+ * Always offers choice if multiple editors available,
+ * but indicates which is the configured default.
+ *
+ * This allows users to:
+ * - Quickly select their configured default (1 click)
+ * - Override and choose non-default editor (1 click)
+ */
+async function selectEditorWithPreference(): Promise<"vscode" | "cursor"> {
+  // Load config to get preference
+  const config = await configLoaderV2.loadConfig();
+
+  const { getEditorService } = await import("../features/install");
+  const editorService = getEditorService();
+  const availableEditors = await editorService.getAvailableEditors();
+
+  if (availableEditors.length === 0) {
+    p.log.error("No editors found. Please install VS Code or Cursor.");
+    throw new Error("No editors found. Please install VS Code or Cursor.");
+  }
+
+  // Single editor - no choice needed
+  if (availableEditors.length === 1) {
+    const editor = availableEditors[0];
+    p.log.info(`Using ${editor.displayName}`);
+    return editor.name;
+  }
+
+  // Multiple editors available
+  const hasExplicitPreference = config.editor.prefer !== "auto";
+  const preferredEditor = availableEditors.find((e) => e.name === config.editor.prefer);
+
+  // Build options with default indication
+  const options = availableEditors.map((e) => {
+    const isDefault = hasExplicitPreference && e.name === config.editor.prefer;
+    const isRecommended = !hasExplicitPreference && e.name === "cursor";
+
+    let hint: string | undefined;
+    if (isDefault) {
+      hint = "Default (configured)";
+    } else if (isRecommended) {
+      hint = "Recommended";
+    }
+
+    return {
+      value: e.name,
+      label: e.displayName,
+      hint,
+    };
+  });
+
+  // CRITICAL: Always prompt, even with configured preference
+  // This allows users to choose non-default editor when needed
+  const message =
+    hasExplicitPreference && preferredEditor
+      ? `Select editor (default: ${preferredEditor.displayName}):`
+      : "Select target editor:";
+
+  const editorChoice = await p.select({
+    message,
+    options,
+  });
+
+  if (p.isCancel(editorChoice)) {
+    throw new Error("Editor selection cancelled");
+  }
+
+  const selectedEditor = editorChoice as "vscode" | "cursor";
+
+  // Log if user chose non-default
+  if (hasExplicitPreference && selectedEditor !== config.editor.prefer) {
+    p.log.info(`Using ${selectedEditor === "cursor" ? "Cursor" : "VS Code"} (overriding default)`);
+  }
+
+  return selectedEditor;
+}
 
 /**
  * Main interactive menu - Quick actions for common tasks
@@ -94,34 +174,8 @@ export async function runInteractive() {
 async function handleAddExtension() {
   p.log.step("Add Extension");
 
-  // Select editor first (if multiple available) for install operations
-  const { getEditorService } = await import("../features/install");
-  const editorService = getEditorService();
-  const availableEditors = await editorService.getAvailableEditors();
-
-  if (availableEditors.length === 0) {
-    p.log.error("No editors found. Please install VS Code or Cursor.");
-    return;
-  }
-
-  let selectedEditor: "vscode" | "cursor" | undefined;
-
-  if (availableEditors.length === 1) {
-    selectedEditor = availableEditors[0].name;
-    p.log.info(`Using ${availableEditors[0].displayName}`);
-  } else {
-    // Multiple editors available - let user choose
-    const editorChoice = await p.select({
-      message: "Select target editor:",
-      options: availableEditors.map((e) => ({
-        value: e.name,
-        label: e.displayName,
-      })),
-    });
-
-    if (p.isCancel(editorChoice)) return;
-    selectedEditor = editorChoice as "vscode" | "cursor";
-  }
+  // Select editor with config preference (Approach 1: Always offer choice with default indicated)
+  const selectedEditor = await selectEditorWithPreference();
 
   const inputType = await p.select({
     message: "What would you like to add?",
@@ -229,34 +283,8 @@ async function handleAddExtension() {
 async function handleUpdateExtensions() {
   p.log.step("Update Extensions");
 
-  // Select editor first (if multiple available)
-  const { getEditorService } = await import("../features/install");
-  const editorService = getEditorService();
-  const availableEditors = await editorService.getAvailableEditors();
-
-  if (availableEditors.length === 0) {
-    p.log.error("No editors found. Please install VS Code or Cursor.");
-    return;
-  }
-
-  let selectedEditor: "vscode" | "cursor";
-
-  if (availableEditors.length === 1) {
-    selectedEditor = availableEditors[0].name;
-    p.log.info(`Using ${availableEditors[0].displayName}`);
-  } else {
-    // Multiple editors available - let user choose
-    const editorChoice = await p.select({
-      message: "Select editor:",
-      options: availableEditors.map((e) => ({
-        value: e.name,
-        label: e.displayName,
-      })),
-    });
-
-    if (p.isCancel(editorChoice)) return;
-    selectedEditor = editorChoice as "vscode" | "cursor";
-  }
+  // Select editor with config preference (Approach 1: Always offer choice with default indicated)
+  const selectedEditor = await selectEditorWithPreference();
 
   const updateType = await p.select({
     message: "What would you like to update?",
@@ -422,34 +450,8 @@ async function handleAdvancedMenu() {
 async function handleListExtensions() {
   p.log.step("List Extensions");
 
-  // Select editor first (if multiple available)
-  const { getEditorService } = await import("../features/install");
-  const editorService = getEditorService();
-  const availableEditors = await editorService.getAvailableEditors();
-
-  if (availableEditors.length === 0) {
-    p.log.error("No editors found. Please install VS Code or Cursor.");
-    return;
-  }
-
-  let selectedEditor: "vscode" | "cursor";
-
-  if (availableEditors.length === 1) {
-    selectedEditor = availableEditors[0].name;
-    p.log.info(`Using ${availableEditors[0].displayName}`);
-  } else {
-    // Multiple editors available - let user choose
-    const editorChoice = await p.select({
-      message: "Select editor:",
-      options: availableEditors.map((e) => ({
-        value: e.name,
-        label: e.displayName,
-      })),
-    });
-
-    if (p.isCancel(editorChoice)) return;
-    selectedEditor = editorChoice as "vscode" | "cursor";
-  }
+  // Select editor with config preference (Approach 1: Always offer choice with default indicated)
+  const selectedEditor = await selectEditorWithPreference();
 
   const format = await p.select({
     message: "Output format:",
@@ -500,34 +502,8 @@ async function handleListExtensions() {
 async function handleRemoveExtensions() {
   p.log.step("Remove Extensions");
 
-  // Select editor first (if multiple available)
-  const { getEditorService } = await import("../features/install");
-  const editorService = getEditorService();
-  const availableEditors = await editorService.getAvailableEditors();
-
-  if (availableEditors.length === 0) {
-    p.log.error("No editors found. Please install VS Code or Cursor.");
-    return;
-  }
-
-  let selectedEditor: "vscode" | "cursor";
-
-  if (availableEditors.length === 1) {
-    selectedEditor = availableEditors[0].name;
-    p.log.info(`Using ${availableEditors[0].displayName}`);
-  } else {
-    // Multiple editors available - let user choose
-    const editorChoice = await p.select({
-      message: "Select editor:",
-      options: availableEditors.map((e) => ({
-        value: e.name,
-        label: e.displayName,
-      })),
-    });
-
-    if (p.isCancel(editorChoice)) return;
-    selectedEditor = editorChoice as "vscode" | "cursor";
-  }
+  // Select editor with config preference (Approach 1: Always offer choice with default indicated)
+  const selectedEditor = await selectEditorWithPreference();
 
   const extensionId = await p.text({
     message: "Enter extension ID to remove:",
