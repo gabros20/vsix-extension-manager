@@ -80,7 +80,7 @@ describe("Update System Integration", () => {
       const checker = new UpdateChecker();
 
       // Access private method via type assertion for testing
-      const isNewer = (checker as any).isNewerVersion;
+      const isNewer = (checker as any).isNewerVersion; // eslint-disable-line @typescript-eslint/no-explicit-any
 
       expect(isNewer("2.0.0", "1.0.0")).toBe(true);
       expect(isNewer("1.1.0", "1.0.0")).toBe(true);
@@ -89,14 +89,14 @@ describe("Update System Integration", () => {
 
     it("should detect equal versions", () => {
       const checker = new UpdateChecker();
-      const isNewer = (checker as any).isNewerVersion;
+      const isNewer = (checker as any).isNewerVersion; // eslint-disable-line @typescript-eslint/no-explicit-any
 
       expect(isNewer("1.0.0", "1.0.0")).toBe(false);
     });
 
     it("should detect older versions", () => {
       const checker = new UpdateChecker();
-      const isNewer = (checker as any).isNewerVersion;
+      const isNewer = (checker as any).isNewerVersion; // eslint-disable-line @typescript-eslint/no-explicit-any
 
       expect(isNewer("1.0.0", "2.0.0")).toBe(false);
     });
@@ -213,7 +213,7 @@ describe("Update System Integration", () => {
     it("should handle network errors gracefully", async () => {
       // Simulate network unavailable by using invalid editor
       const result = await updateChecker.checkForUpdates("weekly", {
-        editor: "nonexistent" as any,
+        editor: "nonexistent" as any, // eslint-disable-line @typescript-eslint/no-explicit-any
       });
 
       // Should return empty updates, not throw

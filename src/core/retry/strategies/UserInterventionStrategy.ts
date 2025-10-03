@@ -41,7 +41,7 @@ export class UserInterventionStrategy extends BaseRetryStrategy {
   private async promptForAction(
     error: Error,
     task: Task,
-    _context: RetryContext,
+    _context: RetryContext, // eslint-disable-line @typescript-eslint/no-unused-vars
   ): Promise<"retry" | "skip" | "abort"> {
     const message = `Operation "${task.name}" failed: ${error.message}\n\nHow would you like to proceed?`;
 

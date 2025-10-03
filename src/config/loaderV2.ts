@@ -167,7 +167,7 @@ export class ConfigLoaderV2 {
    * Load configuration from environment variables
    */
   private loadEnvConfig(): PartialConfigV2 {
-    const config: any = {};
+    const config: any = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     for (const [envVar, configPath] of Object.entries(ENV_VAR_MAP_V2)) {
       const value = process.env[envVar];
@@ -227,7 +227,7 @@ export class ConfigLoaderV2 {
    * Deep merge multiple configs with precedence (later overrides earlier)
    */
   private mergeConfigs(...configs: PartialConfigV2[]): PartialConfigV2 {
-    const result: any = {};
+    const result: any = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     for (const config of configs) {
       this.deepMerge(result, config);

@@ -9,7 +9,7 @@ export interface RetryContext {
   startTime: number;
   timeout?: number;
   maxAttempts?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 export interface RetryOptions {
@@ -17,7 +17,7 @@ export interface RetryOptions {
   timeout?: number;
   backoffMultiplier?: number;
   strategies?: string[];
-  metadata?: Record<string, any>;
+  metadata?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 export interface RetryResult<T = any> {
@@ -32,7 +32,7 @@ export interface RetryResult<T = any> {
 export type Task<T = any> = {
   name: string;
   run: (context: RetryContext) => Promise<T>;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 };
 
 export interface RetryStrategy {

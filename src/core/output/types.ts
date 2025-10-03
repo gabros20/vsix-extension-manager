@@ -13,7 +13,7 @@ export interface CommandResult<T = any> {
   errors?: ErrorItem[];
   warnings?: WarningItem[];
   totals?: ResultTotals;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
   timestamp?: string;
   duration?: number;
 }

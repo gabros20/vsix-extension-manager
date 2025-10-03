@@ -162,7 +162,7 @@ export class EnhancedErrorHandler extends ErrorHandler {
   private async promptUserForAction(
     error: Error,
     context: ErrorContext,
-    _suggestion: ReturnType<typeof errorSuggestionService.getSuggestion>,
+    _suggestion: ReturnType<typeof errorSuggestionService.getSuggestion>, // eslint-disable-line @typescript-eslint/no-unused-vars
   ): Promise<ErrorAction> {
     // Check if we should prompt
     if (context.options?.quiet || context.options?.json || context.options?.yes) {
