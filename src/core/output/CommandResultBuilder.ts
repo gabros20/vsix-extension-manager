@@ -11,7 +11,7 @@ import type {
   ResultTotals,
 } from "./types";
 
-export class CommandResultBuilder<T = any> {
+export class CommandResultBuilder<T = unknown> {
   private result: Partial<CommandResult<T>>;
   private items: ResultItem<T>[] = [];
   private errors: ErrorItem[] = [];
@@ -56,7 +56,7 @@ export class CommandResultBuilder<T = any> {
     return this;
   }
 
-  setMetadata(metadata: Record<string, any>): this {
+  setMetadata(metadata: Record<string, unknown>): this {
     this.result.metadata = { ...this.result.metadata, ...metadata };
     return this;
   }

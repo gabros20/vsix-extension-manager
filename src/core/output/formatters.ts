@@ -3,7 +3,15 @@
  * Integration Phase: Temporarily without chalk until dependency is added
  */
 
-import type { CommandResult, OutputOptions, FormattedOutput } from "./types";
+import type {
+  CommandResult,
+  OutputOptions,
+  FormattedOutput,
+  ResultTotals,
+  ResultItem,
+  WarningItem,
+  ErrorItem,
+} from "./types";
 
 // Simple color helper (ANSI codes)
 const color = {
@@ -109,7 +117,7 @@ export class OutputFormatter {
     }
   }
 
-  private formatTotals(totals: any): string {
+  private formatTotals(totals: ResultTotals): string {
     const parts: string[] = [];
 
     if (totals.successful > 0) {
@@ -133,7 +141,7 @@ export class OutputFormatter {
     return `${parts.join(", ")}${duration}`;
   }
 
-  private formatItems(items: any[]): string {
+  private formatItems(items: ResultItem[]): string {
     const lines: string[] = ["Items:"];
 
     for (const item of items) {
@@ -148,7 +156,7 @@ export class OutputFormatter {
     return lines.join("\n");
   }
 
-  private formatWarnings(warnings: any[]): string {
+  private formatWarnings(warnings: WarningItem[]): string {
     const lines: string[] = [color.yellow("Warnings:")];
 
     for (const warning of warnings) {
@@ -161,7 +169,7 @@ export class OutputFormatter {
     return lines.join("\n");
   }
 
-  private formatErrors(errors: any[], options: OutputOptions): string {
+  private formatErrors(errors: ErrorItem[], options: OutputOptions): string {
     const lines: string[] = [color.red("Errors:")];
 
     for (const error of errors) {

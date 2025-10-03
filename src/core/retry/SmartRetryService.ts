@@ -52,11 +52,12 @@ export class SmartRetryService {
         attempts: 1,
         duration: Date.now() - startTime,
       };
-    } catch (initialError: any) {
-      context.lastError = initialError;
+    } catch (initialError: unknown) {
+      const error = initialError instanceof Error ? initialError : new Error(String(initialError));
+      context.lastError = error;
       context.attemptCount = 1;
 
-      return await this.retryWithStrategies(task, context, initialError);
+      return await this.retryWithStrategies(task, context, error);
     }
   }
 
@@ -89,26 +90,27 @@ export class SmartRetryService {
           attempts: context.attemptCount + 1,
           duration: Date.now() - context.startTime,
         };
-      } catch (error: any) {
-        if (error.message === "USER_ABORTED") {
-          throw error;
+      } catch (error: unknown) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        if (err.message === "USER_ABORTED") {
+          throw err;
         }
 
-        if (error.message === "SKIP_REQUESTED") {
+        if (err.message === "SKIP_REQUESTED") {
           return {
             success: false,
-            error,
+            error: err,
             strategy: strategy.name,
             attempts: context.attemptCount + 1,
             duration: Date.now() - context.startTime,
           };
         }
 
-        lastError = error;
-        context.lastError = error;
+        lastError = err;
+        context.lastError = err;
         context.attemptCount++;
 
-        if (!(await this.shouldContinue(error, strategy, context))) {
+        if (!(await this.shouldContinue(err, strategy, context))) {
           break;
         }
       }

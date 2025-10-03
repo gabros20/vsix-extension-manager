@@ -167,7 +167,7 @@ export class ConfigLoaderV2 {
    * Load configuration from environment variables
    */
   private loadEnvConfig(): PartialConfigV2 {
-    const config: any = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const config: Record<string, unknown> = {};
 
     for (const [envVar, configPath] of Object.entries(ENV_VAR_MAP_V2)) {
       const value = process.env[envVar];
@@ -182,7 +182,7 @@ export class ConfigLoaderV2 {
   /**
    * Parse environment variable value
    */
-  private parseEnvValue(value: string): any {
+  private parseEnvValue(value: string): unknown {
     // Try to parse as JSON for complex values
     if (value.startsWith("{") || value.startsWith("[")) {
       try {
@@ -208,16 +208,16 @@ export class ConfigLoaderV2 {
   /**
    * Set nested value in object using dot notation path
    */
-  private setNestedValue(obj: any, path: string, value: any): void {
+  private setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
     const parts = path.split(".");
-    let current = obj;
+    let current: Record<string, unknown> = obj;
 
     for (let i = 0; i < parts.length - 1; i++) {
       const part = parts[i];
-      if (!current[part]) {
+      if (!current[part] || typeof current[part] !== "object") {
         current[part] = {};
       }
-      current = current[part];
+      current = current[part] as Record<string, unknown>;
     }
 
     current[parts[parts.length - 1]] = value;
@@ -227,7 +227,7 @@ export class ConfigLoaderV2 {
    * Deep merge multiple configs with precedence (later overrides earlier)
    */
   private mergeConfigs(...configs: PartialConfigV2[]): PartialConfigV2 {
-    const result: any = {}; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const result: Record<string, unknown> = {};
 
     for (const config of configs) {
       this.deepMerge(result, config);
@@ -239,13 +239,16 @@ export class ConfigLoaderV2 {
   /**
    * Deep merge helper
    */
-  private deepMerge(target: any, source: any): void {
+  private deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): void {
     for (const key in source) {
       if (source[key] && typeof source[key] === "object" && !Array.isArray(source[key])) {
-        if (!target[key]) {
+        if (!target[key] || typeof target[key] !== "object") {
           target[key] = {};
         }
-        this.deepMerge(target[key], source[key]);
+        this.deepMerge(
+          target[key] as Record<string, unknown>,
+          source[key] as Record<string, unknown>,
+        );
       } else {
         target[key] = source[key];
       }

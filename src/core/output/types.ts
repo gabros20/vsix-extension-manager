@@ -5,7 +5,7 @@
 
 export type CommandStatus = "ok" | "error" | "partial";
 
-export interface CommandResult<T = any> {
+export interface CommandResult<T = unknown> {
   status: CommandStatus;
   command: string;
   summary: string;
@@ -13,12 +13,12 @@ export interface CommandResult<T = any> {
   errors?: ErrorItem[];
   warnings?: WarningItem[];
   totals?: ResultTotals;
-  metadata?: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  metadata?: Record<string, unknown>;
   timestamp?: string;
   duration?: number;
 }
 
-export interface ResultItem<T = any> {
+export interface ResultItem<T = unknown> {
   id: string;
   name?: string;
   version?: string;

@@ -16,7 +16,10 @@ export class DirectInstallStrategy extends BaseRetryStrategy {
       error.message.toLowerCase().includes("extension") ||
       error.message.toLowerCase().includes("cli");
 
-    const notAlreadyDirect = !context.metadata?.strategy?.includes("direct");
+    const strategy = context.metadata?.strategy;
+    const notAlreadyDirect =
+      !(typeof strategy === "string" && strategy.includes("direct")) &&
+      !(Array.isArray(strategy) && strategy.includes("direct"));
 
     return isInstallError && notAlreadyDirect && context.attemptCount < 2;
   }

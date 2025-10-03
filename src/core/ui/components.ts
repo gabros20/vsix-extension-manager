@@ -136,9 +136,9 @@ export class UIComponents {
    * Group multiple prompts together
    */
   async group<T extends Record<string, unknown>>(
-    prompts: Record<string, (results: any) => Promise<unknown> | unknown>, // eslint-disable-line @typescript-eslint/no-explicit-any
+    prompts: Record<string, (results: Record<string, unknown>) => Promise<unknown> | unknown>,
   ): Promise<T> {
-    const result = await p.group(prompts as any, {
+    const result = await p.group(prompts as Parameters<typeof p.group>[0], {
       onCancel: () => {
         this.cancel();
       },
