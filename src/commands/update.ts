@@ -97,13 +97,11 @@ export class UpdateCommand extends BaseCommand {
       // Execute update
       const updateService = getUpdateInstalledService();
       const result = await updateService.updateInstalled({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        editor: chosenEditor as any,
+        editor: chosenEditor as "vscode" | "cursor",
         selectedExtensions: extensionIds,
         parallel: options.parallel || 1,
         retry: options.retry || 2,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        source: options.source as any,
+        source: options.source as "marketplace" | "open-vsx" | undefined,
         preRelease: options.preRelease,
         dryRun: options.dryRun,
         quiet: options.quiet,
