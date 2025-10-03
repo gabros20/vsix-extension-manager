@@ -1,12 +1,23 @@
 import fs from "fs-extra";
 import path from "path";
+import crypto from "crypto";
 
 /**
  * Create download directory if it doesn't exist
+ * @param outputPath - Path to create
+ * @param baseDir - Optional base directory to restrict access to
  */
-export async function createDownloadDirectory(outputPath: string): Promise<string> {
+export async function createDownloadDirectory(
+  outputPath: string,
+  baseDir?: string,
+): Promise<string> {
   try {
     const absolutePath = path.resolve(outputPath);
+
+    // Validate path to prevent traversal attacks
+    if (!isValidPath(absolutePath, baseDir)) {
+      throw new Error(`Invalid or unsafe path: ${outputPath}`);
+    }
 
     // Check if path exists
     const exists = await fs.pathExists(absolutePath);
@@ -60,41 +71,84 @@ export async function getFileInfo(
 }
 
 /**
- * Clean filename to be filesystem safe
+ * Clean filename to be filesystem safe while preserving valid Unicode
+ * Uses Unicode normalization to handle combining characters properly
  */
 export function sanitizeFilename(filename: string): string {
-  // Remove or replace invalid characters
-  return filename
-    .replace(/[<>:"/\\|?*]/g, "_")
-    .replace(/\\s+/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
+  // Normalize Unicode to composed form (NFC) to handle combining characters
+  let normalized = filename.normalize("NFC");
+
+  // Remove or replace filesystem-invalid characters only
+  // Preserves valid Unicode characters (e.g., Japanese, Chinese, Arabic)
+  normalized = normalized
+    .replace(/[<>:"/\\|?*]/g, "_") // Invalid on Windows/Linux
+    .replace(/[\x00-\x1F\x7F]/g, "_") // Control characters
+    .replace(/^\.+/, "_") // Leading dots (hidden files)
+    .replace(/\s+/g, "_") // Whitespace to underscore
+    .replace(/_+/g, "_") // Collapse multiple underscores
+    .replace(/^_+|_+$/g, ""); // Trim underscores
+
+  // Ensure filename isn't empty after sanitization
+  if (normalized.length === 0) {
+    return "untitled";
+  }
+
+  // Handle Windows reserved names (CON, PRN, AUX, etc.)
+  const reservedNames = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)/i;
+  if (reservedNames.test(normalized)) {
+    normalized = `_${normalized}`;
+  }
+
+  return normalized;
 }
 
 /**
  * Generate unique filename if file already exists
+ * Uses timestamp + random suffix for O(1) performance instead of sequential counter
  */
 export async function generateUniqueFilename(directory: string, filename: string): Promise<string> {
   const { name, ext } = path.parse(filename);
-  let counter = 1;
-  let newFilename = filename;
 
-  while (await checkFileExists(path.join(directory, newFilename))) {
-    newFilename = `${name}_${counter}${ext}`;
-    counter++;
+  // Check if original filename is available
+  if (!(await checkFileExists(path.join(directory, filename)))) {
+    return filename;
   }
+
+  // Generate unique filename with timestamp + random suffix
+  // This is O(1) instead of O(n) with sequential counter
+  const timestamp = Date.now();
+  const randomSuffix = crypto.randomBytes(3).toString("hex"); // 6 hex chars
+  const newFilename = `${name}_${timestamp}_${randomSuffix}${ext}`;
 
   return newFilename;
 }
 
 /**
- * Validate directory path
+ * Validate directory path and prevent path traversal attacks
+ * @param dirPath - Path to validate
+ * @param baseDir - Optional base directory to restrict access to (defaults to cwd)
  */
-export function isValidPath(dirPath: string): boolean {
+export function isValidPath(dirPath: string, baseDir?: string): boolean {
   try {
     const resolved = path.resolve(dirPath);
-    // Basic validation - check if it's a reasonable path
-    return resolved.length > 0 && !resolved.includes("..".repeat(10));
+
+    // Check for empty path
+    if (!resolved || resolved.length === 0) {
+      return false;
+    }
+
+    // If base directory specified, ensure resolved path is within it
+    if (baseDir) {
+      const resolvedBase = path.resolve(baseDir);
+      const relative = path.relative(resolvedBase, resolved);
+
+      // Path is invalid if it starts with ".." or is absolute (outside base)
+      if (relative.startsWith("..") || path.isAbsolute(relative)) {
+        return false;
+      }
+    }
+
+    return true;
   } catch {
     return false;
   }

@@ -13,12 +13,34 @@ import {
 } from "./strategies";
 import { ui } from "../ui";
 
+/**
+ * Fatal errors that should never be retried
+ */
+const FATAL_ERROR_PATTERNS = [
+  /404/i, // Not found
+  /ENOENT/i, // File not found
+  /EACCES/i, // Permission denied
+  /invalid.*extension.*id/i, // Invalid extension ID
+  /malformed/i, // Malformed data
+  /unsupported/i, // Unsupported operation
+  /cancelled/i, // User cancelled
+  /aborted/i, // User aborted
+];
+
 export class SmartRetryService {
   private strategies: RetryStrategy[];
 
   constructor(customStrategies?: RetryStrategy[]) {
     this.strategies = customStrategies || this.getDefaultStrategies();
     this.strategies.sort((a, b) => a.priority - b.priority);
+  }
+
+  /**
+   * Check if error is fatal and should not be retried
+   */
+  private isFatalError(error: Error): boolean {
+    const errorMessage = error.message.toLowerCase();
+    return FATAL_ERROR_PATTERNS.some((pattern) => pattern.test(errorMessage));
   }
 
   private getDefaultStrategies(): RetryStrategy[] {
@@ -57,6 +79,16 @@ export class SmartRetryService {
       context.lastError = error;
       context.attemptCount = 1;
 
+      // Quick exit for fatal errors - don't waste time retrying
+      if (this.isFatalError(error)) {
+        return {
+          success: false,
+          error,
+          attempts: 1,
+          duration: Date.now() - startTime,
+        };
+      }
+
       return await this.retryWithStrategies(task, context, error);
     }
   }
@@ -67,58 +99,121 @@ export class SmartRetryService {
     lastError: Error,
   ): Promise<RetryResult<T>> {
     for (const strategy of this.strategies) {
+      // Skip strategies that can't handle this error
       if (!strategy.canHandle(lastError, context)) {
         continue;
       }
 
+      // Stop if we've exhausted retries
       if (context.attemptCount >= (context.maxAttempts || 3)) {
         break;
       }
 
-      try {
-        const description = strategy.getDescription(lastError, context);
-        if (!context.metadata?.quiet) {
-          ui.log.warning(`${description}...`);
+      // Attempt strategy and handle result
+      const result = await this.attemptStrategy(strategy, task, context);
+
+      // Handle success
+      if (result.type === "success") {
+        return result.value;
+      }
+
+      // Handle special errors (abort, skip)
+      if (result.type === "special") {
+        if (result.shouldThrow) {
+          throw result.error;
         }
+        if (result.value) {
+          return result.value;
+        }
+        // Shouldn't happen, but return failure if no value
+        return this.buildFailureResult(result.error, context);
+      }
 
-        const data = await strategy.attempt(task, context);
+      // Handle retry errors
+      lastError = result.error;
+      context.lastError = result.error;
+      context.attemptCount++;
 
-        return {
+      // Stop on fatal errors
+      if (this.isFatalError(result.error)) {
+        break;
+      }
+
+      // Check if we should continue retrying
+      if (!(await this.shouldContinue(result.error, strategy, context))) {
+        break;
+      }
+    }
+
+    return this.buildFailureResult(lastError, context);
+  }
+
+  /**
+   * Attempt a single strategy and classify the result
+   */
+  private async attemptStrategy<T>(
+    strategy: RetryStrategy,
+    task: Task<T>,
+    context: RetryContext,
+  ): Promise<
+    | { type: "success"; value: RetryResult<T> }
+    | { type: "special"; error: Error; shouldThrow: boolean; value?: RetryResult<T> }
+    | { type: "retry"; error: Error }
+  > {
+    try {
+      const description = strategy.getDescription(context.lastError!, context);
+      if (!context.metadata?.quiet) {
+        ui.log.warning(`${description}...`);
+      }
+
+      const data = await strategy.attempt(task, context);
+
+      return {
+        type: "success",
+        value: {
           success: true,
           data,
           strategy: strategy.name,
           attempts: context.attemptCount + 1,
           duration: Date.now() - context.startTime,
-        };
-      } catch (error: unknown) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        if (err.message === "USER_ABORTED") {
-          throw err;
-        }
+        },
+      };
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
 
-        if (err.message === "SKIP_REQUESTED") {
-          return {
+      // Handle user abort
+      if (err.message === "USER_ABORTED") {
+        return { type: "special", error: err, shouldThrow: true };
+      }
+
+      // Handle skip request
+      if (err.message === "SKIP_REQUESTED") {
+        return {
+          type: "special",
+          error: err,
+          shouldThrow: false,
+          value: {
             success: false,
             error: err,
             strategy: strategy.name,
             attempts: context.attemptCount + 1,
             duration: Date.now() - context.startTime,
-          };
-        }
-
-        lastError = err;
-        context.lastError = err;
-        context.attemptCount++;
-
-        if (!(await this.shouldContinue(err, strategy, context))) {
-          break;
-        }
+          },
+        };
       }
-    }
 
+      // Regular retry error
+      return { type: "retry", error: err };
+    }
+  }
+
+  /**
+   * Build final failure result
+   */
+  private buildFailureResult<T>(error: Error, context: RetryContext): RetryResult<T> {
     return {
       success: false,
-      error: lastError,
+      error,
       attempts: context.attemptCount,
       duration: Date.now() - context.startTime,
     };

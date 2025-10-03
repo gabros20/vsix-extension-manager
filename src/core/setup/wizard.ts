@@ -140,7 +140,7 @@ export class SetupWizard {
           options: [
             {
               value: "home",
-              label: "Home directory (~/.vsix/config.yml)",
+              label: "Home directory (~/.vsix/vsix.config.yml)",
               hint: "Global configuration",
             },
             { value: "project", label: "Current project (.vsix.yml)", hint: "Project-specific" },
@@ -228,7 +228,8 @@ export class SetupWizard {
     const homeDir = process.env.HOME || process.env.USERPROFILE || "~";
 
     if (location === "home") {
-      return path.join(homeDir, ".vsix", "config.yml");
+      // Use vsix.config.yml to match CONFIG_V2_FILE_NAMES search pattern
+      return path.join(homeDir, ".vsix", "vsix.config.yml");
     } else {
       return path.join(process.cwd(), ".vsix.yml");
     }

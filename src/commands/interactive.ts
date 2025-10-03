@@ -94,6 +94,35 @@ export async function runInteractive() {
 async function handleAddExtension() {
   p.log.step("Add Extension");
 
+  // Select editor first (if multiple available) for install operations
+  const { getEditorService } = await import("../features/install");
+  const editorService = getEditorService();
+  const availableEditors = await editorService.getAvailableEditors();
+
+  if (availableEditors.length === 0) {
+    p.log.error("No editors found. Please install VS Code or Cursor.");
+    return;
+  }
+
+  let selectedEditor: "vscode" | "cursor" | undefined;
+
+  if (availableEditors.length === 1) {
+    selectedEditor = availableEditors[0].name;
+    p.log.info(`Using ${availableEditors[0].displayName}`);
+  } else {
+    // Multiple editors available - let user choose
+    const editorChoice = await p.select({
+      message: "Select target editor:",
+      options: availableEditors.map((e) => ({
+        value: e.name,
+        label: e.displayName,
+      })),
+    });
+
+    if (p.isCancel(editorChoice)) return;
+    selectedEditor = editorChoice as "vscode" | "cursor";
+  }
+
   const inputType = await p.select({
     message: "What would you like to add?",
     options: [
@@ -176,6 +205,7 @@ async function handleAddExtension() {
     const options: GlobalOptions = {
       quiet: false,
       yes: false,
+      editor: selectedEditor, // Pass selected editor
     };
 
     const result = await addCommand.execute([input], options);
@@ -199,6 +229,35 @@ async function handleAddExtension() {
 async function handleUpdateExtensions() {
   p.log.step("Update Extensions");
 
+  // Select editor first (if multiple available)
+  const { getEditorService } = await import("../features/install");
+  const editorService = getEditorService();
+  const availableEditors = await editorService.getAvailableEditors();
+
+  if (availableEditors.length === 0) {
+    p.log.error("No editors found. Please install VS Code or Cursor.");
+    return;
+  }
+
+  let selectedEditor: "vscode" | "cursor";
+
+  if (availableEditors.length === 1) {
+    selectedEditor = availableEditors[0].name;
+    p.log.info(`Using ${availableEditors[0].displayName}`);
+  } else {
+    // Multiple editors available - let user choose
+    const editorChoice = await p.select({
+      message: "Select editor:",
+      options: availableEditors.map((e) => ({
+        value: e.name,
+        label: e.displayName,
+      })),
+    });
+
+    if (p.isCancel(editorChoice)) return;
+    selectedEditor = editorChoice as "vscode" | "cursor";
+  }
+
   const updateType = await p.select({
     message: "What would you like to update?",
     options: [
@@ -217,6 +276,7 @@ async function handleUpdateExtensions() {
     const options: GlobalOptions = {
       quiet: false,
       yes: false,
+      editor: selectedEditor, // Pass selected editor
     };
 
     let args: string[] = [];
@@ -362,6 +422,35 @@ async function handleAdvancedMenu() {
 async function handleListExtensions() {
   p.log.step("List Extensions");
 
+  // Select editor first (if multiple available)
+  const { getEditorService } = await import("../features/install");
+  const editorService = getEditorService();
+  const availableEditors = await editorService.getAvailableEditors();
+
+  if (availableEditors.length === 0) {
+    p.log.error("No editors found. Please install VS Code or Cursor.");
+    return;
+  }
+
+  let selectedEditor: "vscode" | "cursor";
+
+  if (availableEditors.length === 1) {
+    selectedEditor = availableEditors[0].name;
+    p.log.info(`Using ${availableEditors[0].displayName}`);
+  } else {
+    // Multiple editors available - let user choose
+    const editorChoice = await p.select({
+      message: "Select editor:",
+      options: availableEditors.map((e) => ({
+        value: e.name,
+        label: e.displayName,
+      })),
+    });
+
+    if (p.isCancel(editorChoice)) return;
+    selectedEditor = editorChoice as "vscode" | "cursor";
+  }
+
   const format = await p.select({
     message: "Output format:",
     options: [
@@ -385,6 +474,7 @@ async function handleListExtensions() {
       output?: string;
     } = {
       quiet: false,
+      editor: selectedEditor, // Pass selected editor
       format: format as "table" | "json" | "yaml" | "txt" | "csv",
       output: format !== "table" ? `extensions.${format}` : undefined,
     };
@@ -410,6 +500,35 @@ async function handleListExtensions() {
 async function handleRemoveExtensions() {
   p.log.step("Remove Extensions");
 
+  // Select editor first (if multiple available)
+  const { getEditorService } = await import("../features/install");
+  const editorService = getEditorService();
+  const availableEditors = await editorService.getAvailableEditors();
+
+  if (availableEditors.length === 0) {
+    p.log.error("No editors found. Please install VS Code or Cursor.");
+    return;
+  }
+
+  let selectedEditor: "vscode" | "cursor";
+
+  if (availableEditors.length === 1) {
+    selectedEditor = availableEditors[0].name;
+    p.log.info(`Using ${availableEditors[0].displayName}`);
+  } else {
+    // Multiple editors available - let user choose
+    const editorChoice = await p.select({
+      message: "Select editor:",
+      options: availableEditors.map((e) => ({
+        value: e.name,
+        label: e.displayName,
+      })),
+    });
+
+    if (p.isCancel(editorChoice)) return;
+    selectedEditor = editorChoice as "vscode" | "cursor";
+  }
+
   const extensionId = await p.text({
     message: "Enter extension ID to remove:",
     placeholder: "publisher.extension-name",
@@ -421,7 +540,7 @@ async function handleRemoveExtensions() {
   if (p.isCancel(extensionId)) return;
 
   const confirm = await p.confirm({
-    message: `Remove ${extensionId}?`,
+    message: `Remove ${extensionId} from ${selectedEditor === "cursor" ? "Cursor" : "VS Code"}?`,
     initialValue: false,
   });
 
@@ -432,9 +551,12 @@ async function handleRemoveExtensions() {
 
   try {
     const removeCommand = await loadCommand("remove");
+
+    // Pass editor and yes: true since we already confirmed
     const options: GlobalOptions = {
       quiet: false,
       yes: true,
+      editor: selectedEditor,
     };
 
     const result = await removeCommand.execute([extensionId], options);

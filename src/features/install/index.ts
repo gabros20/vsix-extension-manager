@@ -24,3 +24,14 @@ export type {
 
 export { DirectInstallService, getDirectInstallService } from "./services/directInstallService";
 export type { DirectInstallOptions, ExtensionMetadata } from "./services/directInstallService";
+
+export {
+  InstallPreflightService,
+  getInstallPreflightService,
+} from "./services/installPreflightService";
+export type { PreflightResult } from "./services/installPreflightService";
+
+export {
+  ExtensionCompatibilityService,
+  getExtensionCompatibilityService,
+} from "./services/extensionCompatibilityService";

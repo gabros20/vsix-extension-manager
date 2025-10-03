@@ -11,6 +11,8 @@ import {
   getEditorService,
   getVsixScanner,
   getInstallService,
+  getInstallPreflightService,
+  getExtensionCompatibilityService,
   type EditorInfo,
 } from "../../features/install";
 import { parseExtensionUrl, fetchExtensionVersions } from "../registry";
@@ -32,9 +34,8 @@ export class PlanGenerator {
   private editorService = getEditorService();
   private vsixScanner = getVsixScanner();
   private installService = getInstallService();
-  // Compatibility service not exported from install index - using simplified checks
-  private preflightService: unknown = null; // TODO: Fix after services are properly exported
-  private compatibilityService: unknown = null; // TODO: Fix after services are properly exported
+  private preflightService = getInstallPreflightService();
+  private compatibilityService = getExtensionCompatibilityService();
 
   /**
    * Generate a complete installation plan
@@ -253,42 +254,25 @@ export class PlanGenerator {
       message: target.binaryPath ? `Editor available at ${target.binaryPath}` : "Editor not found",
     });
 
-    // 2. Extensions directory check (using existing preflight service)
-    if (this.preflightService) {
-      try {
-        // Type assertion needed since service isn't properly exported yet
-        const service = this.preflightService as {
-          runPreflightChecks: (name: string) => Promise<{
-            valid: boolean;
-            errors: string[];
-            warnings: string[];
-            suggestions: string[];
-          }>;
-        };
-        const preflightResult = await service.runPreflightChecks(target.name);
-        checks.push({
-          name: "Extensions Directory",
-          status: preflightResult.valid ? "pass" : "fail",
-          message: preflightResult.valid
-            ? "Extensions directory ready"
-            : preflightResult.errors[0] || "Directory check failed",
-          details: {
-            warnings: preflightResult.warnings,
-            suggestions: preflightResult.suggestions,
-          },
-        });
-      } catch (error) {
-        checks.push({
-          name: "Extensions Directory",
-          status: "warning",
-          message: `Preflight check skipped: ${error instanceof Error ? error.message : String(error)}`,
-        });
-      }
-    } else {
+    // 2. Extensions directory check
+    try {
+      const preflightResult = await this.preflightService.runPreflightChecks(target.name);
+      checks.push({
+        name: "Extensions Directory",
+        status: preflightResult.valid ? "pass" : "fail",
+        message: preflightResult.valid
+          ? "Extensions directory ready"
+          : preflightResult.errors[0] || "Directory check failed",
+        details: {
+          warnings: preflightResult.warnings,
+          suggestions: preflightResult.suggestions,
+        },
+      });
+    } catch (error) {
       checks.push({
         name: "Extensions Directory",
         status: "warning",
-        message: "Preflight service not available",
+        message: `Preflight check skipped: ${error instanceof Error ? error.message : String(error)}`,
       });
     }
 
@@ -296,27 +280,10 @@ export class PlanGenerator {
     if (
       extension.source !== "local" &&
       extension.id !== "multiple" &&
-      options.checkCompat !== false &&
-      this.compatibilityService
+      options.checkCompat !== false
     ) {
       try {
-        // Type assertion needed since service isn't properly exported yet
-        const service = this.compatibilityService as {
-          checkCompatibility: (
-            id: string,
-            version: string,
-            binaryPath: string,
-            source: "marketplace" | "open-vsx",
-          ) => Promise<{
-            compatible: boolean;
-            result: {
-              reason?: string;
-              editorVersion?: string;
-              requiredVersion?: string;
-            };
-          }>;
-        };
-        const compatResult = await service.checkCompatibility(
+        const compatResult = await this.compatibilityService.checkCompatibility(
           extension.id,
           extension.version,
           target.binaryPath,
@@ -342,16 +309,6 @@ export class PlanGenerator {
           message: "Compatibility check unavailable",
         });
       }
-    } else if (
-      extension.source !== "local" &&
-      extension.id !== "multiple" &&
-      options.checkCompat !== false
-    ) {
-      checks.push({
-        name: "Compatibility",
-        status: "warning",
-        message: "Compatibility service not available",
-      });
     }
 
     // 4. Disk space check (basic)

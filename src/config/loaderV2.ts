@@ -8,6 +8,11 @@ import * as path from "path";
 import * as yaml from "yaml";
 import { ConfigV2Schema, DEFAULT_CONFIG_V2, type ConfigV2, type PartialConfigV2 } from "./schemaV2";
 import { CONFIG_V2_FILE_NAMES, getConfigSearchPaths, ENV_VAR_MAP_V2 } from "./schemaV2";
+
+// Security limits for config file parsing
+const MAX_CONFIG_FILE_SIZE = 1024 * 1024; // 1MB - prevent DOS attacks
+const MAX_YAML_DEPTH = 20; // Prevent deeply nested YAML bombs
+
 // ConfigError class definition (moved from deleted loader.ts)
 export class ConfigError extends Error {
   constructor(
@@ -79,6 +84,16 @@ export class ConfigLoaderV2 {
         return null;
       }
 
+      // Security: Check file size to prevent DOS attacks
+      const stats = await fs.stat(filePath);
+      if (stats.size > MAX_CONFIG_FILE_SIZE) {
+        throw new ConfigError(
+          `Config file too large: ${stats.size} bytes (max: ${MAX_CONFIG_FILE_SIZE} bytes)`,
+          undefined,
+          "FILE_TOO_LARGE",
+        );
+      }
+
       const content = await fs.readFile(filePath, "utf-8");
       const ext = path.extname(filePath).toLowerCase();
 
@@ -97,8 +112,24 @@ export class ConfigLoaderV2 {
         }
       } else if (ext === ".yml" || ext === ".yaml") {
         try {
-          parsed = yaml.parse(content);
+          // Security: Parse with depth limit to prevent YAML bombs
+          parsed = yaml.parse(content, {
+            maxAliasCount: 100, // Limit alias expansion
+            strict: true,
+          });
+
+          // Additional depth check after parsing
+          if (!this.validateObjectDepth(parsed, MAX_YAML_DEPTH)) {
+            throw new ConfigError(
+              `YAML structure too deeply nested (max depth: ${MAX_YAML_DEPTH})`,
+              undefined,
+              "YAML_TOO_DEEP",
+            );
+          }
         } catch (error) {
+          if (error instanceof ConfigError) {
+            throw error;
+          }
           throw new ConfigError(
             `Invalid YAML in ${filePath}`,
             error instanceof Error ? error : undefined,
@@ -234,6 +265,25 @@ export class ConfigLoaderV2 {
     }
 
     return result;
+  }
+
+  /**
+   * Validate object depth to prevent stack overflow
+   */
+  private validateObjectDepth(obj: unknown, maxDepth: number, currentDepth = 0): boolean {
+    if (currentDepth > maxDepth) {
+      return false;
+    }
+
+    if (obj && typeof obj === "object") {
+      for (const value of Object.values(obj)) {
+        if (!this.validateObjectDepth(value, maxDepth, currentDepth + 1)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
   }
 
   /**
