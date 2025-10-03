@@ -26,7 +26,7 @@ export interface ErrorContext {
  * Get contextual suggestions for errors
  */
 export class ErrorSuggestionService {
-  getSuggestion(error: Error, _context: ErrorContext = {}): ErrorSuggestion {
+  getSuggestion(error: Error): ErrorSuggestion {
     const errorMsg = error.message.toLowerCase();
 
     // Binary mismatch errors

@@ -140,7 +140,7 @@ describe("Retry System Integration", () => {
 
       const task: Task = {
         name: "test-priority",
-        run: async (context) => {
+        run: async () => {
           attempts++;
           if (attempts <= 5) {
             // Simulate network error that requires multiple strategies

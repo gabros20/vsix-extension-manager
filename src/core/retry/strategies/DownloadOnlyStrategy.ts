@@ -32,7 +32,7 @@ export class DownloadOnlyStrategy extends BaseRetryStrategy {
     });
   }
 
-  getDescription(_error: Error, _context: RetryContext): string {
+  getDescription(): string {
     return "Installation failed. Downloading only (manual install required)";
   }
 }

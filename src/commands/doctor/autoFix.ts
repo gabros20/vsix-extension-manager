@@ -34,7 +34,7 @@ export class AutoFixService {
         return await this.createDirectory(issue);
 
       case "clean-corrupted":
-        return await this.cleanCorruptedExtensions(issue);
+        return await this.cleanCorruptedExtensions();
 
       case "fix-permissions":
         return await this.fixPermissions(issue);
@@ -80,7 +80,7 @@ export class AutoFixService {
   /**
    * Clean corrupted extensions
    */
-  private async cleanCorruptedExtensions(_issue: HealthCheck): Promise<FixResult> {
+  private async cleanCorruptedExtensions(): Promise<FixResult> {
     // This would require more context about which extensions are corrupted
     // For now, return a message that manual intervention is needed
     return {

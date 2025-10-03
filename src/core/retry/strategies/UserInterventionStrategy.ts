@@ -17,7 +17,7 @@ export class UserInterventionStrategy extends BaseRetryStrategy {
 
   async attempt<T>(task: Task<T>, context: RetryContext): Promise<T> {
     const lastError = context.lastError || new Error("Unknown error");
-    const action = await this.promptForAction(lastError, task, context);
+    const action = await this.promptForAction(lastError, task);
 
     switch (action) {
       case "retry":
@@ -38,11 +38,7 @@ export class UserInterventionStrategy extends BaseRetryStrategy {
     }
   }
 
-  private async promptForAction(
-    error: Error,
-    task: Task,
-    _context: RetryContext, // eslint-disable-line @typescript-eslint/no-unused-vars
-  ): Promise<"retry" | "skip" | "abort"> {
+  private async promptForAction(error: Error, task: Task): Promise<"retry" | "skip" | "abort"> {
     const message = `Operation "${task.name}" failed: ${error.message}\n\nHow would you like to proceed?`;
 
     const result = await ui.select<"retry" | "skip" | "abort">({
@@ -57,7 +53,7 @@ export class UserInterventionStrategy extends BaseRetryStrategy {
     return result;
   }
 
-  getDescription(_error: Error, _context: RetryContext): string {
+  getDescription(): string {
     return "Requesting user intervention";
   }
 }

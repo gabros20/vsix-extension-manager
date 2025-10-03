@@ -27,7 +27,7 @@ export class EnhancedErrorHandler extends ErrorHandler {
     context: ErrorContext = {},
   ): Promise<ErrorAction> {
     // Get contextual suggestions
-    const suggestion = errorSuggestionService.getSuggestion(error, context);
+    const suggestion = errorSuggestionService.getSuggestion(error);
 
     // Show error with suggestions
     this.showErrorWithSuggestions(error, suggestion, context);
@@ -41,7 +41,7 @@ export class EnhancedErrorHandler extends ErrorHandler {
     }
 
     // Prompt user for action in interactive mode
-    return await this.promptUserForAction(error, context, suggestion);
+    return await this.promptUserForAction(error, context);
   }
 
   /**
@@ -159,11 +159,7 @@ export class EnhancedErrorHandler extends ErrorHandler {
   /**
    * Prompt user for action in interactive mode
    */
-  private async promptUserForAction(
-    error: Error,
-    context: ErrorContext,
-    _suggestion: ReturnType<typeof errorSuggestionService.getSuggestion>, // eslint-disable-line @typescript-eslint/no-unused-vars
-  ): Promise<ErrorAction> {
+  private async promptUserForAction(error: Error, context: ErrorContext): Promise<ErrorAction> {
     // Check if we should prompt
     if (context.options?.quiet || context.options?.json || context.options?.yes) {
       // Non-interactive mode - abort
@@ -194,7 +190,7 @@ export class EnhancedErrorHandler extends ErrorHandler {
    * Format error for JSON output
    */
   formatErrorForJson(error: Error, context: ErrorContext): Record<string, unknown> {
-    const suggestion = errorSuggestionService.getSuggestion(error, context);
+    const suggestion = errorSuggestionService.getSuggestion(error);
 
     return {
       error: {

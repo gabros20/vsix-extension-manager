@@ -35,7 +35,7 @@ export class DirectInstallStrategy extends BaseRetryStrategy {
     });
   }
 
-  getDescription(_error: Error, _context: RetryContext): string {
+  getDescription(): string {
     return "Falling back to direct installation method";
   }
 }
