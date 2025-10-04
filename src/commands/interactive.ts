@@ -88,6 +88,242 @@ async function selectEditorWithPreference(): Promise<"vscode" | "cursor"> {
 }
 
 /**
+ * Group extensions by publisher for statistics
+ */
+function groupExtensionsByPublisher(extensions: Array<{ publisher: string; id: string }>) {
+  return extensions.reduce(
+    (acc, ext) => {
+      if (!acc[ext.publisher]) {
+        acc[ext.publisher] = [];
+      }
+      acc[ext.publisher].push(ext);
+      return acc;
+    },
+    {} as Record<string, Array<{ publisher: string; id: string }>>,
+  );
+}
+
+/**
+ * Handle remove all extensions with warning
+ */
+async function handleRemoveAll(
+  installed: Array<{ id: string; publisher: string; displayName: string }>,
+): Promise<string[]> {
+  const groupByPublisher = groupExtensionsByPublisher(installed);
+  const topPublishers = Object.entries(groupByPublisher)
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, 5);
+
+  p.note(
+    `You have ${installed.length} extensions from ${Object.keys(groupByPublisher).length} publishers\n\n` +
+      `Top publishers:\n` +
+      topPublishers.map(([pub, exts]) => `• ${pub}: ${exts.length} extensions`).join("\n"),
+    "⚠️ Warning: This will remove ALL extensions",
+  );
+
+  const confirmed = await p.confirm({
+    message: `Are you absolutely sure you want to remove all ${installed.length} extensions?`,
+    initialValue: false,
+  });
+
+  if (p.isCancel(confirmed)) {
+    return [];
+  }
+
+  return confirmed ? installed.map((e) => e.id) : [];
+}
+
+/**
+ * Smart multiselect - handles small lists directly
+ */
+async function selectFromList(
+  items: Array<{ id: string; displayName: string; version: string }>,
+  message: string,
+): Promise<string[]> {
+  const selected = await p.multiselect({
+    message,
+    options: items.map((ext) => ({
+      value: ext.id,
+      label: `${ext.displayName || ext.id} (v${ext.version})`,
+    })),
+    required: false,
+  });
+
+  if (p.isCancel(selected)) {
+    return [];
+  }
+
+  return selected as string[];
+}
+
+/**
+ * Handle large filtered set (> 30 items)
+ */
+async function handleLargeFilteredSet(
+  filtered: Array<{ id: string; displayName: string; version: string; publisher: string }>,
+): Promise<string[]> {
+  const action = await p.select({
+    message: `Found ${filtered.length} matches (still a large list):`,
+    options: [
+      { value: "refine", label: "🔍 Refine search", hint: "Search again" },
+      { value: "paginate", label: "📋 Browse pages", hint: "Paginated view" },
+      { value: "all", label: `🗑️ Remove all ${filtered.length} matches`, hint: "Remove all" },
+      { value: "cancel", label: "❌ Cancel" },
+    ],
+  });
+
+  if (p.isCancel(action) || action === "cancel") {
+    return [];
+  }
+
+  if (action === "refine") {
+    return await handleSearchRemove(filtered);
+  } else if (action === "paginate") {
+    return await handleBrowseRemove(filtered);
+  } else if (action === "all") {
+    return await handleRemoveAll(filtered);
+  }
+
+  return [];
+}
+
+/**
+ * Handle search-based removal
+ */
+async function handleSearchRemove(
+  installed: Array<{ id: string; displayName: string; version: string; publisher: string }>,
+): Promise<string[]> {
+  const query = await p.text({
+    message: "Search extensions:",
+    placeholder: "name, publisher, or keyword",
+    validate: (val) => (val.length < 2 ? "Enter at least 2 characters" : undefined),
+  });
+
+  if (p.isCancel(query)) {
+    return [];
+  }
+
+  const lowerQuery = query.toLowerCase();
+  const filtered = installed.filter(
+    (ext) =>
+      ext.id.toLowerCase().includes(lowerQuery) ||
+      ext.displayName.toLowerCase().includes(lowerQuery) ||
+      ext.publisher.toLowerCase().includes(lowerQuery),
+  );
+
+  if (filtered.length === 0) {
+    p.log.warning(`No extensions match "${query}"`);
+    return [];
+  }
+
+  p.log.info(`Found ${filtered.length} matching extension(s)`);
+
+  if (filtered.length > 30) {
+    return await handleLargeFilteredSet(filtered);
+  }
+
+  return await selectFromList(filtered, `Select from ${filtered.length} matches`);
+}
+
+/**
+ * Handle paginated browsing for large lists
+ */
+async function handleBrowseRemove(
+  installed: Array<{ id: string; displayName: string; version: string; publisher: string }>,
+): Promise<string[]> {
+  const PAGE_SIZE = 15;
+  const totalPages = Math.ceil(installed.length / PAGE_SIZE);
+
+  if (installed.length <= 20) {
+    return await selectFromList(installed, "Select extensions to remove");
+  }
+
+  const selected = new Set<string>();
+  let currentPage = 0;
+
+  while (true) {
+    const pageItems = installed.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+
+    const action = await p.select({
+      message: `Page ${currentPage + 1}/${totalPages} | ${selected.size} selected | Choose action:`,
+      options: [
+        {
+          value: "select",
+          label: `📋 Select from this page (${pageItems.length} items)`,
+          hint: "Use Space to toggle",
+        },
+        {
+          value: "next",
+          label: "➡️ Next page",
+          hint: currentPage < totalPages - 1 ? undefined : "(last page)",
+        },
+        {
+          value: "prev",
+          label: "⬅️ Previous page",
+          hint: currentPage > 0 ? undefined : "(first page)",
+        },
+        { value: "jump", label: "🎯 Jump to page..." },
+        { value: "search", label: "🔍 Switch to search mode" },
+        {
+          value: "done",
+          label: "✅ Done selecting",
+          hint: selected.size > 0 ? `${selected.size} to remove` : "None selected",
+        },
+        { value: "cancel", label: "❌ Cancel" },
+      ],
+    });
+
+    if (p.isCancel(action) || action === "cancel") {
+      return [];
+    }
+
+    if (action === "select") {
+      const pageIds = pageItems.map((ext) => ext.id);
+      const initiallySelected = pageIds.filter((id) => selected.has(id));
+
+      const pageSelection = await p.multiselect({
+        message: `Select extensions (Page ${currentPage + 1}/${totalPages}) - Ctrl+C to go back:`,
+        options: pageItems.map((ext) => ({
+          value: ext.id,
+          label: `${ext.displayName || ext.id} (v${ext.version})`,
+        })),
+        initialValues: initiallySelected,
+        required: false,
+      });
+
+      if (!p.isCancel(pageSelection)) {
+        pageIds.forEach((id) => selected.delete(id));
+        (pageSelection as string[]).forEach((id) => selected.add(id));
+      }
+    } else if (action === "next" && currentPage < totalPages - 1) {
+      currentPage++;
+    } else if (action === "prev" && currentPage > 0) {
+      currentPage--;
+    } else if (action === "jump") {
+      const pageNum = await p.text({
+        message: `Jump to page (1-${totalPages}):`,
+        validate: (val) => {
+          const num = Number.parseInt(val);
+          if (Number.isNaN(num) || num < 1 || num > totalPages) {
+            return `Enter a number between 1 and ${totalPages}`;
+          }
+        },
+      });
+
+      if (!p.isCancel(pageNum)) {
+        currentPage = Number.parseInt(pageNum) - 1;
+      }
+    } else if (action === "search") {
+      return await handleSearchRemove(installed);
+    } else if (action === "done") {
+      break;
+    }
+  }
+
+  return Array.from(selected);
+}
+
+/**
  * Main interactive menu - Quick actions for common tasks
  */
 export async function runInteractive() {
@@ -497,45 +733,86 @@ async function handleListExtensions() {
 }
 
 /**
- * Handle removing extensions
+ * Handle removing extensions (enhanced with pagination and search)
  */
 async function handleRemoveExtensions() {
   p.log.step("Remove Extensions");
 
-  // Select editor with config preference (Approach 1: Always offer choice with default indicated)
   const selectedEditor = await selectEditorWithPreference();
 
-  const extensionId = await p.text({
-    message: "Enter extension ID to remove:",
-    placeholder: "publisher.extension-name",
-    validate: (value) => {
-      if (!value) return "Extension ID is required";
-    },
+  const { getInstalledExtensions } = await import("../features/export");
+  const installed = await getInstalledExtensions(selectedEditor);
+
+  if (installed.length === 0) {
+    p.log.warning("No extensions found");
+    return;
+  }
+
+  const mode = await p.select({
+    message: `Choose removal method (${installed.length} installed):`,
+    options: [
+      {
+        value: "all",
+        label: `🗑️ Remove all ${installed.length} extensions`,
+        hint: "Clean slate",
+      },
+      {
+        value: "search",
+        label: "🔍 Search and select",
+        hint: "Filter by name/publisher/keyword",
+      },
+      {
+        value: "browse",
+        label: "📋 Browse and select",
+        hint: installed.length > 30 ? "Paginated view" : "Full list",
+      },
+    ],
   });
 
-  if (p.isCancel(extensionId)) return;
+  if (p.isCancel(mode)) return;
+
+  let toRemove: string[] = [];
+
+  switch (mode) {
+    case "all":
+      toRemove = await handleRemoveAll(installed);
+      break;
+    case "search":
+      toRemove = await handleSearchRemove(installed);
+      break;
+    case "browse":
+      toRemove = await handleBrowseRemove(installed);
+      break;
+  }
+
+  if (toRemove.length === 0) {
+    p.log.info("No extensions selected for removal");
+    return;
+  }
 
   const confirm = await p.confirm({
-    message: `Remove ${extensionId} from ${selectedEditor === "cursor" ? "Cursor" : "VS Code"}?`,
+    message: `Remove ${toRemove.length} extension(s) from ${selectedEditor === "cursor" ? "Cursor" : "VS Code"}?`,
     initialValue: false,
   });
 
-  if (p.isCancel(confirm) || !confirm) return;
+  if (p.isCancel(confirm) || !confirm) {
+    p.log.info("Removal cancelled");
+    return;
+  }
 
   const s = p.spinner();
-  s.start("Removing...");
+  s.start(`Removing ${toRemove.length} extension(s)...`);
 
   try {
     const removeCommand = await loadCommand("remove");
 
-    // Pass editor and yes: true since we already confirmed
     const options: GlobalOptions = {
       quiet: false,
       yes: true,
       editor: selectedEditor,
     };
 
-    const result = await removeCommand.execute([extensionId], options);
+    const result = await removeCommand.execute(toRemove, options);
 
     s.stop("Done!");
 
