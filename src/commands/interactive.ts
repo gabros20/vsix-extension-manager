@@ -324,6 +324,197 @@ async function handleBrowseRemove(
 }
 
 /**
+ * Handle search-based update selection
+ */
+async function handleSearchUpdate(
+  installed: Array<{ id: string; displayName: string; version: string; publisher: string }>,
+): Promise<string[]> {
+  const query = await p.text({
+    message: "Search extensions to update:",
+    placeholder: "name, publisher, or keyword",
+    validate: (val) => (val.length < 2 ? "Enter at least 2 characters" : undefined),
+  });
+
+  if (p.isCancel(query)) {
+    return [];
+  }
+
+  const lowerQuery = query.toLowerCase();
+  const filtered = installed.filter(
+    (ext) =>
+      ext.id.toLowerCase().includes(lowerQuery) ||
+      ext.displayName.toLowerCase().includes(lowerQuery) ||
+      ext.publisher.toLowerCase().includes(lowerQuery),
+  );
+
+  if (filtered.length === 0) {
+    p.log.warning(`No extensions match "${query}"`);
+    return [];
+  }
+
+  p.log.info(`Found ${filtered.length} matching extension(s)`);
+
+  if (filtered.length > 30) {
+    return await handleLargeFilteredSetForUpdate(filtered);
+  }
+
+  return await selectFromListForUpdate(filtered, `Select from ${filtered.length} matches`);
+}
+
+/**
+ * Handle large filtered set for update (> 30 items)
+ */
+async function handleLargeFilteredSetForUpdate(
+  filtered: Array<{ id: string; displayName: string; version: string; publisher: string }>,
+): Promise<string[]> {
+  const action = await p.select({
+    message: `Found ${filtered.length} matches (still a large list):`,
+    options: [
+      { value: "refine", label: "🔍 Refine search", hint: "Search again" },
+      { value: "paginate", label: "📋 Browse pages", hint: "Paginated view" },
+      { value: "all", label: `🔄 Update all ${filtered.length} matches`, hint: "Update all" },
+      { value: "cancel", label: "❌ Cancel" },
+    ],
+  });
+
+  if (p.isCancel(action) || action === "cancel") {
+    return [];
+  }
+
+  if (action === "refine") {
+    return await handleSearchUpdate(filtered);
+  } else if (action === "paginate") {
+    return await handleBrowseUpdate(filtered);
+  } else if (action === "all") {
+    return filtered.map((e) => e.id);
+  }
+
+  return [];
+}
+
+/**
+ * Smart multiselect for update - handles small lists directly
+ */
+async function selectFromListForUpdate(
+  items: Array<{ id: string; displayName: string; version: string }>,
+  message: string,
+): Promise<string[]> {
+  const selected = await p.multiselect({
+    message,
+    options: items.map((ext) => ({
+      value: ext.id,
+      label: `${ext.displayName || ext.id} (v${ext.version})`,
+    })),
+    required: false,
+  });
+
+  if (p.isCancel(selected)) {
+    return [];
+  }
+
+  return selected as string[];
+}
+
+/**
+ * Handle paginated browsing for update (large lists)
+ */
+async function handleBrowseUpdate(
+  installed: Array<{ id: string; displayName: string; version: string; publisher: string }>,
+): Promise<string[]> {
+  const PAGE_SIZE = 15;
+  const totalPages = Math.ceil(installed.length / PAGE_SIZE);
+
+  if (installed.length <= 20) {
+    return await selectFromListForUpdate(installed, "Select extensions to update");
+  }
+
+  const selected = new Set<string>();
+  let currentPage = 0;
+
+  while (true) {
+    const pageItems = installed.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+
+    const action = await p.select({
+      message: `Page ${currentPage + 1}/${totalPages} | ${selected.size} selected | Choose action:`,
+      options: [
+        {
+          value: "select",
+          label: `📋 Select from this page (${pageItems.length} items)`,
+          hint: "Use Space to toggle",
+        },
+        {
+          value: "next",
+          label: "➡️ Next page",
+          hint: currentPage < totalPages - 1 ? undefined : "(last page)",
+        },
+        {
+          value: "prev",
+          label: "⬅️ Previous page",
+          hint: currentPage > 0 ? undefined : "(first page)",
+        },
+        { value: "jump", label: "🎯 Jump to page..." },
+        { value: "search", label: "🔍 Switch to search mode" },
+        {
+          value: "done",
+          label: "✅ Done selecting",
+          hint: selected.size > 0 ? `${selected.size} to update` : "None selected",
+        },
+        { value: "cancel", label: "❌ Cancel" },
+      ],
+    });
+
+    if (p.isCancel(action) || action === "cancel") {
+      return [];
+    }
+
+    if (action === "select") {
+      const pageIds = pageItems.map((ext) => ext.id);
+      const initiallySelected = pageIds.filter((id) => selected.has(id));
+
+      const pageSelection = await p.multiselect({
+        message: `Select extensions (Page ${currentPage + 1}/${totalPages}) - Ctrl+C to go back:`,
+        options: pageItems.map((ext) => ({
+          value: ext.id,
+          label: `${ext.displayName || ext.id} (v${ext.version})`,
+        })),
+        initialValues: initiallySelected,
+        required: false,
+      });
+
+      if (!p.isCancel(pageSelection)) {
+        pageIds.forEach((id) => selected.delete(id));
+        (pageSelection as string[]).forEach((id) => selected.add(id));
+      }
+    } else if (action === "next" && currentPage < totalPages - 1) {
+      currentPage++;
+    } else if (action === "prev" && currentPage > 0) {
+      currentPage--;
+    } else if (action === "jump") {
+      const pageNum = await p.text({
+        message: `Jump to page (1-${totalPages}):`,
+        validate: (val) => {
+          const num = Number.parseInt(val);
+          if (Number.isNaN(num) || num < 1 || num > totalPages) {
+            return `Enter a number between 1 and ${totalPages}`;
+          }
+          return undefined;
+        },
+      });
+
+      if (!p.isCancel(pageNum)) {
+        currentPage = Number.parseInt(pageNum as string) - 1;
+      }
+    } else if (action === "search") {
+      return await handleSearchUpdate(installed);
+    } else if (action === "done") {
+      break;
+    }
+  }
+
+  return Array.from(selected);
+}
+
+/**
  * Main interactive menu - Quick actions for common tasks
  */
 export async function runInteractive() {
@@ -522,37 +713,62 @@ async function handleUpdateExtensions() {
   // Select editor with config preference (Approach 1: Always offer choice with default indicated)
   const selectedEditor = await selectEditorWithPreference();
 
-  const updateType = await p.select({
-    message: "What would you like to update?",
+  const { getInstalledExtensions } = await import("../features/export");
+  const installed = await getInstalledExtensions(selectedEditor);
+
+  if (installed.length === 0) {
+    p.log.warning("No extensions found");
+    return;
+  }
+
+  const updateMode = await p.select({
+    message: `What would you like to update? (${installed.length} installed):`,
     options: [
       { value: "all", label: "🔄 Update all extensions", hint: "Check and update all" },
-      { value: "specific", label: "🎯 Update specific extension", hint: "By ID" },
+      {
+        value: "search",
+        label: "🔍 Search and select",
+        hint: "Filter by name/publisher/keyword",
+      },
+      {
+        value: "browse",
+        label: "📋 Browse and select",
+        hint: installed.length > 30 ? "Paginated view" : "Full list",
+      },
     ],
   });
 
-  if (p.isCancel(updateType)) return;
+  if (p.isCancel(updateMode)) return;
+
+  let toUpdate: string[] = [];
+
+  switch (updateMode) {
+    case "all":
+      // Don't set toUpdate - let the update command handle all
+      break;
+    case "search":
+      toUpdate = await handleSearchUpdate(installed);
+      break;
+    case "browse":
+      toUpdate = await handleBrowseUpdate(installed);
+      break;
+  }
+
+  if (updateMode !== "all" && toUpdate.length === 0) {
+    p.log.info("No extensions selected for update");
+    return;
+  }
 
   try {
     const updateCommand = await loadCommand("update");
     const options: GlobalOptions = {
       quiet: false,
       yes: false,
-      editor: selectedEditor, // Pass selected editor
+      editor: selectedEditor,
     };
 
-    let args: string[] = [];
-
-    if (updateType === "specific") {
-      const extensionId = await p.text({
-        message: "Enter extension ID:",
-        placeholder: "publisher.extension-name",
-      });
-      if (p.isCancel(extensionId)) return;
-      args = [extensionId];
-    }
-
     // Update command manages its own progress display
-    const result = await updateCommand.execute(args, options);
+    const result = await updateCommand.execute(toUpdate, options);
 
     if (result.status === "ok") {
       p.log.success(result.summary);
