@@ -532,9 +532,6 @@ async function handleUpdateExtensions() {
 
   if (p.isCancel(updateType)) return;
 
-  const s = p.spinner();
-  s.start("Updating...");
-
   try {
     const updateCommand = await loadCommand("update");
     const options: GlobalOptions = {
@@ -546,19 +543,16 @@ async function handleUpdateExtensions() {
     let args: string[] = [];
 
     if (updateType === "specific") {
-      s.stop();
       const extensionId = await p.text({
         message: "Enter extension ID:",
         placeholder: "publisher.extension-name",
       });
       if (p.isCancel(extensionId)) return;
       args = [extensionId];
-      s.start("Updating...");
     }
 
+    // Update command manages its own progress display
     const result = await updateCommand.execute(args, options);
-
-    s.stop("Done!");
 
     if (result.status === "ok") {
       p.log.success(result.summary);
@@ -566,7 +560,7 @@ async function handleUpdateExtensions() {
       p.log.error(result.summary);
     }
   } catch (error) {
-    s.stop("Failed");
+    p.log.error(`Update failed: ${error instanceof Error ? error.message : String(error)}`);
     throw error;
   }
 }

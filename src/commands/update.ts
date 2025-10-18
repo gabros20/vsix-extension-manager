@@ -7,7 +7,7 @@
 import { BaseCommand } from "./base/BaseCommand";
 import type { CommandResult, CommandHelp, GlobalOptions } from "./base/types";
 import { CommandResultBuilder } from "../core/output/CommandResultBuilder";
-import { getUpdateInstalledService } from "../features/update";
+import { getUpdateOrchestratorService } from "../features/update";
 import { getEditorService } from "../features/install";
 import { getInstalledExtensions } from "../features/export";
 import { ui, promptPolicy } from "../core/ui";
@@ -91,25 +91,40 @@ export class UpdateCommand extends BaseCommand {
       // Show progress
       const spinner = ui.spinner();
       if (!options.quiet && !options.json) {
-        spinner.start("Checking for updates...");
+        spinner.start("Preparing update...");
       }
 
-      // Execute update
-      const updateService = getUpdateInstalledService();
-      const result = await updateService.updateInstalled({
-        editor: chosenEditor as "vscode" | "cursor",
-        selectedExtensions: extensionIds,
-        parallel: options.parallel || 1,
-        retry: options.retry || 2,
-        source: options.source as "marketplace" | "open-vsx" | undefined,
-        preRelease: options.preRelease,
-        dryRun: options.dryRun,
-        quiet: options.quiet,
-        json: options.json,
-      });
+      // Execute update with progress callbacks
+      const updateService = getUpdateOrchestratorService();
+      const result = await updateService.updateInstalled(
+        {
+          editor: chosenEditor as "vscode" | "cursor",
+          selectedExtensions: extensionIds,
+          parallel: options.parallel || 1,
+          retry: options.retry || 2,
+          source: options.source as "marketplace" | "open-vsx" | undefined,
+          preRelease: options.preRelease,
+          dryRun: options.dryRun,
+          quiet: options.quiet,
+          json: options.json,
+        },
+        // onMessage callback for status updates
+        (message: string) => {
+          if (!options.quiet && !options.json) {
+            spinner.message(message);
+          }
+        },
+        // onProgress callback for download progress
+        (id: string, progress) => {
+          if (!options.quiet && !options.json) {
+            const percentage = progress.percentage ? ` - ${Math.round(progress.percentage)}%` : "";
+            spinner.message(`Downloading: ${id}${percentage}`);
+          }
+        },
+      );
 
       if (!options.quiet && !options.json) {
-        spinner.stop("Update check complete");
+        spinner.stop("Update complete");
       }
 
       // Add results to builder
@@ -142,14 +157,17 @@ export class UpdateCommand extends BaseCommand {
         }
       });
 
+      // Count both up-to-date and skipped as "skipped"
+      const totalSkipped = result.upToDate + result.skipped;
+
       // Show summary
       if (promptPolicy.isInteractive(options)) {
         if (result.updated > 0) {
           ui.log.success(`✅ Updated ${result.updated} extension(s)`);
         }
 
-        if (result.skipped > 0) {
-          ui.log.info(`⏭️  Skipped ${result.skipped} extension(s) (already up-to-date)`);
+        if (totalSkipped > 0) {
+          ui.log.info(`⏭️  Skipped ${totalSkipped} extension(s) (already up-to-date)`);
         }
 
         if (result.failed > 0) {
@@ -180,17 +198,18 @@ export class UpdateCommand extends BaseCommand {
       }
 
       const allSucceeded = result.failed === 0;
+
       ui.outro(
         allSucceeded
-          ? `✅ Update complete: ${result.updated} updated, ${result.skipped} skipped`
+          ? `✅ Update complete: ${result.updated} updated, ${totalSkipped} skipped`
           : `⚠️  Update incomplete: ${result.updated} updated, ${result.failed} failed`,
       );
 
       // Add warnings if any skipped
-      if (result.skipped > 0) {
+      if (totalSkipped > 0) {
         builder.addWarningItem({
           code: "SKIPPED",
-          message: `${result.skipped} extensions skipped (already up-to-date)`,
+          message: `${totalSkipped} extensions skipped (already up-to-date)`,
         });
       }
 
