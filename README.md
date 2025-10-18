@@ -1,6 +1,12 @@
 ## VSIX Extension Manager v2.0
 
-A powerful, modern CLI for managing VS Code and Cursor extensions with smart automation, intelligent retry, and comprehensive workflows.
+**Stop fighting with "extension not available" errors.** Download, install, and manage VS Code and Cursor extensions directly—no marketplace restrictions, full version control, complete offline support.
+
+Microsoft blocks Cursor from the official marketplace. This CLI bypasses those restrictions by downloading VSIX files directly from both the Visual Studio Marketplace and OpenVSX, giving you complete control over your extension ecosystem.
+
+**Interactive mode or one-liners—your choice.** Run `vsix-extension-manager` for a beautiful guided menu, or use `vsix-extension-manager add` for smart command-line workflows that auto-detect URLs, extension IDs, local files, directories, or lists. Smart retry logic, automatic backups, health checks, and zero-config setup included.
+
+> **🚧 Work in Progress:** v2.0 is currently in rapid development. Features and commands are actively being tested and refined. Expect breaking changes, incomplete features, and potential bugs. Use with caution and update regularly.
 
 [![npm version](https://img.shields.io/npm/v/vsix-extension-manager.svg)](https://www.npmjs.com/package/vsix-extension-manager)
 [![npm downloads](https://img.shields.io/npm/dm/vsix-extension-manager.svg)](https://www.npmjs.com/package/vsix-extension-manager)
@@ -9,8 +15,6 @@ A powerful, modern CLI for managing VS Code and Cursor extensions with smart aut
 [![Release (semantic-release)](https://github.com/gabros20/vsix-extension-manager/actions/workflows/semantic-release.yml/badge.svg)](https://github.com/gabros20/vsix-extension-manager/actions/workflows/semantic-release.yml)
 [![Last commit](https://img.shields.io/github/last-commit/gabros20/vsix-extension-manager)](https://github.com/gabros20/vsix-extension-manager/commits/main)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-donate-FFDD00?logo=buymeacoffee&logoColor=black)](https://www.buymeacoffee.com/tamas_gabor)
-
-> **⚠️ v2.0 Breaking Changes:** This release introduces a completely redesigned CLI with simplified commands. See the [Migration Guide](#migration-from-v1x-to-v20) below.
 
 ### Table of Contents
 
@@ -36,7 +40,6 @@ A powerful, modern CLI for managing VS Code and Cursor extensions with smart aut
   - [Profiles](#profiles)
   - [Environment Variables](#environment-variables)
   - [Precedence Rules](#precedence-rules)
-- [Migration from v1.x to v2.0](#migration-from-v1x-to-v20)
 - [Contributing](#contributing)
 - [FAQ / Troubleshooting](#faq--troubleshooting)
 - [License](#license)
@@ -51,6 +54,7 @@ VSIX Extension Manager solves this with a fast, reliable CLI for downloading VSI
 ### Features / Highlights
 
 #### 🚀 v2.0 Improvements
+
 - ✨ **Universal `add` command** - One command for all scenarios (URL, file, directory, list, ID)
 - 🎯 **Smart input detection** - Automatically determines what to do with your input
 - 🔄 **Intelligent retry** - Automatic error recovery with escalating strategies
@@ -61,6 +65,7 @@ VSIX Extension Manager solves this with a fast, reliable CLI for downloading VSI
 - 🎨 **First-run wizard** - Interactive setup for new users
 
 #### Core Features
+
 - ✅ **Multi-source support** - Marketplace and OpenVSX with auto-detect
 - ✅ **Batch operations** - Download and install multiple extensions efficiently
 - ✅ **Version management** - Latest (stable/pre-release) or specific versions
@@ -181,11 +186,13 @@ vsix-extension-manager doctor --fix
 Smart command that automatically detects input type and executes the appropriate workflow.
 
 **Usage:**
+
 ```bash
 vsix-extension-manager add <input> [options]
 ```
 
 **Input Types** (automatically detected):
+
 - **URL**: Marketplace or OpenVSX extension URL
 - **Extension ID**: `publisher.name` format
 - **VSIX File**: Path to `.vsix` file
@@ -193,6 +200,7 @@ vsix-extension-manager add <input> [options]
 - **List File**: `.txt` or `extensions.json` file
 
 **Examples:**
+
 ```bash
 # From URL (auto-downloads and installs)
 vsix-extension-manager add "https://marketplace.visualstudio.com/items?itemName=ms-python.python"
@@ -226,6 +234,7 @@ vsix-extension-manager add extensions.txt --parallel 5
 ```
 
 **Common Options:**
+
 - `--editor <type>` - Target editor (cursor, vscode, auto)
 - `--download-only` - Download without installing
 - `--output <path>` - Output directory for downloads
@@ -340,13 +349,13 @@ vsix-extension-manager setup --force
 
 ```bash
 # List available backups
-vsix rollback --list
+vsix-extension-manager rollback --list
 
 # Restore specific backup
-vsix rollback --backup-id <id>
+vsix-extension-manager rollback --backup-id <id>
 
 # Restore latest backup for an extension
-vsix rollback --extension-id ms-python.python --latest
+vsix-extension-manager rollback --extension-id ms-python.python --latest
 ```
 
 ```bash
@@ -1157,7 +1166,7 @@ export VSIX_ALLOW_MISMATCHED_BINARY=false # Allow proceeding when binary identit
   - `--quiet`: Reduce output
   - `--json`: Machine-readable logs
   - `--summary <path>`: Write install summary JSON
-  - `--allow-mismatched-binary`: Proceed even if `code` points to Cursor or vice versa (not recommended)
+  - `--allow-mismatched-binary`: Proceed even if `code` points to Cursor or vice‑versa (not recommended)
 
 - Update:
   - `--editor <vscode|cursor|auto>`: Target editor (default: auto)
@@ -1369,8 +1378,8 @@ Create `~/.vsix/config.yml` or `.vsix.yml` in your project:
 ```yaml
 # ~/.vsix/config.yml
 editor:
-  prefer: cursor           # Preference when multiple found
-  cursor-binary: auto      # auto | explicit path
+  prefer: cursor # Preference when multiple found
+  cursor-binary: auto # auto | explicit path
   vscode-binary: auto
 
 safety:
@@ -1383,8 +1392,8 @@ performance:
   parallel-installs: 1
 
 behavior:
-  skip-installed: ask       # ask | always | never
-  update-check: weekly      # never | daily | weekly
+  skip-installed: ask # ask | always | never
+  update-check: weekly # never | daily | weekly
   auto-retry: true
 
 # Active profile
@@ -1431,97 +1440,11 @@ vsix-extension-manager add ms-python.python  # Uses environment settings
 #### Precedence Rules
 
 Configuration precedence (highest to lowest):
+
 1. **CLI flags** - `--editor cursor`
 2. **Environment variables** - `VSIX_EDITOR=cursor`
 3. **Config file** - `~/.vsix/config.yml`
 4. **Default values** - Built-in defaults
-
-### Migration from v1.x to v2.0
-
-v2.0 introduces breaking changes with a completely redesigned CLI. Here's how to migrate:
-
-#### Automatic Migration
-
-On first run, v2.0 automatically detects and migrates v1.x configuration files:
-
-```bash
-# First run of v2.0
-vsix-extension-manager add ms-python.python
-
-# Output:
-✅ Configuration migrated to v2.0 format
-```
-
-Old config is backed up as `.v1.backup`.
-
-#### Command Migration
-
-| v1.x Command | v2.0 Command | Notes |
-|--------------|--------------|-------|
-| `download --url <url>` | `vsix-extension-manager add <url>` | Simplified |
-| `quick-install --url <url>` | `vsix-extension-manager add <url>` | Now default behavior |
-| `install --vsix <file>` | `vsix-extension-manager add <file>` | Auto-detects file |
-| `install --vsix-dir <dir>` | `vsix-extension-manager add <dir>` | Auto-detects directory |
-| `from-list --file <list>` | `vsix-extension-manager add <list>` | Auto-detects list |
-| `export-installed -o <file>` | `vsix-extension-manager list --output <file>` | Enhanced formats |
-| `update-installed` | `vsix-extension-manager update` | Simplified |
-| `uninstall <id>` | `vsix-extension-manager remove <id>` | Renamed |
-| `versions <id>` | `vsix-extension-manager info <id>` | Enhanced details |
-
-#### Flag Migration
-
-| v1.x Flag | v2.0 Flag | Notes |
-|-----------|-----------|-------|
-| `--verbose` | `--debug` | Renamed |
-| `--reinstall` | `--force` | Renamed |
-| `--check-compatibility` | `--check-compat` | Shortened |
-| `--allow-mismatched-binary` | `--allow-mismatch` | Shortened |
-| `--install-parallel` | `--parallel` | Unified |
-| `--no-install` | `--download-only` | Clearer |
-| `--url <url>` | `<url>` | Positional argument |
-| `--vsix <file>` | `<file>` | Positional argument |
-| `--file <list>` | `<list>` | Positional argument |
-
-#### Quick Migration Examples
-
-```bash
-# v1.x
-vsix-extension-manager download --url "https://..." --version latest
-# v2.0
-vsix-extension-manager add "https://..."
-
-# v1.x
-vsix-extension-manager quick-install --url "..." --editor cursor
-# v2.0
-vsix-extension-manager add "..." --editor cursor
-
-# v1.x
-vsix-extension-manager install --vsix ./extension.vsix
-# v2.0
-vsix-extension-manager add ./extension.vsix
-
-# v1.x
-vsix-extension-manager from-list --file extensions.txt --install-after
-# v2.0
-vsix-extension-manager add extensions.txt
-
-# v1.x
-vsix-extension-manager export-installed -o list.txt
-# v2.0
-vsix-extension-manager list --output list.txt
-
-# v1.x
-vsix-extension-manager update-installed
-# v2.0
-vsix-extension-manager update
-
-# v1.x
-vsix-extension-manager uninstall ms-python.python
-# v2.0
-vsix-extension-manager remove ms-python.python
-```
-
-For complete migration documentation, see [MIGRATION.md](./MIGRATION.md).
 
 ### License
 
@@ -1529,8 +1452,17 @@ MIT — see [LICENSE](LICENSE).
 
 ### Acknowledgments
 
+- [Visual Studio Marketplace](https://marketplace.visualstudio.com/) - Primary extension source
+- [OpenVSX Registry](https://open-vsx.org/) - Alternative open-source extension registry
+- [axios](https://github.com/axios/axios) - HTTP client for reliable downloads
+- [adm-zip](https://github.com/cthackers/adm-zip) - VSIX file extraction and handling
+- [Commander.js](https://github.com/tj/commander.js) - CLI framework
+- [@clack/prompts](https://github.com/natemoo-re/clack) - Beautiful interactive prompts
+- [YAML](https://github.com/eemeli/yaml) - Configuration file parsing
+- [Zod](https://github.com/colinhacks/zod) - Schema validation
+- [semantic-release](https://github.com/semantic-release/semantic-release) - Automated versioning & releases
+- Built with [TypeScript](https://www.typescriptlang.org/) for type safety
 - Inspired by [mjmirza/download-vsix-from-visual-studio-market-place](https://github.com/mjmirza/download-vsix-from-visual-studio-market-place)
-- Built with modern CLI tooling: [Commander.js](https://github.com/tj/commander.js) and [@clack/prompts](https://github.com/natemooe/clack)
 
 <p align="left">
   <a href="https://www.buymeacoffee.com/tamas_gabor">
