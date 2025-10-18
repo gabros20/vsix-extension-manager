@@ -374,7 +374,6 @@ Interactive Mode Menu:
 **Download**
 
 - Download single extension from marketplace URL
-- Download multiple extensions from JSON collection (URLs + versions)
 - Download from exported list (txt / extensions.json)
 
 **Update**
@@ -435,38 +434,6 @@ vsix-extension-manager download --url "..." --version "1.2.3" --verify-checksum 
 vsix-extension-manager download \
   --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" \
   --version "2023.20.0" \
-  --install-after
-```
-
-#### Bulk from JSON collection (URLs + versions)
-
-- Template:
-
-```json
-[
-  {
-    "url": "https://marketplace.visualstudio.com/items?itemName=ms-python.python",
-    "version": "latest"
-  },
-  { "url": "https://open-vsx.org/extension/ms-python/python", "version": "2025.4.0" }
-]
-```
-
-- Run (non-interactive):
-
-```bash
-vsix-extension-manager download \
-  --file ./extensions.json \
-  --output ./downloads \
-  --retry 3 \
-  --retry-delay 1500 \
-  --summary ./summary.json \
-  --quiet
-
-# Download and install bulk extensions
-vsix-extension-manager download \
-  --file ./extensions.json \
-  --output ./downloads \
   --install-after
 ```
 
@@ -1012,19 +979,18 @@ code   --install-extension ./downloads/<file>.vsix
 
 ### Which mode should I use?
 
-| Mode                        | Input                                     | Version resolution                       | Parallel                                | Best for                           |
-| --------------------------- | ----------------------------------------- | ---------------------------------------- | --------------------------------------- | ---------------------------------- |
-| **Download Modes**          |                                           |                                          |                                         |                                    |
-| Single extension (URL)      | Marketplace/OpenVSX URL                   | Exact or `latest` (pre-release optional) | N/A                                     | One-off downloads                  |
-| Bulk from JSON collection   | JSON array of `{ url, version, source? }` | Exact or `latest` per entry              | Yes (CLI `--parallel`, non-interactive) | Mixed sources, pinned versions     |
-| Download from exported list | `txt` of IDs or `extensions.json`         | Resolves `latest` automatically          | Yes (CLI)                               | Migrating/export-import workflows  |
-| **Install Modes**           |                                           |                                          |                                         |                                    |
-| Install single VSIX         | Single `.vsix` file or directory path     | N/A (version in filename)                | N/A                                     | Testing individual extensions      |
-| Install from directory      | Directory path (scans for `.vsix`)        | N/A (version in filename)                | Yes (CLI `--parallel`)                  | Bulk setup from downloads          |
-| Install from list           | `txt` or `extensions.json`                | Resolves `latest` (or uses existing)     | Yes (CLI `--parallel`)                  | Complete environment setup         |
-| **Integrated Workflows**    |                                           |                                          |                                         |                                    |
-| Download + Install          | URL + `--install-after`                   | Exact or `latest`                        | N/A                                     | One-step download and install      |
-| List Download + Install     | `txt`/JSON + `--install`                  | Resolves `latest` automatically          | Yes (download and install)              | Complete setup from exported lists |
+| Mode                        | Input                                 | Version resolution                       | Parallel                   | Best for                           |
+| --------------------------- | ------------------------------------- | ---------------------------------------- | -------------------------- | ---------------------------------- |
+| **Download Modes**          |                                       |                                          |                            |                                    |
+| Single extension (URL)      | Marketplace/OpenVSX URL               | Exact or `latest` (pre-release optional) | N/A                        | One-off downloads                  |
+| Download from exported list | `txt` of IDs or `extensions.json`     | Resolves `latest` automatically          | Yes (CLI)                  | Migrating/export-import workflows  |
+| **Install Modes**           |                                       |                                          |                            |                                    |
+| Install single VSIX         | Single `.vsix` file or directory path | N/A (version in filename)                | N/A                        | Testing individual extensions      |
+| Install from directory      | Directory path (scans for `.vsix`)    | N/A (version in filename)                | Yes (CLI `--parallel`)     | Bulk setup from downloads          |
+| Install from list           | `txt` or `extensions.json`            | Resolves `latest` (or uses existing)     | Yes (CLI `--parallel`)     | Complete environment setup         |
+| **Integrated Workflows**    |                                       |                                          |                            |                                    |
+| Download + Install          | URL + `--install-after`               | Exact or `latest`                        | N/A                        | One-step download and install      |
+| List Download + Install     | `txt`/JSON + `--install`              | Resolves `latest` automatically          | Yes (download and install) | Complete setup from exported lists |
 
 ### Configuration / Options
 

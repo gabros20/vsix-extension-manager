@@ -1,5 +1,3 @@
-
-
 # Standardized Output System
 
 Consistent API responses and output formatting across all commands.
@@ -361,9 +359,7 @@ return { installed: extensions };
 
 ```typescript
 // All commands use CommandResultBuilder
-return new CommandResultBuilder("command-name")
-  .addSuccess({ id: "..." })
-  .build();
+return new CommandResultBuilder("command-name").addSuccess({ id: "..." }).build();
 
 // Consistent structure, automatic totals, proper error handling
 ```
