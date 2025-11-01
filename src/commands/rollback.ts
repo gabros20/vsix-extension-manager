@@ -1,120 +1,193 @@
-import * as p from "@clack/prompts";
+/**
+ * Rollback Command - Restore extensions from backups
+ * Converted to BaseCommand pattern for v2.0 consistency
+ */
+
+import { BaseCommand } from "./base/BaseCommand";
+import type { CommandResult, CommandHelp, GlobalOptions } from "./base/types";
+import { CommandResultBuilder } from "../core/output/CommandResultBuilder";
 import { getBackupService, type BackupMetadata } from "../core/backup";
+import { ui, promptPolicy } from "../core/ui";
 import { formatBytes } from "../core/ui/progress";
 
-interface RollbackOptions {
+/**
+ * Rollback command options
+ */
+export interface RollbackOptions extends GlobalOptions {
   extensionId?: string;
-  editor?: string;
   backupId?: string;
   latest?: boolean;
   list?: boolean;
-  force?: boolean;
   cleanup?: boolean;
   keepCount?: number;
-  quiet?: boolean;
-  json?: boolean;
   backupDir?: string;
 }
 
-export async function rollback(options: RollbackOptions) {
-  const quiet = Boolean(options.quiet);
-  const json = Boolean(options.json);
-  const backupService = getBackupService(options.backupDir);
+/**
+ * Rollback command implementation
+ */
+class RollbackCommand extends BaseCommand {
+  async execute(args: string[], options: GlobalOptions): Promise<CommandResult> {
+    const builder = new CommandResultBuilder("rollback");
+    const rollbackOptions = options as RollbackOptions;
+    const backupService = getBackupService(rollbackOptions.backupDir);
 
-  try {
-    // List mode - show available backups
-    if (options.list) {
-      const editor = options.editor as "vscode" | "cursor" | undefined;
-      const backups = await backupService.listBackups(options.extensionId, editor);
-
-      if (json) {
-        console.log(JSON.stringify(backups, null, 2));
-        return;
+    try {
+      // List mode - show available backups
+      if (rollbackOptions.list) {
+        return await this.handleListBackups(backupService, rollbackOptions, builder);
       }
 
-      if (backups.length === 0) {
-        if (!quiet) {
-          p.log.info("No backups found");
-        }
-        return;
+      // Cleanup mode - remove old backups
+      if (rollbackOptions.cleanup) {
+        return await this.handleCleanup(backupService, rollbackOptions, builder);
       }
 
-      if (!quiet) {
-        console.clear();
-        p.intro("📦 Available Backups");
+      // Rollback mode - restore from backup
+      return await this.handleRollback(backupService, rollbackOptions, builder, args);
+    } catch (error) {
+      builder.addError({
+        code: "ROLLBACK_ERROR",
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return builder.build();
+    }
+  }
 
-        for (const backup of backups) {
-          const date = new Date(backup.timestamp);
-          p.log.info(
-            `${backup.extensionId} v${backup.extensionVersion} (${backup.editor})\n` +
-              `  ID: ${backup.id}\n` +
-              `  Date: ${date.toLocaleString()}\n` +
-              `  Reason: ${backup.reason || "Manual backup"}`,
-          );
-        }
+  /**
+   * Handle listing available backups
+   */
+  private async handleListBackups(
+    backupService: ReturnType<typeof getBackupService>,
+    options: RollbackOptions,
+    builder: CommandResultBuilder,
+  ): Promise<CommandResult> {
+    const editor = options.editor as "vscode" | "cursor" | undefined;
+    const backups = await backupService.listBackups(options.extensionId, editor);
 
-        // Show backup size info
-        const sizeInfo = await backupService.getBackupSize();
-        p.outro(`Total: ${sizeInfo.count} backups, ${formatBytes(sizeInfo.sizeBytes)}`);
+    if (backups.length === 0) {
+      if (promptPolicy.isInteractive(options)) {
+        ui.log.info("No backups found");
       }
-      return;
+      return builder.setSummary("No backups found").build();
     }
 
-    // Cleanup mode - remove old backups
-    if (options.cleanup) {
-      const keepCount = Number(options.keepCount ?? 3);
-      const removed = await backupService.cleanupOldBackups(keepCount);
+    // Add backups to result items
+    for (const backup of backups) {
+      const date = new Date(backup.timestamp);
+      builder.addSuccess({
+        id: backup.id,
+        message: `${backup.extensionId} v${backup.extensionVersion} (${backup.editor})`,
+        details: {
+          extensionId: backup.extensionId,
+          version: backup.extensionVersion,
+          editor: backup.editor,
+          timestamp: date.toISOString(),
+          date: date.toLocaleString(),
+          reason: backup.reason || "Manual backup",
+        },
+      });
+    }
 
-      if (json) {
-        console.log(JSON.stringify({ removed, keepCount }, null, 2));
-        return;
-      }
+    // Show in UI if interactive
+    if (promptPolicy.isInteractive(options)) {
+      ui.intro("📦 Available Backups");
 
-      if (!quiet) {
-        p.log.success(
-          `Cleaned up ${removed} old backup(s), keeping latest ${keepCount} per extension`,
+      for (const backup of backups) {
+        const date = new Date(backup.timestamp);
+        ui.log.info(
+          `${backup.extensionId} v${backup.extensionVersion} (${backup.editor})\n` +
+            `  ID: ${backup.id}\n` +
+            `  Date: ${date.toLocaleString()}\n` +
+            `  Reason: ${backup.reason || "Manual backup"}`,
         );
       }
-      return;
+
+      const sizeInfo = await backupService.getBackupSize();
+      ui.outro(`Total: ${sizeInfo.count} backups, ${formatBytes(sizeInfo.sizeBytes)}`);
     }
 
-    // Rollback mode - restore from backup
-    if (!quiet && !json) {
-      console.clear();
-      p.intro("🔄 Rollback Extension");
+    return builder
+      .setSummary(`Found ${backups.length} backup(s)`)
+      .setMetadata({ totalBackups: backups.length })
+      .build();
+  }
+
+  /**
+   * Handle cleanup of old backups
+   */
+  private async handleCleanup(
+    backupService: ReturnType<typeof getBackupService>,
+    options: RollbackOptions,
+    builder: CommandResultBuilder,
+  ): Promise<CommandResult> {
+    const keepCount = Number(options.keepCount ?? 3);
+    const removed = await backupService.cleanupOldBackups(keepCount);
+
+    if (promptPolicy.isInteractive(options)) {
+      ui.log.success(
+        `Cleaned up ${removed} old backup(s), keeping latest ${keepCount} per extension`,
+      );
+    }
+
+    return builder
+      .setSummary(`Cleaned up ${removed} backup(s), kept ${keepCount} per extension`)
+      .setMetadata({ removed, keepCount })
+      .build();
+  }
+
+  /**
+   * Handle rollback from backup
+   */
+  private async handleRollback(
+    backupService: ReturnType<typeof getBackupService>,
+    options: RollbackOptions,
+    builder: CommandResultBuilder,
+    args: string[],
+  ): Promise<CommandResult> {
+    if (promptPolicy.isInteractive(options)) {
+      ui.intro("🔄 Rollback Extension");
     }
 
     let backupToRestore: BackupMetadata | null = null;
 
-    // If backup ID provided, use it
+    // Determine which backup to restore
     if (options.backupId) {
+      // Explicit backup ID provided
       const backups = await backupService.listBackups();
       backupToRestore = backups.find((b) => b.id === options.backupId) || null;
 
       if (!backupToRestore) {
         throw new Error(`Backup not found: ${options.backupId}`);
       }
-    }
-    // If latest flag and extension ID provided, get latest backup
-    else if (options.latest && options.extensionId) {
+    } else if (options.latest && options.extensionId) {
+      // Latest backup for specific extension
       const editor = options.editor as "vscode" | "cursor" | undefined;
       backupToRestore = await backupService.getLatestBackup(options.extensionId, editor);
 
       if (!backupToRestore) {
         throw new Error(`No backups found for extension: ${options.extensionId}`);
       }
-    }
-    // Interactive mode - let user select
-    else if (!quiet && !json) {
+    } else if (args.length > 0) {
+      // Backup ID as positional argument
+      const backupId = args[0];
+      const backups = await backupService.listBackups();
+      backupToRestore = backups.find((b) => b.id === backupId) || null;
+
+      if (!backupToRestore) {
+        throw new Error(`Backup not found: ${backupId}`);
+      }
+    } else if (promptPolicy.isInteractive(options)) {
+      // Interactive mode - let user select
       const editor = options.editor as "vscode" | "cursor" | undefined;
       const backups = await backupService.listBackups(options.extensionId, editor);
 
       if (backups.length === 0) {
-        p.log.warn("No backups found");
-        return;
+        ui.log.warning("No backups found");
+        return builder.setSummary("No backups available").build();
       }
 
-      const selected = await p.select({
+      const selected = await ui.select({
         message: "Select backup to restore:",
         options: backups.map((backup) => {
           const date = new Date(backup.timestamp);
@@ -126,15 +199,18 @@ export async function rollback(options: RollbackOptions) {
         }),
       });
 
-      if (p.isCancel(selected)) {
-        p.cancel("Rollback cancelled");
-        process.exit(0);
+      if (selected === undefined) {
+        ui.cancel("Rollback cancelled");
+        return builder.setSummary("Rollback cancelled").build();
       }
 
       backupToRestore = backups.find((b) => b.id === selected) || null;
     } else {
-      throw new Error(
-        "Please provide --backup-id, --latest with --extension-id, or run interactively",
+      // Non-interactive mode requires explicit parameters
+      promptPolicy.handleRequiredInput(
+        "Backup identifier",
+        "--backup-id or --latest with --extension-id",
+        { options, command: "vsix-extension-manager rollback" },
       );
     }
 
@@ -143,60 +219,85 @@ export async function rollback(options: RollbackOptions) {
     }
 
     // Confirm rollback
-    if (!quiet && !json && !options.force) {
-      const confirm = await p.confirm({
-        message: `Restore ${backupToRestore.extensionId} v${backupToRestore.extensionVersion} from backup?`,
-      });
+    if (promptPolicy.shouldPrompt({ options, command: "rollback" }) && !options.force) {
+      const confirmed = await ui.confirm(
+        `Restore ${backupToRestore.extensionId} v${backupToRestore.extensionVersion} from backup?`,
+        true,
+      );
 
-      if (p.isCancel(confirm) || !confirm) {
-        p.cancel("Rollback cancelled");
-        process.exit(0);
+      if (!confirmed) {
+        ui.cancel("Rollback cancelled");
+        return builder.setSummary("Rollback cancelled").build();
       }
     }
 
     // Perform rollback
-    const spinner = quiet || json ? null : p.spinner();
+    const spinner = promptPolicy.isInteractive(options) ? ui.spinner() : null;
     spinner?.start("Restoring from backup...");
 
-    await backupService.restoreExtension(backupToRestore.id, Boolean(options.force));
+    try {
+      await backupService.restoreExtension(backupToRestore.id, Boolean(options.force));
 
-    spinner?.stop("Restore completed");
+      spinner?.stop("Restore completed");
 
-    if (json) {
-      console.log(
-        JSON.stringify(
-          {
-            success: true,
-            restored: backupToRestore,
-          },
-          null,
-          2,
-        ),
-      );
-    } else if (!quiet) {
-      p.outro(
-        `✅ Successfully restored ${backupToRestore.extensionId} v${backupToRestore.extensionVersion}`,
-      );
+      builder.addSuccess({
+        id: backupToRestore.extensionId,
+        message: `Restored ${backupToRestore.extensionId} v${backupToRestore.extensionVersion}`,
+        details: {
+          version: backupToRestore.extensionVersion,
+          editor: backupToRestore.editor,
+          backupId: backupToRestore.id,
+        },
+      });
+
+      if (promptPolicy.isInteractive(options)) {
+        ui.outro(
+          `✅ Successfully restored ${backupToRestore.extensionId} v${backupToRestore.extensionVersion}`,
+        );
+      }
+
+      return builder
+        .setSummary(
+          `Successfully restored ${backupToRestore.extensionId} v${backupToRestore.extensionVersion}`,
+        )
+        .setMetadata({ restored: backupToRestore })
+        .build();
+    } catch (error) {
+      spinner?.stop("Restore failed");
+      throw error;
     }
-  } catch (error) {
-    if (json) {
-      console.log(
-        JSON.stringify(
-          {
-            success: false,
-            error: error instanceof Error ? error.message : String(error),
-          },
-          null,
-          2,
-        ),
-      );
-    } else {
-      p.log.error("❌ Error: " + (error instanceof Error ? error.message : String(error)));
-    }
-    process.exit(1);
+  }
+
+  getHelp(): CommandHelp {
+    return {
+      name: "rollback",
+      description: "Restore extensions from backups",
+      usage: "rollback [backup-id] [options]",
+      examples: [
+        "vsix-extension-manager rollback --list",
+        "vsix-extension-manager rollback --latest --extension-id ms-python.python",
+        "vsix-extension-manager rollback --backup-id abc123",
+        "vsix-extension-manager rollback --cleanup --keep-count 5",
+      ],
+      options: [
+        { flag: "--list", description: "List available backups" },
+        { flag: "--backup-id <id>", description: "Restore specific backup by ID" },
+        {
+          flag: "--latest",
+          description: "Restore latest backup (requires --extension-id)",
+        },
+        { flag: "--extension-id <id>", description: "Filter by extension ID" },
+        { flag: "--cleanup", description: "Clean up old backups" },
+        {
+          flag: "--keep-count <n>",
+          description: "Number of backups to keep per extension (default: 3)",
+        },
+        { flag: "--force", description: "Force restore without confirmation" },
+        { flag: "--backup-dir <path>", description: "Custom backup directory" },
+      ],
+    };
   }
 }
 
-export async function runRollbackUI(options: RollbackOptions) {
-  await rollback(options);
-}
+// Export singleton instance
+export default new RollbackCommand();

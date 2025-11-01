@@ -6,6 +6,11 @@ import { getInstallPreflightService } from "./installPreflightService";
 import { getDirectInstallService } from "./directInstallService";
 import { robustInstallService } from "./robustInstallService";
 import { getEnhancedBulkInstallService } from "./enhancedBulkInstallService";
+import {
+  FS_SETTLE_DELAY_MS,
+  FS_SETTLE_CHECK_DELAY_MS,
+  RETRY_DELAY_MS,
+} from "../../../config/constants";
 
 export interface InstallOptions {
   dryRun?: boolean;
@@ -108,6 +113,7 @@ export class InstallService {
   /**
    * Ensure extensions folder file state is valid before each installation
    * This is a workaround for VS Code's buggy file management
+   * Uses atomic operations to prevent race conditions
    */
   private async ensureValidFileState(binaryPath: string): Promise<void> {
     try {
@@ -124,25 +130,53 @@ export class InstallService {
 
       // VS Code bug workaround: Always ensure .obsolete exists
       // VS Code deletes this file during installation and fails to recreate it
-      if (!(await fs.pathExists(obsoletePath))) {
-        await fs.writeFile(obsoletePath, JSON.stringify({}, null, 2));
-      }
+      // Use atomic write to prevent race conditions
+      await this.ensureFileExistsAtomic(obsoletePath, JSON.stringify({}, null, 2));
 
       // VS Code bug workaround: Ensure extensions.json is valid
       // VS Code sometimes creates corrupted JSON during bulk operations
-      if (!(await fs.pathExists(extensionsJsonPath))) {
-        await fs.writeFile(extensionsJsonPath, JSON.stringify([], null, 2));
-      } else {
-        try {
-          const content = await fs.readFile(extensionsJsonPath, "utf-8");
-          JSON.parse(content); // Validate JSON
-        } catch {
-          // VS Code created corrupted JSON, fix it
-          await fs.writeFile(extensionsJsonPath, JSON.stringify([], null, 2));
-        }
-      }
+      await this.ensureValidJsonFile(extensionsJsonPath, []);
     } catch {
       // Silently ignore file state errors - this is VS Code's problem
+    }
+  }
+
+  /**
+   * Atomically ensure a file exists with given content (no race condition)
+   */
+  private async ensureFileExistsAtomic(filePath: string, defaultContent: string): Promise<void> {
+    try {
+      // Try to create file exclusively (fails if exists)
+      await fs.writeFile(filePath, defaultContent, { flag: "wx" });
+    } catch {
+      // File already exists or write failed - both are acceptable
+      // We don't need to do anything
+    }
+  }
+
+  /**
+   * Ensure a valid JSON file exists with atomic operations
+   */
+  private async ensureValidJsonFile(filePath: string, defaultValue: unknown): Promise<void> {
+    try {
+      // Try to read and parse existing file
+      const content = await fs.readFile(filePath, "utf-8");
+      JSON.parse(content); // Validate JSON
+      // File exists and is valid, nothing to do
+    } catch {
+      // File doesn't exist or is corrupted, recreate it atomically
+      const tempPath = `${filePath}.tmp.${Date.now()}`;
+      try {
+        // Write to temp file first
+        await fs.writeFile(tempPath, JSON.stringify(defaultValue, null, 2));
+        // Atomic rename (overwrites if exists)
+        await fs.rename(tempPath, filePath);
+      } catch {
+        // Cleanup temp file if rename failed
+        await fs.remove(tempPath).catch(() => {
+          /* ignore */
+        });
+      }
     }
   }
 
@@ -160,11 +194,11 @@ export class InstallService {
 
       if (hasTempFiles) {
         // Wait for temporary files to be cleaned up
-        await this.delay(500);
+        await this.delay(FS_SETTLE_DELAY_MS);
       }
 
       // Additional small delay to ensure file system is ready
-      await this.delay(100);
+      await this.delay(FS_SETTLE_CHECK_DELAY_MS);
     } catch {
       // Silently ignore - this is just a best-effort optimization
     }
@@ -342,8 +376,9 @@ export class InstallService {
         lastError = error instanceof Error ? error.message : String(error);
 
         if (attempt < retry) {
-          // Wait before retry
-          await this.delay(retryDelay * Math.pow(2, attempt)); // Exponential backoff
+          // Wait before retry with exponential backoff
+          const delay = (retryDelay || RETRY_DELAY_MS) * Math.pow(2, attempt);
+          await this.delay(delay);
         }
       }
     }

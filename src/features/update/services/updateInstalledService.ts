@@ -129,70 +129,144 @@ export class UpdateInstalledService {
     const deduplicatedExtensions = this.deduplicateExtensions(extensionsToCheck);
 
     // Plan updates by resolving latest versions
-    onMessage?.("Resolving latest versions...");
+    // Use parallel resolution with concurrency limit to avoid rate limiting
     const plans: UpdateItemPlan[] = [];
-    for (const ext of deduplicatedExtensions) {
-      const id = ext.id;
-      const current = ext.version;
-      try {
-        const latest = await this.withRetry(
-          async () => {
-            return resolveVersion(id, "latest", preRelease, sourcePref);
-          },
-          retry,
-          retryDelay,
-        );
+    const concurrency = Math.min(5, deduplicatedExtensions.length); // Max 5 parallel version checks
+    let versionCheckIndex = 0;
+    let versionCheckCompleted = 0;
+    const versionResults: Array<{
+      id: string;
+      current: string;
+      latest?: string;
+      error?: string;
+    }> = [];
 
-        if (!latest) {
-          summary.failed++;
-          summary.items.push({
-            id,
-            currentVersion: current,
-            targetVersion: current,
-            status: "failed",
-            error: "Could not resolve latest version",
-            elapsedMs: 0,
-          });
-          continue;
-        }
+    const totalToCheck = deduplicatedExtensions.length;
 
-        // Compare versions semantically
-        // If selectedExtensions is provided, the user has already chosen to update these,
-        // so we should trust that decision and always consider them as needing updates
-        const needsUpdate = options.selectedExtensions
-          ? options.selectedExtensions.includes(id)
-          : this.isVersionNewer(latest, current);
+    if (totalToCheck === 0) {
+      summary.elapsedMs = Date.now() - startAll;
+      onMessage?.("No extensions to check");
+      return summary;
+    }
 
-        if (!needsUpdate) {
-          summary.upToDate++;
-          summary.items.push({
-            id,
-            currentVersion: current,
-            targetVersion: latest,
-            status: "up-to-date",
-            elapsedMs: 0,
-          });
-          continue;
-        }
-        plans.push({ id, currentVersion: current, targetVersion: latest });
-      } catch (error) {
-        // Could not resolve versions – mark failed and continue
+    onMessage?.(`Checking versions: 0/${totalToCheck}`);
+
+    // Process version checks in parallel with bounded concurrency
+    const versionWorkers: Promise<void>[] = [];
+    for (let w = 0; w < concurrency; w++) {
+      versionWorkers.push(
+        (async () => {
+          while (true) {
+            const myIndex = versionCheckIndex++;
+            if (myIndex >= deduplicatedExtensions.length) break;
+
+            const ext = deduplicatedExtensions[myIndex];
+            const id = ext.id;
+            const current = ext.version;
+
+            // Report which extension we're checking
+            onMessage?.(`Checking versions: ${versionCheckCompleted}/${totalToCheck} - ${id}`);
+
+            try {
+              const latest = await this.withRetry(
+                async () => {
+                  return resolveVersion(id, "latest", preRelease, sourcePref);
+                },
+                retry,
+                retryDelay,
+              );
+
+              if (!latest) {
+                versionResults.push({
+                  id,
+                  current,
+                  error: "Could not resolve latest version",
+                });
+              } else {
+                versionResults.push({
+                  id,
+                  current,
+                  latest,
+                });
+              }
+            } catch (error) {
+              versionResults.push({
+                id,
+                current,
+                error: error instanceof Error ? error.message : String(error),
+              });
+            }
+
+            versionCheckCompleted++;
+            onMessage?.(`Checking versions: ${versionCheckCompleted}/${totalToCheck}`);
+
+            // Add small delay between requests to avoid rate limiting (100ms)
+            await new Promise((r) => setTimeout(r, 100));
+          }
+        })(),
+      );
+    }
+
+    await Promise.all(versionWorkers);
+
+    onMessage?.(`Version check complete. Processing ${versionResults.length} results...`);
+
+    // Process version check results and build update plan
+    for (const result of versionResults) {
+      if (result.error) {
         summary.failed++;
         summary.items.push({
-          id,
-          currentVersion: current,
-          targetVersion: current,
+          id: result.id,
+          currentVersion: result.current,
+          targetVersion: result.current,
           status: "failed",
-          error: error instanceof Error ? error.message : String(error),
+          error: result.error,
           elapsedMs: 0,
         });
         continue;
       }
+
+      if (!result.latest) {
+        summary.failed++;
+        summary.items.push({
+          id: result.id,
+          currentVersion: result.current,
+          targetVersion: result.current,
+          status: "failed",
+          error: "Could not resolve latest version",
+          elapsedMs: 0,
+        });
+        continue;
+      }
+
+      // Compare versions semantically
+      // Always check if the latest version is newer than current version
+      const needsUpdate = this.isVersionNewer(result.latest, result.current);
+
+      if (!needsUpdate) {
+        summary.upToDate++;
+        summary.items.push({
+          id: result.id,
+          currentVersion: result.current,
+          targetVersion: result.latest,
+          status: "up-to-date",
+          elapsedMs: 0,
+        });
+        continue;
+      }
+
+      plans.push({ id: result.id, currentVersion: result.current, targetVersion: result.latest });
     }
 
     summary.toUpdate = plans.length;
+
+    onMessage?.(
+      `Found ${summary.upToDate} up-to-date, ${summary.failed} failed, ${plans.length} to update`,
+    );
+
     if (plans.length === 0) {
       summary.elapsedMs = Date.now() - startAll;
+      onMessage?.("All extensions are up-to-date!");
       return summary;
     }
 
@@ -221,8 +295,15 @@ export class UpdateInstalledService {
 
     // Perform updates with bounded concurrency
     let index = 0;
+    let updateCompleted = 0;
+    const totalToUpdate = plans.length;
     const results: UpdateItemResult[] = [];
     const workers: Promise<void>[] = [];
+
+    if (totalToUpdate > 0) {
+      onMessage?.(`Updating: 0/${totalToUpdate}`);
+    }
+
     for (let w = 0; w < parallel; w++) {
       workers.push(
         (async () => {
@@ -231,9 +312,15 @@ export class UpdateInstalledService {
             if (myIndex >= plans.length) break;
             const plan = plans[myIndex];
             const startItem = Date.now();
+
+            // Report which extension we're updating
+            onMessage?.(`Updating: ${updateCompleted}/${totalToUpdate} - ${plan.id}`);
+
             try {
               if (dryRun) {
                 results.push({ ...plan, status: "skipped", elapsedMs: Date.now() - startItem });
+                updateCompleted++;
+                onMessage?.(`Updating: ${updateCompleted}/${totalToUpdate}`);
                 continue;
               }
 
@@ -308,6 +395,8 @@ export class UpdateInstalledService {
                   elapsedMs: Date.now() - startItem,
                   backupId: backupMetadata?.id,
                 });
+                updateCompleted++;
+                onMessage?.(`Updating: ${updateCompleted}/${totalToUpdate}`);
               } else {
                 // Provide detailed error information for troubleshooting
                 const errorParts = [installRes.error, installRes.stderr, installRes.stdout].filter(
@@ -341,6 +430,8 @@ export class UpdateInstalledService {
                   elapsedMs: Date.now() - startItem,
                   backupId: backupMetadata?.id,
                 });
+                updateCompleted++;
+                onMessage?.(`Updating: ${updateCompleted}/${totalToUpdate}`);
               }
             } catch (error) {
               results.push({
@@ -349,6 +440,8 @@ export class UpdateInstalledService {
                 error: error instanceof Error ? error.message : String(error),
                 elapsedMs: Date.now() - startItem,
               });
+              updateCompleted++;
+              onMessage?.(`Updating: ${updateCompleted}/${totalToUpdate}`);
             }
           }
         })(),

@@ -1,0 +1,341 @@
+/**
+ * Update Command - Update installed extensions with smart rollback
+ * Refactored from updateInstalled.ts with integrated backup/rollback
+ * Integration Phase: Now uses CommandResultBuilder
+ */
+
+import { BaseCommand } from "./base/BaseCommand";
+import type { CommandResult, CommandHelp, GlobalOptions } from "./base/types";
+import { CommandResultBuilder } from "../core/output/CommandResultBuilder";
+import { getUpdateOrchestratorService } from "../features/update";
+import { getEditorService } from "../features/install";
+import { getInstalledExtensions } from "../features/export";
+import { ui, promptPolicy } from "../core/ui";
+
+/**
+ * Update command options
+ */
+export interface UpdateOptions extends GlobalOptions {
+  ids?: string[];
+  all?: boolean;
+  checkCompat?: boolean;
+}
+
+/**
+ * Update command implementation
+ */
+export class UpdateCommand extends BaseCommand {
+  async execute(args: string[], options: GlobalOptions): Promise<CommandResult> {
+    const builder = new CommandResultBuilder("update");
+    const updateOptions = options as UpdateOptions;
+
+    ui.intro("⬆️  Update Extensions");
+
+    try {
+      // Get editor info
+      const editorService = getEditorService();
+      const editor = options.editor || "auto";
+      let chosenEditor: "vscode" | "cursor";
+
+      if (editor === "auto") {
+        const available = await editorService.getAvailableEditors();
+        if (available.length === 0) {
+          throw new Error("No editors found. Please install VS Code or Cursor.");
+        }
+
+        if (available.length === 1) {
+          chosenEditor = available[0].name;
+          if (promptPolicy.isInteractive(options)) {
+            ui.log.info(`Auto-detected ${available[0].displayName}`);
+          }
+        } else {
+          if (!promptPolicy.shouldPrompt({ options, command: "update" })) {
+            promptPolicy.handleRequiredInput("Editor", "--editor", {
+              options,
+              command: "vsix update",
+            });
+          }
+
+          const selected = await ui.selectEditor(available, "cursor");
+          chosenEditor = selected.name;
+        }
+      } else {
+        chosenEditor = editor as "vscode" | "cursor";
+      }
+
+      // Determine which extensions to update
+      const extensionIds = await this.getExtensionsToUpdate(args, updateOptions, chosenEditor);
+
+      if (extensionIds.length === 0) {
+        ui.log.info("No extensions selected for update");
+        return builder.setSummary("No extensions updated").build();
+      }
+
+      // Show what will be updated
+      if (promptPolicy.isInteractive(options)) {
+        ui.note(`Will check ${extensionIds.length} extension(s) for updates`, "Update Plan");
+      }
+
+      // Confirm update
+      if (promptPolicy.shouldPrompt({ options, command: "update" })) {
+        const confirmed = await ui.confirm(
+          `Check and update ${extensionIds.length} extension(s)?`,
+          true,
+        );
+
+        if (!confirmed) {
+          ui.cancel("Update cancelled");
+        }
+      }
+
+      // Show progress
+      const spinner = ui.spinner();
+      if (!options.quiet && !options.json) {
+        spinner.start("Preparing update...");
+      }
+
+      // Execute update with progress callbacks
+      const updateService = getUpdateOrchestratorService();
+      const result = await updateService.updateInstalled(
+        {
+          editor: chosenEditor as "vscode" | "cursor",
+          selectedExtensions: extensionIds,
+          parallel: options.parallel || 1,
+          retry: options.retry || 2,
+          source: options.source as "marketplace" | "open-vsx" | undefined,
+          preRelease: options.preRelease,
+          dryRun: options.dryRun,
+          quiet: options.quiet,
+          json: options.json,
+        },
+        // onMessage callback for status updates
+        (message: string) => {
+          if (!options.quiet && !options.json) {
+            spinner.message(message);
+          }
+        },
+        // onProgress callback for download progress
+        (id: string, progress) => {
+          if (!options.quiet && !options.json) {
+            const percentage = progress.percentage ? ` - ${Math.round(progress.percentage)}%` : "";
+            spinner.message(`Downloading: ${id}${percentage}`);
+          }
+        },
+      );
+
+      if (!options.quiet && !options.json) {
+        spinner.stop("Update complete");
+      }
+
+      // Add results to builder
+      interface UpdateItem {
+        id: string;
+        status: string;
+        targetVersion?: string;
+        currentVersion?: string;
+        error?: string;
+      }
+
+      result.items.forEach((item: UpdateItem) => {
+        const itemData = {
+          id: item.id,
+          name: item.id,
+          version: item.targetVersion || item.currentVersion,
+        };
+
+        if (item.status === "updated") {
+          builder.addSuccess(itemData);
+        } else if (item.status === "failed") {
+          builder.addFailure(itemData);
+          builder.addError({
+            code: "UPDATE_FAILED",
+            message: item.error || "Update failed",
+            item: item.id,
+          });
+        } else if (item.status === "up-to-date" || item.status === "skipped") {
+          builder.addSkipped(itemData);
+        }
+      });
+
+      // Count both up-to-date and skipped as "skipped"
+      const totalSkipped = result.upToDate + result.skipped;
+
+      // Show summary
+      if (promptPolicy.isInteractive(options)) {
+        if (result.updated > 0) {
+          ui.log.success(`✅ Updated ${result.updated} extension(s)`);
+        }
+
+        if (totalSkipped > 0) {
+          ui.log.info(`⏭️  Skipped ${totalSkipped} extension(s) (already up-to-date)`);
+        }
+
+        if (result.failed > 0) {
+          ui.log.error(`❌ Failed ${result.failed} extension(s)`);
+        }
+
+        const builtResult = builder.build();
+        if (builtResult.totals) {
+          ui.showResultSummary(builtResult.totals);
+        }
+
+        if (builtResult.errors && builtResult.errors.length > 0) {
+          ui.note(
+            builtResult.errors.map((e) => `❌ ${e.item}: ${e.message}`).join("\n"),
+            "Failed Updates",
+          );
+        }
+
+        // Show backup IDs if created
+        if (result.backups && result.backups.length > 0) {
+          const backupId = result.backups[0].id;
+          ui.note(
+            `Backup created: ${backupId}\n` +
+              `Rollback with: vsix rollback --backup-id ${backupId}`,
+            "💾 Backup Info",
+          );
+        }
+      }
+
+      const allSucceeded = result.failed === 0;
+
+      ui.outro(
+        allSucceeded
+          ? `✅ Update complete: ${result.updated} updated, ${totalSkipped} skipped`
+          : `⚠️  Update incomplete: ${result.updated} updated, ${result.failed} failed`,
+      );
+
+      // Add warnings if any skipped
+      if (totalSkipped > 0) {
+        builder.addWarningItem({
+          code: "SKIPPED",
+          message: `${totalSkipped} extensions skipped (already up-to-date)`,
+        });
+      }
+
+      return builder
+        .setSummary(`Updated ${result.updated} of ${extensionIds.length} extensions`)
+        .build();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+
+      if (promptPolicy.isInteractive(options)) {
+        ui.log.error(message);
+      }
+
+      return CommandResultBuilder.fromError(
+        "update",
+        error instanceof Error ? error : new Error(message),
+      );
+    }
+  }
+
+  /**
+   * Determine which extensions to update
+   */
+  private async getExtensionsToUpdate(
+    args: string[],
+    options: UpdateOptions,
+    editor: "vscode" | "cursor",
+  ): Promise<string[]> {
+    // If IDs provided as arguments, use those
+    if (args.length > 0) {
+      return args;
+    }
+
+    // If --ids flag provided, use those
+    if (options.ids && options.ids.length > 0) {
+      return options.ids;
+    }
+
+    // If --all or no arguments in non-interactive, update all
+    if (options.all || !promptPolicy.shouldPrompt({ options, command: "update" })) {
+      const installed = await getInstalledExtensions(editor);
+      return installed.map((ext) => ext.id);
+    }
+
+    // Interactive mode: prompt for selection
+    return await this.promptForExtensions(editor);
+  }
+
+  /**
+   * Prompt user to select extensions to update
+   */
+  private async promptForExtensions(editor: "vscode" | "cursor"): Promise<string[]> {
+    const installed = await getInstalledExtensions(editor);
+
+    if (installed.length === 0) {
+      ui.log.warning("No extensions found");
+      return [];
+    }
+
+    // Ask for mode
+    const mode = await ui.select({
+      message: "Choose update mode:",
+      options: [
+        { value: "all", label: `Update all ${installed.length} extensions` },
+        { value: "selected", label: "Select specific extensions" },
+      ],
+    });
+
+    if (mode === "all") {
+      return installed.map((ext) => ext.id);
+    }
+
+    // Multi-select
+    const selected = await ui.multiselect({
+      message: `Select extensions to update (${installed.length} available):`,
+      options: installed.map((ext) => ({
+        value: ext.id,
+        label: `${ext.displayName || ext.id} (${ext.version})`,
+      })),
+      required: false,
+    });
+
+    return selected;
+  }
+
+  /**
+   * Get command help
+   */
+  getHelp(): CommandHelp {
+    return {
+      name: "update",
+      description: "Update installed extensions to latest versions",
+      usage: "vsix update [extension-ids...] [options]",
+      examples: [
+        "vsix update",
+        "vsix update --all",
+        "vsix update ms-python.python",
+        "vsix update ms-python.python dbaeumer.vscode-eslint",
+        "vsix update --editor cursor --all",
+        "vsix update --pre-release",
+        "vsix update --dry-run",
+      ],
+      options: [
+        { flag: "--editor <type>", description: "Target editor (cursor|vscode|auto)" },
+        { flag: "--all", description: "Update all installed extensions" },
+        {
+          flag: "--check-compat",
+          description: "Check compatibility before updating",
+        },
+        {
+          flag: "--pre-release",
+          description: "Include pre-release versions",
+        },
+        { flag: "--source <registry>", description: "Registry (marketplace|open-vsx|auto)" },
+        { flag: "--parallel <n>", description: "Parallel downloads", defaultValue: "1" },
+        { flag: "--output <path>", description: "Download directory", defaultValue: "./downloads" },
+        { flag: "--dry-run", description: "Show what would be updated" },
+        { flag: "--quiet", description: "Minimal output" },
+        { flag: "--json", description: "JSON output" },
+        { flag: "--yes", description: "Auto-confirm" },
+      ],
+    };
+  }
+}
+
+/**
+ * Export singleton instance
+ */
+export default new UpdateCommand();
