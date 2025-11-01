@@ -314,24 +314,22 @@ export class UpdateCommand extends BaseCommand {
       ],
       options: [
         { flag: "--editor <type>", description: "Target editor (cursor|vscode|auto)" },
-        { flag: "--all", description: "Update all installed extensions", defaultValue: "false" },
+        { flag: "--all", description: "Update all installed extensions" },
         {
           flag: "--check-compat",
           description: "Check compatibility before updating",
-          defaultValue: "true",
         },
         {
           flag: "--pre-release",
           description: "Include pre-release versions",
-          defaultValue: "false",
         },
         { flag: "--source <registry>", description: "Registry (marketplace|open-vsx|auto)" },
         { flag: "--parallel <n>", description: "Parallel downloads", defaultValue: "1" },
         { flag: "--output <path>", description: "Download directory", defaultValue: "./downloads" },
-        { flag: "--dry-run", description: "Show what would be updated", defaultValue: "false" },
-        { flag: "--quiet", description: "Minimal output", defaultValue: "false" },
-        { flag: "--json", description: "JSON output", defaultValue: "false" },
-        { flag: "--yes", description: "Auto-confirm", defaultValue: "false" },
+        { flag: "--dry-run", description: "Show what would be updated" },
+        { flag: "--quiet", description: "Minimal output" },
+        { flag: "--json", description: "JSON output" },
+        { flag: "--yes", description: "Auto-confirm" },
       ],
     };
   }

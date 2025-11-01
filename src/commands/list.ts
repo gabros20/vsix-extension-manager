@@ -189,9 +189,11 @@ export class ListCommand extends BaseCommand {
       return JSON.stringify(extensions, null, 2);
     }
 
-    // Simple format: array of extension IDs
+    // Simple format: VS Code extensions.json format for compatibility
     return JSON.stringify(
-      extensions.map((ext) => ext.id),
+      {
+        recommendations: extensions.map((ext) => ext.id),
+      },
       null,
       2,
     );
@@ -319,10 +321,9 @@ export class ListCommand extends BaseCommand {
         {
           flag: "--detailed",
           description: "Include detailed information",
-          defaultValue: "false",
         },
-        { flag: "--quiet", description: "Minimal output", defaultValue: "false" },
-        { flag: "--json", description: "JSON output", defaultValue: "false" },
+        { flag: "--quiet", description: "Minimal output" },
+        { flag: "--json", description: "JSON output" },
       ],
     };
   }

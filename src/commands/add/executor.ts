@@ -250,6 +250,9 @@ export class AddExecutor {
     const builder = new CommandResultBuilder("add");
     const fileName = path.basename(filePath);
 
+    // Resolve path to absolute path
+    const absolutePath = path.resolve(filePath);
+
     if (options.downloadOnly) {
       builder.addSkipped({
         id: fileName,
@@ -263,7 +266,7 @@ export class AddExecutor {
       {
         name: `Install ${fileName}`,
         run: async () => {
-          return await this.installSingleFile(filePath, options);
+          return await this.installSingleFile(absolutePath, options);
         },
       },
       {
@@ -274,13 +277,15 @@ export class AddExecutor {
     );
 
     if (!installResult.success || !installResult.data?.success) {
+      const errorMsg =
+        installResult.error?.message || installResult.data?.error || "Install failed";
       builder.addFailure({
         id: fileName,
         name: fileName,
       });
       builder.addError({
         code: "INSTALL_FAILED",
-        message: installResult.error?.message || installResult.data?.error || "Install failed",
+        message: errorMsg,
       });
       return builder.setSummary(`Failed to install ${fileName}`).build();
     }

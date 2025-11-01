@@ -608,7 +608,7 @@ async function handleAddExtension() {
     message: "What would you like to add?",
     options: [
       { value: "url", label: "📦 Extension from URL", hint: "Marketplace or OpenVSX" },
-      { value: "id", label: "🔍 Extension by ID", hint: "e.g., ms-python.python" },
+      { value: "id", label: "🔍 Extension by Unique Identifier", hint: "e.g., ms-python.python" },
       { value: "file", label: "📁 Local VSIX file", hint: "Install from disk" },
       { value: "list", label: "📋 Extensions from list", hint: "Batch install" },
     ],
@@ -868,7 +868,7 @@ async function handleAdvancedMenu() {
   const action = await p.select({
     message: "Advanced Options",
     options: [
-      { value: "list", label: "📋 List installed extensions", hint: "Export to file" },
+      { value: "list", label: "📋 Export extensions list", hint: "Save to file" },
       { value: "remove", label: "🗑️  Remove extensions", hint: "Uninstall" },
       { value: "info", label: "ℹ️  Extension info", hint: "View details" },
       { value: "back", label: "⬅️  Back to main menu" },
@@ -891,28 +891,27 @@ async function handleAdvancedMenu() {
 }
 
 /**
- * Handle listing extensions
+ * Handle listing extensions (export to file only)
  */
 async function handleListExtensions() {
-  p.log.step("List Extensions");
+  p.log.step("Export Extensions List");
 
   // Select editor with config preference (Approach 1: Always offer choice with default indicated)
   const selectedEditor = await selectEditorWithPreference();
 
   const format = await p.select({
-    message: "Output format:",
+    message: "Export format:",
     options: [
-      { value: "table", label: "📊 Table (console)", hint: "Human-readable" },
-      { value: "json", label: "📄 JSON", hint: "Machine-readable" },
-      { value: "yaml", label: "📝 YAML", hint: "Config format" },
-      { value: "txt", label: "📃 Text", hint: "Simple list" },
+      { value: "json", label: "📄 JSON", hint: "VS Code extensions.json format" },
+      { value: "yaml", label: "📝 YAML", hint: "Human-readable config" },
+      { value: "txt", label: "📃 Text", hint: "Simple list of IDs" },
     ],
   });
 
   if (p.isCancel(format)) return;
 
   const s = p.spinner();
-  s.start("Loading extensions...");
+  s.start("Exporting extensions...");
 
   try {
     const listCommand = await loadCommand("list");
@@ -924,7 +923,7 @@ async function handleListExtensions() {
       quiet: false,
       editor: selectedEditor, // Pass selected editor
       format: format as "table" | "json" | "yaml" | "txt" | "csv",
-      output: format !== "table" ? `extensions.${format}` : undefined,
+      output: `extensions.${format}`,
     };
 
     const result = await listCommand.execute([], options);
@@ -1000,16 +999,6 @@ async function handleRemoveExtensions() {
     return;
   }
 
-  const confirm = await p.confirm({
-    message: `Remove ${toRemove.length} extension(s) from ${selectedEditor === "cursor" ? "Cursor" : "VS Code"}?`,
-    initialValue: false,
-  });
-
-  if (p.isCancel(confirm) || !confirm) {
-    p.log.info("Removal cancelled");
-    return;
-  }
-
   const s = p.spinner();
   s.start(`Removing ${toRemove.length} extension(s)...`);
 
@@ -1043,37 +1032,81 @@ async function handleRemoveExtensions() {
 async function handleExtensionInfo() {
   p.log.step("Extension Info");
 
-  const extensionId = await p.text({
-    message: "Enter extension ID:",
-    placeholder: "publisher.extension-name",
-    validate: (value) => {
-      if (!value) return "Extension ID is required";
-    },
+  const mode = await p.select({
+    message: "What would you like to view?",
+    options: [
+      { value: "single", label: "🔍 Single extension details", hint: "By Unique Identifier" },
+      { value: "all", label: "📋 All installed extensions", hint: "Table view" },
+    ],
   });
 
-  if (p.isCancel(extensionId)) return;
+  if (p.isCancel(mode)) return;
 
-  const s = p.spinner();
-  s.start("Fetching info...");
+  if (mode === "single") {
+    const extensionId = await p.text({
+      message: "Enter extension ID:",
+      placeholder: "publisher.extension-name",
+      validate: (value) => {
+        if (!value) return "Extension ID is required";
+      },
+    });
 
-  try {
-    const infoCommand = await loadCommand("info");
-    const options: GlobalOptions = {
-      quiet: false,
-    };
+    if (p.isCancel(extensionId)) return;
 
-    const result = await infoCommand.execute([extensionId], options);
+    const s = p.spinner();
+    s.start("Fetching info...");
 
-    s.stop("Done!");
+    try {
+      const infoCommand = await loadCommand("info");
+      const options: GlobalOptions = {
+        quiet: false,
+      };
 
-    if (result.status === "ok") {
-      p.log.success(result.summary);
-    } else {
-      p.log.error(result.summary);
+      const result = await infoCommand.execute([extensionId], options);
+
+      s.stop("Done!");
+
+      if (result.status === "ok") {
+        p.log.success(result.summary);
+      } else {
+        p.log.error(result.summary);
+      }
+    } catch (error) {
+      s.stop("Failed");
+      throw error;
     }
-  } catch (error) {
-    s.stop("Failed");
-    throw error;
+  } else {
+    // Show all installed extensions in table format
+    const selectedEditor = await selectEditorWithPreference();
+
+    const s = p.spinner();
+    s.start("Loading extensions...");
+
+    try {
+      const listCommand = await loadCommand("list");
+      const options: GlobalOptions & {
+        format?: "table" | "json" | "yaml" | "txt" | "csv";
+        output?: string;
+      } = {
+        quiet: false,
+        editor: selectedEditor,
+        format: "table",
+        output: undefined, // Display in console, don't save to file
+      };
+
+      const result = await listCommand.execute([], options);
+
+      s.stop("Done!");
+
+      if (result.status === "ok") {
+        p.log.success(result.summary);
+      } else {
+        p.log.error(result.summary);
+      }
+    } catch (error) {
+      s.stop("Failed");
+      throw error;
+    }
   }
 }
 
@@ -1084,22 +1117,31 @@ async function handleHelp() {
   p.log.step("Help");
 
   p.note(
-    `Common Commands:
-  • add      - Add extensions (URL, file, or list)
-  • update   - Update installed extensions
-  • remove   - Uninstall extensions
-  • list     - List installed extensions
-  • info     - Show extension details
-  • doctor   - Health check & diagnostics
-  • setup    - Configuration wizard
+    `Main Menu Options:
+  ⚡ Add extension     - Install from URL, file, or list
+  🔄 Update           - Keep extensions up-to-date
+  💻 Setup            - First-time configuration wizard
+  🏥 Fix problems     - Health checks and diagnostics
 
-Quick Tips:
-  • Use arrow keys to navigate
-  • Press Ctrl+C to cancel at any time
-  • Tab completes file paths
-  • Run 'vsix-extension-manager <command> --help' for details
+Advanced Options:
+  📋 Export list      - Save to JSON/YAML/TXT
+  🗑️  Remove          - Uninstall with search/filters
+  ℹ️  Extension info   - View details or browse all
 
-Documentation: https://github.com/gabros20/vsix-extension-manager`,
-    "VSIX Extension Manager v2.0",
+Navigation:
+  • Use ↑↓ arrow keys to navigate
+  • Press Space to select (multi-select)
+  • Press Enter to confirm
+  • Press Ctrl+C to cancel or go back
+
+File Formats:
+  • JSON - VS Code extensions.json format
+  • YAML - Human-readable config
+  • TXT  - Simple list of IDs
+
+More Info:
+  • CLI usage: vsix-extension-manager --help
+  • Docs: github.com/gabros20/vsix-extension-manager`,
+    "VSIX Extension Manager v2.0 - Interactive Mode",
   );
 }

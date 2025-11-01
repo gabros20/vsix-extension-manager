@@ -180,7 +180,6 @@ export class InfoCommand extends BaseCommand {
         {
           flag: "--all",
           description: "Show all available versions",
-          defaultValue: "false",
         },
         {
           flag: "--limit <n>",
@@ -192,8 +191,8 @@ export class InfoCommand extends BaseCommand {
           description: "Registry (marketplace|open-vsx)",
           defaultValue: "marketplace",
         },
-        { flag: "--quiet", description: "Minimal output", defaultValue: "false" },
-        { flag: "--json", description: "JSON output", defaultValue: "false" },
+        { flag: "--quiet", description: "Minimal output" },
+        { flag: "--json", description: "JSON output" },
       ],
     };
   }

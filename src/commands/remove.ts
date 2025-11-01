@@ -263,12 +263,12 @@ export class RemoveCommand extends BaseCommand {
       ],
       options: [
         { flag: "--editor <type>", description: "Target editor (cursor|vscode|auto)" },
-        { flag: "--all", description: "Remove all installed extensions", defaultValue: "false" },
+        { flag: "--all", description: "Remove all installed extensions" },
         { flag: "--parallel <n>", description: "Parallel removals", defaultValue: "2" },
-        { flag: "--dry-run", description: "Show what would be removed", defaultValue: "false" },
-        { flag: "--quiet", description: "Minimal output", defaultValue: "false" },
-        { flag: "--json", description: "JSON output", defaultValue: "false" },
-        { flag: "--yes", description: "Auto-confirm", defaultValue: "false" },
+        { flag: "--dry-run", description: "Show what would be removed" },
+        { flag: "--quiet", description: "Minimal output" },
+        { flag: "--json", description: "JSON output" },
+        { flag: "--yes", description: "Auto-confirm" },
       ],
     };
   }

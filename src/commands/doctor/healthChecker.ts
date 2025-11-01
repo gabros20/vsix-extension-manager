@@ -285,42 +285,75 @@ export class HealthChecker {
       const https = await import("https");
       const http = await import("http");
 
-      const protocol = url.startsWith("https") ? https : http;
-      const urlObj = new URL(url);
+      const response = await new Promise<{ success: boolean; statusCode?: number }>((resolve) => {
+        const makeRequest = (requestUrl: string, redirectCount = 0): void => {
+          if (redirectCount > 5) {
+            resolve({ success: false });
+            return;
+          }
 
-      const response = await new Promise<boolean>((resolve) => {
-        const req = protocol.request(
-          {
-            hostname: urlObj.hostname,
-            port: urlObj.port || (protocol === https ? 443 : 80),
-            path: urlObj.pathname,
-            method: "HEAD",
-            timeout: 5000,
-          },
-          (res) => {
-            resolve(res.statusCode !== undefined && res.statusCode >= 200 && res.statusCode < 400);
-          },
-        );
+          const urlObj = new URL(requestUrl);
+          const protocol = urlObj.protocol === "https:" ? https : http;
 
-        req.on("error", () => resolve(false));
-        req.on("timeout", () => {
-          req.destroy();
-          resolve(false);
-        });
-        req.end();
+          const req = protocol.request(
+            {
+              hostname: urlObj.hostname,
+              port: urlObj.port || (protocol === https ? 443 : 80),
+              path: urlObj.pathname + urlObj.search,
+              method: "GET",
+              timeout: 10000,
+              headers: {
+                "User-Agent": "vsix-extension-manager",
+              },
+            },
+            (res) => {
+              // Handle redirects
+              if (
+                res.statusCode &&
+                res.statusCode >= 300 &&
+                res.statusCode < 400 &&
+                res.headers.location
+              ) {
+                const redirectUrl = new URL(res.headers.location, requestUrl).href;
+                makeRequest(redirectUrl, redirectCount + 1);
+                return;
+              }
+
+              // Consume response to free up socket
+              res.resume();
+
+              resolve({
+                success:
+                  res.statusCode !== undefined && res.statusCode >= 200 && res.statusCode < 400,
+                statusCode: res.statusCode,
+              });
+            },
+          );
+
+          req.on("error", () => resolve({ success: false }));
+          req.on("timeout", () => {
+            req.destroy();
+            resolve({ success: false });
+          });
+          req.end();
+        };
+
+        makeRequest(url);
       });
 
-      if (response) {
+      if (response.success) {
         return {
           name: `${name} Access`,
           status: "pass",
           message: `${name} reachable`,
+          details: response.statusCode ? `Status: ${response.statusCode}` : undefined,
         };
       } else {
         return {
           name: `${name} Access`,
           status: "warning",
           message: `${name} not reachable`,
+          details: response.statusCode ? `Status: ${response.statusCode}` : "Connection failed",
           fixable: false,
         };
       }
@@ -450,10 +483,28 @@ export class HealthChecker {
     const checks: HealthCheck[] = [];
 
     try {
-      // Use os.freemem() as a proxy for available disk space
-      // This is an approximation, actual disk space check would need platform-specific commands
-      const freeMemGB = os.freemem() / (1024 * 1024 * 1024);
-      const availableGB = freeMemGB; // Simplified approximation
+      // Use platform-specific commands to get actual disk space
+      const { promisify } = await import("util");
+      const { exec } = await import("child_process");
+      const execAsync = promisify(exec);
+
+      let availableGB: number;
+
+      if (os.platform() === "darwin" || os.platform() === "linux") {
+        // Use df command on Unix-like systems
+        const { stdout } = await execAsync("df -k . | tail -1 | awk '{print $4}'");
+        const availableKB = parseInt(stdout.trim(), 10);
+        availableGB = availableKB / (1024 * 1024); // Convert KB to GB
+      } else if (os.platform() === "win32") {
+        // Use wmic on Windows
+        const { stdout } = await execAsync(
+          "wmic logicaldisk where \"DeviceID='C:'\" get FreeSpace",
+        );
+        const availableBytes = parseInt(stdout.split("\n")[1].trim(), 10);
+        availableGB = availableBytes / (1024 * 1024 * 1024);
+      } else {
+        throw new Error("Unsupported platform");
+      }
 
       if (availableGB < 1) {
         checks.push({
@@ -479,11 +530,12 @@ export class HealthChecker {
           details: `${availableGB.toFixed(2)} GB free`,
         });
       }
-    } catch {
+    } catch (error) {
       checks.push({
         name: "Disk Space",
         status: "warning",
         message: "Could not check disk space",
+        details: error instanceof Error ? error.message : undefined,
         fixable: false,
       });
     }

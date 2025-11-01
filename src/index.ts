@@ -4,6 +4,9 @@ import { Command } from "commander";
 import { initializeErrorHandler, handleErrorAndExit } from "./core/errors";
 import packageJson from "../package.json";
 
+// Increase max listeners to prevent warnings during parallel operations
+process.setMaxListeners(20);
+
 const program = new Command();
 
 program

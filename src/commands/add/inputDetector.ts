@@ -58,21 +58,22 @@ export class InputDetector {
           };
         }
 
-        // Extension list file (JSON or TXT)
-        if (ext === ".json" || ext === ".txt") {
+        // Extension list file (JSON, YAML, or TXT)
+        if (ext === ".json" || ext === ".txt" || ext === ".yaml" || ext === ".yml") {
           const isJson = ext === ".json";
+          const isYaml = ext === ".yaml" || ext === ".yml";
           return {
             type: "extension-list",
             value: input,
             metadata: {
               isJson,
-              isTxt: !isJson,
+              isTxt: !isJson && !isYaml,
             },
           };
         }
 
         throw new UserInputError(
-          `Unsupported file type: ${ext}. Expected .vsix, .json, or .txt`,
+          `Unsupported file type: ${ext}. Expected .vsix, .json, .yaml, or .txt`,
           "UNSUPPORTED_FILE_TYPE",
         );
       }

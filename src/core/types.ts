@@ -2,7 +2,7 @@
 
 export type SourceRegistry = "marketplace" | "open-vsx" | "auto";
 
-export type ExportFormat = "txt" | "extensions.json";
+export type ExportFormat = "txt" | "extensions.json" | "yaml";
 
 export type EditorType = "vscode" | "cursor" | "auto";
 

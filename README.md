@@ -59,10 +59,13 @@ VSIX Extension Manager solves this with a fast, reliable CLI for downloading VSI
 - 🎯 **Smart input detection** - Automatically determines what to do with your input
 - 🔄 **Intelligent retry** - Automatic error recovery with escalating strategies
 - ⚙️ **Config v2.0** - YAML-based configuration with profiles and auto-migration
-- 🏥 **Health check** - Proactive diagnostics with auto-fix capabilities
+- 🏥 **Health check** - Proactive diagnostics with auto-fix capabilities (disk space, network, compatibility)
 - 🔔 **Update notifications** - Non-intrusive background update checking
 - 📊 **Standardized output** - Consistent JSON API for CI/CD integration
-- 🎨 **First-run wizard** - Interactive setup for new users
+- 🎨 **Interactive mode** - Beautiful guided menus with improved help and navigation
+- 📝 **YAML support** - Full import/export support for YAML format alongside JSON and TXT
+- 🔧 **Improved diagnostics** - Accurate disk space and network connectivity checks
+- ♻️ **Better UX** - Streamlined confirmation flows and clearer menu labels
 
 #### Core Features
 
@@ -104,6 +107,15 @@ npm run build
 
 v2.0 simplifies everything with a universal `add` command that automatically detects what you want to do.
 
+**New to the tool?** Simply run `vsix-extension-manager` (no arguments) to launch the interactive mode with guided menus!
+
+```bash
+# Launch interactive mode
+vsix-extension-manager
+
+# Or use the universal add command directly
+```
+
 #### Universal `add` Command
 
 The `add` command is your one-stop solution for all extension operations:
@@ -137,21 +149,35 @@ vsix-extension-manager add extensions.txt --quiet --json
 #### List & Manage Extensions
 
 ```bash
-# List installed extensions
+# List installed extensions (table view in console)
 vsix-extension-manager list
 
-# Export to file
-vsix-extension-manager list --output my-extensions.txt
-
-# Export as JSON
+# Export to file (JSON - VS Code extensions.json format)
 vsix-extension-manager list --format json --output extensions.json
 
 # Export as YAML
-vsix-extension-manager list --format yaml --output extensions.yml
+vsix-extension-manager list --format yaml --output extensions.yaml
+
+# Export as plain text
+vsix-extension-manager list --format txt --output extensions.txt
 
 # Detailed information
 vsix-extension-manager list --detailed
 ```
+
+**Note:** The `list` command now exports in proper VS Code `extensions.json` format:
+
+```json
+{
+  "recommendations": ["ms-python.python", "dbaeumer.vscode-eslint"]
+}
+```
+
+**Supported Formats:**
+
+- **JSON** - VS Code extensions.json format (with `recommendations` key)
+- **YAML** - Human-readable config (supports both array and object with `recommendations`)
+- **TXT** - Simple newline-separated list of extension IDs
 
 #### Update Extensions
 
@@ -179,6 +205,32 @@ vsix-extension-manager doctor
 vsix-extension-manager doctor --fix
 ```
 
+**v2.0 Health Check Improvements:**
+
+- ✅ **Accurate disk space** - Fixed to show actual disk space (not RAM)
+- ✅ **Better network checks** - Improved marketplace connectivity detection with redirect support
+- ✅ **Editor detection** - Auto-detects VS Code and Cursor installations
+- ✅ **Extension integrity** - Checks for corrupted extensions
+- ✅ **Configuration validation** - Verifies config file validity
+
+#### Interactive Mode
+
+Launch the interactive mode for a guided experience:
+
+```bash
+vsix-extension-manager
+```
+
+**Interactive Mode Features:**
+
+- 📋 **Main Menu** - Quick access to add, update, setup, and fix operations
+- ⚙️ **Advanced Menu** - Export lists, remove extensions, view info
+- 🔍 **Smart search** - Find extensions by name, publisher, or keyword
+- 📊 **Table views** - Browse all installed extensions
+- 📝 **Format support** - Export to JSON, YAML, or TXT
+- ❓ **Contextual help** - Press `?` or select Help for interactive tips
+- 🎯 **Improved UX** - Streamlined flows with single confirmations
+
 ### v2.0 Commands Reference
 
 #### `add` - Universal Entry Point
@@ -197,7 +249,7 @@ vsix-extension-manager add <input> [options]
 - **Extension ID**: `publisher.name` format
 - **VSIX File**: Path to `.vsix` file
 - **Directory**: Folder containing `.vsix` files
-- **List File**: `.txt` or `extensions.json` file
+- **List File**: `.txt`, `.json` (extensions.json format), `.yaml`, or `.yml` file
 
 **Examples:**
 
@@ -284,17 +336,17 @@ vsix-extension-manager update --parallel 3
 #### `list` - List Installed
 
 ```bash
-# List in table format (default)
+# List in table format (console output, not saved)
 vsix-extension-manager list
 
-# Export to file
-vsix-extension-manager list --output extensions.txt
-
-# JSON format
+# Export to JSON (VS Code extensions.json format with "recommendations")
 vsix-extension-manager list --format json --output extensions.json
 
-# YAML format
-vsix-extension-manager list --format yaml --output extensions.yml
+# Export to YAML
+vsix-extension-manager list --format yaml --output extensions.yaml
+
+# Export to plain text (one ID per line)
+vsix-extension-manager list --format txt --output extensions.txt
 
 # CSV format
 vsix-extension-manager list --format csv --output extensions.csv
@@ -302,6 +354,16 @@ vsix-extension-manager list --format csv --output extensions.csv
 # Detailed information
 vsix-extension-manager list --detailed
 ```
+
+**Important:** The JSON export now outputs proper VS Code `extensions.json` format:
+
+```json
+{
+  "recommendations": ["ext1", "ext2"]
+}
+```
+
+**Interactive Mode:** In interactive mode, selecting "Export extensions list" will only offer file formats (JSON/YAML/TXT). To view extensions in a table, use "Extension Info" → "All installed extensions".
 
 #### `info` - Extension Details
 
