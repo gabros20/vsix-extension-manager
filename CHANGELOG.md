@@ -1,3 +1,71 @@
+# [2.0.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.16.0...v2.0.0) (2025-11-01)
+
+### Bug Fixes
+
+- comprehensive code review fixes + interactive mode bugs (5 handlers) ([20474c4](https://github.com/gabros20/vsix-extension-manager/commit/20474c4d8c660789a4847cdc347d8b39cd980b4d))
+- disable background update check in interactive mode ([59203ba](https://github.com/gabros20/vsix-extension-manager/commit/59203ba8ad3cbcd76603cddd6301e712c2ae7ca6))
+- duplicate format prompt + reduce lint errors (60→52) ([cdfc65b](https://github.com/gabros20/vsix-extension-manager/commit/cdfc65b19cf020d683b437a522b339da4717a6e3))
+- eliminate final 'as any' type casts (remove.ts, update.ts) ([e9442ca](https://github.com/gabros20/vsix-extension-manager/commit/e9442ca689718ebc24fd010fc87cb6ab13a4ac5a))
+- eliminate final 3 'any' types with proper TypeScript ([7588728](https://github.com/gabros20/vsix-extension-manager/commit/7588728d453e338bb2057da6a83621a18e6aafa7))
+- move default action registration after commands to prevent duplication ([edd6ad1](https://github.com/gabros20/vsix-extension-manager/commit/edd6ad11a3c0639b72c89e89bbb1130a43fce4f6))
+- properly fix unused parameters (60→18 errors, 70% improvement) ([b67611c](https://github.com/gabros20/vsix-extension-manager/commit/b67611c41fe954ece4b2afe11cc49760d3069173))
+- reduce lint errors from 52 to 40 (23% improvement) ([0578103](https://github.com/gabros20/vsix-extension-manager/commit/0578103800959af66260c2ad57dfc768df576af8))
+- reduce lint errors from 60 to 27 (55% improvement) ([10eff4c](https://github.com/gabros20/vsix-extension-manager/commit/10eff4c3e06a63de9908cf0664e6616d903180a5))
+- remove duplicate command registration causing UI duplication ([db69fe2](https://github.com/gabros20/vsix-extension-manager/commit/db69fe2777f4514f8e6c859977008a36c30b4388))
+- replace all 'any' types with proper TypeScript (18→0 errors, 100% complete!) ([52bc852](https://github.com/gabros20/vsix-extension-manager/commit/52bc852edc5dc57329abc46768772824b84263c0))
+- resolve additional type errors in v2.0 commands ([b2e4366](https://github.com/gabros20/vsix-extension-manager/commit/b2e43664387c88bfd131786bce20610bc2a08287))
+- resolve all TypeScript type errors in v2.0 commands ([8321920](https://github.com/gabros20/vsix-extension-manager/commit/83219205574176274d4e63d4e0c8774d12df9ad1))
+- resolve critical bugs and add YAML support with UX improvements ([c6bbb80](https://github.com/gabros20/vsix-extension-manager/commit/c6bbb803315bfa2a8f1ffcc97a54c221b4aaba61))
+- resolve majority of TypeScript type errors in v2.0 commands ([97f49af](https://github.com/gabros20/vsix-extension-manager/commit/97f49af664b89fae453d54581e4a39fca53526ef))
+- skip first-run wizard in non-TTY environments ([4928917](https://github.com/gabros20/vsix-extension-manager/commit/4928917bbb5ebb9f756add2f67eea6b821e7b8c8))
+- update command registry to use default exports correctly ([9ea2482](https://github.com/gabros20/vsix-extension-manager/commit/9ea24827a2575c425b5bf95daf445d8cbac097b2))
+
+### Features
+
+- add comprehensive v2.0 implementation plan ([08e1d59](https://github.com/gabros20/vsix-extension-manager/commit/08e1d59873fbf2560c46b633cf807d118bdde172))
+- add Docker-based isolated testing infrastructure ([8416e9d](https://github.com/gabros20/vsix-extension-manager/commit/8416e9d7237b3f674171bcf38f3adacfb683eaf3))
+- add draft v2.0 UX improvement proposals and update workflows ([5284bf0](https://github.com/gabros20/vsix-extension-manager/commit/5284bf0058abdac5f67a9a1e37597cb54ec5fcad))
+- add multi-select UX for update extensions ([eee39bb](https://github.com/gabros20/vsix-extension-manager/commit/eee39bb8e0cbd7e18e176c9ace396dd071956d56))
+- complete v2.0 clean slate - all legacy removed ([9f15a71](https://github.com/gabros20/vsix-extension-manager/commit/9f15a71429ac1d4c84f631fbb29990a3811f2e98))
+- convert rollback command to BaseCommand pattern ([d23cc72](https://github.com/gabros20/vsix-extension-manager/commit/d23cc72e400d756560afc91dd7da069466fb2985))
+- create base command framework for v2.0 ([7b08eaf](https://github.com/gabros20/vsix-extension-manager/commit/7b08eaf6edf361def0ff01f3188be9de241b2851))
+- create Clack-based UI component system ([8d9f7dd](https://github.com/gabros20/vsix-extension-manager/commit/8d9f7dd4b85f97a940fa04401e5c500f0b09c801))
+- create unified add command entry point ([b72057f](https://github.com/gabros20/vsix-extension-manager/commit/b72057fddbf78ed9ff7d36dbfb0bd0d5012016e5))
+- enhance extension removal with pagination, search, and selection persistence ([3724d49](https://github.com/gabros20/vsix-extension-manager/commit/3724d497381d1dcb489df436673186f639d9208a))
+- enhance install flow with detailed failure reporting and graceful error handling ([8fa6ef6](https://github.com/gabros20/vsix-extension-manager/commit/8fa6ef6391dcb8c95dd7e6fba6f7b0f0f2b76e4c))
+- implement config preference in interactive mode (Approach 1) ([4df4b24](https://github.com/gabros20/vsix-extension-manager/commit/4df4b24d318788543edd0d8bb708232078ac2675))
+- implement full interactive mode with Clack menus ([5b89568](https://github.com/gabros20/vsix-extension-manager/commit/5b89568bdd9c3eb85e159ad647c2552b151ddbd7))
+- implement info command with rich extension details ([c170d57](https://github.com/gabros20/vsix-extension-manager/commit/c170d574539a3f21c4c7ecea8d2e6ceec3d47846))
+- implement list command with enhanced formats ([57793d1](https://github.com/gabros20/vsix-extension-manager/commit/57793d1971250f34f8f1af88b75996822e392d36))
+- implement plan generation system ([940f59c](https://github.com/gabros20/vsix-extension-manager/commit/940f59c5351753d2d26075c57684e62c934c9f1e))
+- implement plan preview UI with Clack ([ac986dc](https://github.com/gabros20/vsix-extension-manager/commit/ac986dcf4f467a136da67ff2b9f891b27c37f0d6))
+- implement remove command with enhanced UX ([de43ea1](https://github.com/gabros20/vsix-extension-manager/commit/de43ea1e2e9a7ad348e122036d9e394f7791eeff))
+- implement smart input detection and add command executor ([e302963](https://github.com/gabros20/vsix-extension-manager/commit/e302963fc7802400025b3ece028d8fd7dbd52982))
+- implement update command with smart rollback ([3901f9c](https://github.com/gabros20/vsix-extension-manager/commit/3901f9ca9fc528172c54eb279eb0f4c7935898e8))
+- implement Week 4 - Enhanced Error Handling & Doctor Command ([b2c001e](https://github.com/gabros20/vsix-extension-manager/commit/b2c001ef0006fbadc67db097cd148310f8427c14))
+- implement Week 5 Task 5.1 - Unified Configuration System v2 ([2328790](https://github.com/gabros20/vsix-extension-manager/commit/2328790dc178e53c2812a2e791de4c4c236dc392))
+- implement Week 5 Task 5.2 - First-Run Setup Wizard ([bb809f2](https://github.com/gabros20/vsix-extension-manager/commit/bb809f2b59541f64545bdcb7e9b70eebaab192e2))
+- implement Week 6 Task 6.1 - Intelligent Retry System ([ad0a1ff](https://github.com/gabros20/vsix-extension-manager/commit/ad0a1fffc06a021aa9c5cbdc829288474ba04567))
+- implement Week 6 Task 6.2 - Standardized JSON Output ([3d3ac24](https://github.com/gabros20/vsix-extension-manager/commit/3d3ac24a69ec60689233f35832d67b4a11d2de87))
+- implement Week 7 - Update Notifications & Messaging Polish ([20d86f1](https://github.com/gabros20/vsix-extension-manager/commit/20d86f10960e0632969f43126b375d0a027a2451))
+- implement Week 8 - Integration Testing & Documentation ([6f96606](https://github.com/gabros20/vsix-extension-manager/commit/6f966068c305a310d8eae5b28844ce8daaffbf9d))
+- integrate background update checker at startup ([b4ca414](https://github.com/gabros20/vsix-extension-manager/commit/b4ca414672888247bd765f9f9f1d77c836eac1f7))
+- integrate config v2 and first-run detection at startup ([4fb04da](https://github.com/gabros20/vsix-extension-manager/commit/4fb04da0f5cfa1c221849396a42bf660293b4699))
+- integrate Phase 2 systems into add command ([2c17bbf](https://github.com/gabros20/vsix-extension-manager/commit/2c17bbf376d697c08254a0930098027141bc2bfe))
+- migrate doctor & setup to CommandResultBuilder ([37c26ac](https://github.com/gabros20/vsix-extension-manager/commit/37c26ac0ec72af4323c47c80001de46e604f041d))
+- migrate remove/update/list/info to CommandResultBuilder ([8415ed5](https://github.com/gabros20/vsix-extension-manager/commit/8415ed5566716405e291436645a5285d04af3a74))
+- remove all migration code - clean slate v2.0 ([f849f6d](https://github.com/gabros20/vsix-extension-manager/commit/f849f6dcf9309cf20e6dfddae49e8487d7cac544))
+- wire add command into CLI with output formatter ([bf7b5a2](https://github.com/gabros20/vsix-extension-manager/commit/bf7b5a2830d2ec505f9d11a14c7fe470a299b01b))
+- wire v2 commands into CLI + fix argument parsing ([ab9fc21](https://github.com/gabros20/vsix-extension-manager/commit/ab9fc21074d4569d0314a0ce6899cb2b5b2e9e8c))
+- wire v2.0 commands into main CLI index ([3d1929e](https://github.com/gabros20/vsix-extension-manager/commit/3d1929e3464edea7ad6a8a0eb6ee442562c1f072))
+
+### BREAKING CHANGES
+
+- No v1.x compatibility - fresh start for v2.0
+  User requested: Clean slate without v1.x migration support
+
+Co-authored-by: factory-droid[bot] <138933559+factory-droid[bot]@users.noreply.github.com>
+
 # Changelog
 
 ## [Unreleased]
