@@ -2,12 +2,19 @@ import { spawn, spawnSync } from "child_process";
 import fs from "fs-extra";
 import os from "os";
 import { InstallError } from "../../../core/errors";
+import {
+  DEFAULT_EDITOR_CLI_TIMEOUT_MS,
+  DEFAULT_EDITOR_VERIFICATION_TIMEOUT_MS,
+  DEFAULT_EDITOR_LIST_TIMEOUT_MS,
+} from "../../../config/constants";
 
 export interface EditorInfo {
   name: "vscode" | "cursor";
   displayName: string;
   binaryPath: string;
   isAvailable: boolean;
+  version?: string;
+  extensionsPath?: string;
 }
 
 export interface InstalledExtension {
@@ -154,7 +161,7 @@ export class EditorCliService {
     try {
       const result = spawnSync(command, ["--version"], {
         stdio: "pipe",
-        timeout: 15000, // Increased to handle slower editors like Cursor
+        timeout: DEFAULT_EDITOR_VERIFICATION_TIMEOUT_MS,
       });
       return result.status === 0 && !result.signal;
     } catch {
@@ -190,9 +197,32 @@ export class EditorCliService {
     return null;
   }
 
-  private resolveRealPath(p: string): string {
+  /**
+   * Resolve real path with cycle detection to prevent infinite loops
+   * @param p - Path to resolve
+   * @param seen - Set of already visited paths (for cycle detection)
+   * @param maxDepth - Maximum symlink depth to follow
+   */
+  private resolveRealPath(p: string, seen: Set<string> = new Set(), maxDepth = 10): string {
+    // Prevent infinite recursion from circular symlinks
+    if (maxDepth <= 0) {
+      return p;
+    }
+
+    // Detect cycles
+    if (seen.has(p)) {
+      return p;
+    }
+
     try {
-      return fs.realpathSync(p);
+      const resolved = fs.realpathSync(p);
+
+      // If path was actually a symlink, track it for cycle detection
+      if (resolved !== p) {
+        seen.add(p);
+      }
+
+      return resolved;
     } catch {
       return p;
     }
@@ -226,11 +256,9 @@ export class EditorCliService {
    */
   private verifyEditorBinary(binaryPath: string): boolean {
     try {
-      // Cursor can take longer to respond, so we increase timeout
-      // Some editors (like Cursor) may take longer on first run
       const result = spawnSync(binaryPath, ["--version"], {
         stdio: "pipe",
-        timeout: 15000, // Increased from 5000 to handle slower responses
+        timeout: DEFAULT_EDITOR_VERIFICATION_TIMEOUT_MS,
       });
       // Check if command succeeded (exit code 0)
       // Some editors may not output version info but still return 0
@@ -247,7 +275,7 @@ export class EditorCliService {
     return new Promise((resolve) => {
       const child = spawn(binaryPath, ["--version"], {
         stdio: "pipe",
-        timeout: 15000, // Increased from 5000 to handle slower responses
+        timeout: DEFAULT_EDITOR_VERIFICATION_TIMEOUT_MS,
       });
 
       child.on("close", (code, signal) => {
@@ -421,7 +449,34 @@ export class EditorCliService {
       timeout?: number;
     } = {},
   ): Promise<InstallResult> {
-    const { force = false, timeout = 30000 } = options;
+    const { force = false, timeout = DEFAULT_EDITOR_CLI_TIMEOUT_MS } = options;
+
+    // Validate inputs to prevent command injection
+    if (!vsixPath || typeof vsixPath !== "string") {
+      return {
+        success: false,
+        error: "Invalid VSIX path provided",
+        exitCode: 1,
+      };
+    }
+
+    // Ensure path exists and is a file
+    if (!fs.existsSync(vsixPath)) {
+      return {
+        success: false,
+        error: `VSIX file not found: ${vsixPath}`,
+        exitCode: 1,
+      };
+    }
+
+    // Validate file extension
+    if (!vsixPath.toLowerCase().endsWith(".vsix")) {
+      return {
+        success: false,
+        error: `File must have .vsix extension: ${vsixPath}`,
+        exitCode: 1,
+      };
+    }
 
     return new Promise((resolve) => {
       const args = ["--install-extension", vsixPath];
@@ -487,7 +542,7 @@ export class EditorCliService {
     return new Promise((resolve, reject) => {
       const child = spawn(binaryPath, ["--list-extensions", "--show-versions"], {
         stdio: ["ignore", "pipe", "pipe"],
-        timeout: 10000,
+        timeout: DEFAULT_EDITOR_LIST_TIMEOUT_MS,
       });
 
       let stdout = "";
@@ -547,10 +602,19 @@ export class EditorCliService {
    * Uninstall an extension
    */
   async uninstallExtension(binaryPath: string, extensionId: string): Promise<InstallResult> {
+    // Validate extension ID format (publisher.extension)
+    if (!extensionId || typeof extensionId !== "string" || !extensionId.includes(".")) {
+      return {
+        success: false,
+        error: `Invalid extension ID format: ${extensionId}. Expected format: publisher.extension`,
+        exitCode: 1,
+      };
+    }
+
     return new Promise((resolve) => {
       const child = spawn(binaryPath, ["--uninstall-extension", extensionId], {
         stdio: ["ignore", "pipe", "pipe"],
-        timeout: 15000,
+        timeout: DEFAULT_EDITOR_CLI_TIMEOUT_MS,
       });
 
       let stdout = "";
@@ -606,7 +670,7 @@ export class EditorCliService {
     return new Promise((resolve, reject) => {
       const child = spawn(binaryPath, ["--version"], {
         stdio: ["ignore", "pipe", "pipe"],
-        timeout: 15000, // Increased to handle Cursor's slower response
+        timeout: DEFAULT_EDITOR_VERIFICATION_TIMEOUT_MS,
       });
 
       let stdout = "";

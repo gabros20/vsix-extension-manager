@@ -1,365 +1,1147 @@
+/**
+ * Interactive mode for VSIX Extension Manager v2.0
+ * Beautiful, task-oriented menus using Clack
+ */
+
 import * as p from "@clack/prompts";
-import type { Config } from "../config/constants";
+import type { GlobalOptions } from "./base/types";
+import { loadCommand } from "./registry";
+import { configLoaderV2 } from "../config/loaderV2";
 
-export async function runInteractive(config: Config) {
-  console.clear();
-  p.intro("🔽 VSIX Extension Manager");
+/**
+ * Helper: Select editor with config preference (Approach 1)
+ *
+ * Always offers choice if multiple editors available,
+ * but indicates which is the configured default.
+ *
+ * This allows users to:
+ * - Quickly select their configured default (1 click)
+ * - Override and choose non-default editor (1 click)
+ */
+async function selectEditorWithPreference(): Promise<"vscode" | "cursor"> {
+  // Load config to get preference
+  const config = await configLoaderV2.loadConfig();
 
-  // Main menu loop to handle back navigation
+  const { getEditorService } = await import("../features/install");
+  const editorService = getEditorService();
+  const availableEditors = await editorService.getAvailableEditors();
+
+  if (availableEditors.length === 0) {
+    p.log.error("No editors found. Please install VS Code or Cursor.");
+    throw new Error("No editors found. Please install VS Code or Cursor.");
+  }
+
+  // Single editor - no choice needed
+  if (availableEditors.length === 1) {
+    const editor = availableEditors[0];
+    p.log.info(`Using ${editor.displayName}`);
+    return editor.name;
+  }
+
+  // Multiple editors available
+  const hasExplicitPreference = config.editor.prefer !== "auto";
+  const preferredEditor = availableEditors.find((e) => e.name === config.editor.prefer);
+
+  // Build options with default indication
+  const options = availableEditors.map((e) => {
+    const isDefault = hasExplicitPreference && e.name === config.editor.prefer;
+    const isRecommended = !hasExplicitPreference && e.name === "cursor";
+
+    let hint: string | undefined;
+    if (isDefault) {
+      hint = "Default (configured)";
+    } else if (isRecommended) {
+      hint = "Recommended";
+    }
+
+    return {
+      value: e.name,
+      label: e.displayName,
+      hint,
+    };
+  });
+
+  // CRITICAL: Always prompt, even with configured preference
+  // This allows users to choose non-default editor when needed
+  const message =
+    hasExplicitPreference && preferredEditor
+      ? `Select editor (default: ${preferredEditor.displayName}):`
+      : "Select target editor:";
+
+  const editorChoice = await p.select({
+    message,
+    options,
+  });
+
+  if (p.isCancel(editorChoice)) {
+    throw new Error("Editor selection cancelled");
+  }
+
+  const selectedEditor = editorChoice as "vscode" | "cursor";
+
+  // Log if user chose non-default
+  if (hasExplicitPreference && selectedEditor !== config.editor.prefer) {
+    p.log.info(`Using ${selectedEditor === "cursor" ? "Cursor" : "VS Code"} (overriding default)`);
+  }
+
+  return selectedEditor;
+}
+
+/**
+ * Group extensions by publisher for statistics
+ */
+function groupExtensionsByPublisher(extensions: Array<{ publisher: string; id: string }>) {
+  return extensions.reduce(
+    (acc, ext) => {
+      if (!acc[ext.publisher]) {
+        acc[ext.publisher] = [];
+      }
+      acc[ext.publisher].push(ext);
+      return acc;
+    },
+    {} as Record<string, Array<{ publisher: string; id: string }>>,
+  );
+}
+
+/**
+ * Handle remove all extensions with warning
+ */
+async function handleRemoveAll(
+  installed: Array<{ id: string; publisher: string; displayName: string }>,
+): Promise<string[]> {
+  const groupByPublisher = groupExtensionsByPublisher(installed);
+  const topPublishers = Object.entries(groupByPublisher)
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, 5);
+
+  p.note(
+    `You have ${installed.length} extensions from ${Object.keys(groupByPublisher).length} publishers\n\n` +
+      `Top publishers:\n` +
+      topPublishers.map(([pub, exts]) => `• ${pub}: ${exts.length} extensions`).join("\n"),
+    "⚠️ Warning: This will remove ALL extensions",
+  );
+
+  const confirmed = await p.confirm({
+    message: `Are you absolutely sure you want to remove all ${installed.length} extensions?`,
+    initialValue: false,
+  });
+
+  if (p.isCancel(confirmed)) {
+    return [];
+  }
+
+  return confirmed ? installed.map((e) => e.id) : [];
+}
+
+/**
+ * Smart multiselect - handles small lists directly
+ */
+async function selectFromList(
+  items: Array<{ id: string; displayName: string; version: string }>,
+  message: string,
+): Promise<string[]> {
+  const selected = await p.multiselect({
+    message,
+    options: items.map((ext) => ({
+      value: ext.id,
+      label: `${ext.displayName || ext.id} (v${ext.version})`,
+    })),
+    required: false,
+  });
+
+  if (p.isCancel(selected)) {
+    return [];
+  }
+
+  return selected as string[];
+}
+
+/**
+ * Handle large filtered set (> 30 items)
+ */
+async function handleLargeFilteredSet(
+  filtered: Array<{ id: string; displayName: string; version: string; publisher: string }>,
+): Promise<string[]> {
+  const action = await p.select({
+    message: `Found ${filtered.length} matches (still a large list):`,
+    options: [
+      { value: "refine", label: "🔍 Refine search", hint: "Search again" },
+      { value: "paginate", label: "📋 Browse pages", hint: "Paginated view" },
+      { value: "all", label: `🗑️ Remove all ${filtered.length} matches`, hint: "Remove all" },
+      { value: "cancel", label: "❌ Cancel" },
+    ],
+  });
+
+  if (p.isCancel(action) || action === "cancel") {
+    return [];
+  }
+
+  if (action === "refine") {
+    return await handleSearchRemove(filtered);
+  } else if (action === "paginate") {
+    return await handleBrowseRemove(filtered);
+  } else if (action === "all") {
+    return await handleRemoveAll(filtered);
+  }
+
+  return [];
+}
+
+/**
+ * Handle search-based removal
+ */
+async function handleSearchRemove(
+  installed: Array<{ id: string; displayName: string; version: string; publisher: string }>,
+): Promise<string[]> {
+  const query = await p.text({
+    message: "Search extensions:",
+    placeholder: "name, publisher, or keyword",
+    validate: (val) => (val.length < 2 ? "Enter at least 2 characters" : undefined),
+  });
+
+  if (p.isCancel(query)) {
+    return [];
+  }
+
+  const lowerQuery = query.toLowerCase();
+  const filtered = installed.filter(
+    (ext) =>
+      ext.id.toLowerCase().includes(lowerQuery) ||
+      ext.displayName.toLowerCase().includes(lowerQuery) ||
+      ext.publisher.toLowerCase().includes(lowerQuery),
+  );
+
+  if (filtered.length === 0) {
+    p.log.warning(`No extensions match "${query}"`);
+    return [];
+  }
+
+  p.log.info(`Found ${filtered.length} matching extension(s)`);
+
+  if (filtered.length > 30) {
+    return await handleLargeFilteredSet(filtered);
+  }
+
+  return await selectFromList(filtered, `Select from ${filtered.length} matches`);
+}
+
+/**
+ * Handle paginated browsing for large lists
+ */
+async function handleBrowseRemove(
+  installed: Array<{ id: string; displayName: string; version: string; publisher: string }>,
+): Promise<string[]> {
+  const PAGE_SIZE = 15;
+  const totalPages = Math.ceil(installed.length / PAGE_SIZE);
+
+  if (installed.length <= 20) {
+    return await selectFromList(installed, "Select extensions to remove");
+  }
+
+  const selected = new Set<string>();
+  let currentPage = 0;
+
   while (true) {
-    const category = await showMainMenu();
+    const pageItems = installed.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
-    if (p.isCancel(category) || category === "quit") {
-      p.cancel("Operation cancelled.");
-      process.exit(0);
+    const action = await p.select({
+      message: `Page ${currentPage + 1}/${totalPages} | ${selected.size} selected | Choose action:`,
+      options: [
+        {
+          value: "select",
+          label: `📋 Select from this page (${pageItems.length} items)`,
+          hint: "Use Space to toggle",
+        },
+        {
+          value: "next",
+          label: "➡️ Next page",
+          hint: currentPage < totalPages - 1 ? undefined : "(last page)",
+        },
+        {
+          value: "prev",
+          label: "⬅️ Previous page",
+          hint: currentPage > 0 ? undefined : "(first page)",
+        },
+        { value: "jump", label: "🎯 Jump to page..." },
+        { value: "search", label: "🔍 Switch to search mode" },
+        {
+          value: "done",
+          label: "✅ Done selecting",
+          hint: selected.size > 0 ? `${selected.size} to remove` : "None selected",
+        },
+        { value: "cancel", label: "❌ Cancel" },
+      ],
+    });
+
+    if (p.isCancel(action) || action === "cancel") {
+      return [];
     }
 
-    // Handle category selection
-    const shouldExit = await handleCategorySelection(category as string, config);
-    if (shouldExit) {
+    if (action === "select") {
+      const pageIds = pageItems.map((ext) => ext.id);
+      const initiallySelected = pageIds.filter((id) => selected.has(id));
+
+      const pageSelection = await p.multiselect({
+        message: `Select extensions (Page ${currentPage + 1}/${totalPages}) - Ctrl+C to go back:`,
+        options: pageItems.map((ext) => ({
+          value: ext.id,
+          label: `${ext.displayName || ext.id} (v${ext.version})`,
+        })),
+        initialValues: initiallySelected,
+        required: false,
+      });
+
+      if (!p.isCancel(pageSelection)) {
+        pageIds.forEach((id) => selected.delete(id));
+        (pageSelection as string[]).forEach((id) => selected.add(id));
+      }
+    } else if (action === "next" && currentPage < totalPages - 1) {
+      currentPage++;
+    } else if (action === "prev" && currentPage > 0) {
+      currentPage--;
+    } else if (action === "jump") {
+      const pageNum = await p.text({
+        message: `Jump to page (1-${totalPages}):`,
+        validate: (val) => {
+          const num = Number.parseInt(val);
+          if (Number.isNaN(num) || num < 1 || num > totalPages) {
+            return `Enter a number between 1 and ${totalPages}`;
+          }
+        },
+      });
+
+      if (!p.isCancel(pageNum)) {
+        currentPage = Number.parseInt(pageNum) - 1;
+      }
+    } else if (action === "search") {
+      return await handleSearchRemove(installed);
+    } else if (action === "done") {
       break;
     }
   }
+
+  return Array.from(selected);
 }
 
 /**
- * Show the main category selection menu
+ * Handle search-based update selection
  */
-async function showMainMenu(): Promise<string | symbol> {
-  return await p.select({
-    message: "What do you want to do?",
+async function handleSearchUpdate(
+  installed: Array<{ id: string; displayName: string; version: string; publisher: string }>,
+): Promise<string[]> {
+  const query = await p.text({
+    message: "Search extensions to update:",
+    placeholder: "name, publisher, or keyword",
+    validate: (val) => (val.length < 2 ? "Enter at least 2 characters" : undefined),
+  });
+
+  if (p.isCancel(query)) {
+    return [];
+  }
+
+  const lowerQuery = query.toLowerCase();
+  const filtered = installed.filter(
+    (ext) =>
+      ext.id.toLowerCase().includes(lowerQuery) ||
+      ext.displayName.toLowerCase().includes(lowerQuery) ||
+      ext.publisher.toLowerCase().includes(lowerQuery),
+  );
+
+  if (filtered.length === 0) {
+    p.log.warning(`No extensions match "${query}"`);
+    return [];
+  }
+
+  p.log.info(`Found ${filtered.length} matching extension(s)`);
+
+  if (filtered.length > 30) {
+    return await handleLargeFilteredSetForUpdate(filtered);
+  }
+
+  return await selectFromListForUpdate(filtered, `Select from ${filtered.length} matches`);
+}
+
+/**
+ * Handle large filtered set for update (> 30 items)
+ */
+async function handleLargeFilteredSetForUpdate(
+  filtered: Array<{ id: string; displayName: string; version: string; publisher: string }>,
+): Promise<string[]> {
+  const action = await p.select({
+    message: `Found ${filtered.length} matches (still a large list):`,
     options: [
-      { value: "install", label: "Install", hint: "Install extensions or VSIX files" },
-      { value: "download", label: "Download", hint: "Download VSIX files" },
-      { value: "update", label: "Update", hint: "Update installed extensions" },
-      { value: "uninstall", label: "Uninstall", hint: "Uninstall extensions" },
-      { value: "export", label: "Export", hint: "Export extension lists" },
-      { value: "version", label: "Version", hint: "Check extension versions" },
-      { value: "quit", label: "Quit", hint: "Exit the application" },
+      { value: "refine", label: "🔍 Refine search", hint: "Search again" },
+      { value: "paginate", label: "📋 Browse pages", hint: "Paginated view" },
+      { value: "all", label: `🔄 Update all ${filtered.length} matches`, hint: "Update all" },
+      { value: "cancel", label: "❌ Cancel" },
     ],
   });
+
+  if (p.isCancel(action) || action === "cancel") {
+    return [];
+  }
+
+  if (action === "refine") {
+    return await handleSearchUpdate(filtered);
+  } else if (action === "paginate") {
+    return await handleBrowseUpdate(filtered);
+  } else if (action === "all") {
+    return filtered.map((e) => e.id);
+  }
+
+  return [];
 }
 
 /**
- * Handle the selected category and show appropriate sub-menu
+ * Smart multiselect for update - handles small lists directly
  */
-async function handleCategorySelection(category: string, config: Config): Promise<boolean> {
-  switch (category) {
-    case "install":
-      return await showInstallMenu(config);
-    case "download":
-      return await showDownloadMenu(config);
-    case "update":
-      return await showUpdateMenu(config);
-    case "uninstall":
-      return await showUninstallMenu(config);
-    case "export":
-      return await showExportMenu(config);
-    case "version":
-      return await showVersionMenu(config);
+async function selectFromListForUpdate(
+  items: Array<{ id: string; displayName: string; version: string }>,
+  message: string,
+): Promise<string[]> {
+  const selected = await p.multiselect({
+    message,
+    options: items.map((ext) => ({
+      value: ext.id,
+      label: `${ext.displayName || ext.id} (v${ext.version})`,
+    })),
+    required: false,
+  });
+
+  if (p.isCancel(selected)) {
+    return [];
+  }
+
+  return selected as string[];
+}
+
+/**
+ * Handle paginated browsing for update (large lists)
+ */
+async function handleBrowseUpdate(
+  installed: Array<{ id: string; displayName: string; version: string; publisher: string }>,
+): Promise<string[]> {
+  const PAGE_SIZE = 15;
+  const totalPages = Math.ceil(installed.length / PAGE_SIZE);
+
+  if (installed.length <= 20) {
+    return await selectFromListForUpdate(installed, "Select extensions to update");
+  }
+
+  const selected = new Set<string>();
+  let currentPage = 0;
+
+  while (true) {
+    const pageItems = installed.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+
+    const action = await p.select({
+      message: `Page ${currentPage + 1}/${totalPages} | ${selected.size} selected | Choose action:`,
+      options: [
+        {
+          value: "select",
+          label: `📋 Select from this page (${pageItems.length} items)`,
+          hint: "Use Space to toggle",
+        },
+        {
+          value: "next",
+          label: "➡️ Next page",
+          hint: currentPage < totalPages - 1 ? undefined : "(last page)",
+        },
+        {
+          value: "prev",
+          label: "⬅️ Previous page",
+          hint: currentPage > 0 ? undefined : "(first page)",
+        },
+        { value: "jump", label: "🎯 Jump to page..." },
+        { value: "search", label: "🔍 Switch to search mode" },
+        {
+          value: "done",
+          label: "✅ Done selecting",
+          hint: selected.size > 0 ? `${selected.size} to update` : "None selected",
+        },
+        { value: "cancel", label: "❌ Cancel" },
+      ],
+    });
+
+    if (p.isCancel(action) || action === "cancel") {
+      return [];
+    }
+
+    if (action === "select") {
+      const pageIds = pageItems.map((ext) => ext.id);
+      const initiallySelected = pageIds.filter((id) => selected.has(id));
+
+      const pageSelection = await p.multiselect({
+        message: `Select extensions (Page ${currentPage + 1}/${totalPages}) - Ctrl+C to go back:`,
+        options: pageItems.map((ext) => ({
+          value: ext.id,
+          label: `${ext.displayName || ext.id} (v${ext.version})`,
+        })),
+        initialValues: initiallySelected,
+        required: false,
+      });
+
+      if (!p.isCancel(pageSelection)) {
+        pageIds.forEach((id) => selected.delete(id));
+        (pageSelection as string[]).forEach((id) => selected.add(id));
+      }
+    } else if (action === "next" && currentPage < totalPages - 1) {
+      currentPage++;
+    } else if (action === "prev" && currentPage > 0) {
+      currentPage--;
+    } else if (action === "jump") {
+      const pageNum = await p.text({
+        message: `Jump to page (1-${totalPages}):`,
+        validate: (val) => {
+          const num = Number.parseInt(val);
+          if (Number.isNaN(num) || num < 1 || num > totalPages) {
+            return `Enter a number between 1 and ${totalPages}`;
+          }
+          return undefined;
+        },
+      });
+
+      if (!p.isCancel(pageNum)) {
+        currentPage = Number.parseInt(pageNum as string) - 1;
+      }
+    } else if (action === "search") {
+      return await handleSearchUpdate(installed);
+    } else if (action === "done") {
+      break;
+    }
+  }
+
+  return Array.from(selected);
+}
+
+/**
+ * Main interactive menu - Quick actions for common tasks
+ */
+export async function runInteractive() {
+  console.clear();
+
+  p.intro("🔽 VSIX Extension Manager v2.0");
+
+  let shouldContinue = true;
+
+  while (shouldContinue) {
+    const action = await p.select({
+      message: "What would you like to do?",
+      options: [
+        { value: "add", label: "⚡ Add extension", hint: "URL, file, or list" },
+        { value: "update", label: "🔄 Update extensions", hint: "Keep extensions current" },
+        { value: "setup", label: "💻 Setup new machine", hint: "Configure for first use" },
+        { value: "doctor", label: "🏥 Fix problems", hint: "Health check & diagnostics" },
+        { value: "advanced", label: "⚙️  Advanced options...", hint: "More commands" },
+        { value: "help", label: "❓ Help", hint: "Get help" },
+        { value: "exit", label: "👋 Exit", hint: "Quit interactive mode" },
+      ],
+    });
+
+    if (p.isCancel(action) || action === "exit") {
+      shouldContinue = false;
+      break;
+    }
+
+    try {
+      switch (action) {
+        case "add":
+          await handleAddExtension();
+          break;
+        case "update":
+          await handleUpdateExtensions();
+          break;
+        case "setup":
+          await handleSetup();
+          break;
+        case "doctor":
+          await handleDoctor();
+          break;
+        case "advanced":
+          await handleAdvancedMenu();
+          break;
+        case "help":
+          await handleHelp();
+          break;
+      }
+
+      // Ask if user wants to continue
+      if (shouldContinue) {
+        const continueChoice = await p.confirm({
+          message: "Return to main menu?",
+          initialValue: true,
+        });
+
+        if (p.isCancel(continueChoice) || !continueChoice) {
+          shouldContinue = false;
+        } else {
+          console.log(""); // Spacing
+        }
+      }
+    } catch (error) {
+      p.log.error(`Error: ${error instanceof Error ? error.message : String(error)}`);
+
+      const retry = await p.confirm({
+        message: "Return to main menu?",
+        initialValue: true,
+      });
+
+      if (p.isCancel(retry) || !retry) {
+        shouldContinue = false;
+      }
+    }
+  }
+
+  p.outro("👋 Thanks for using VSIX Extension Manager!");
+}
+
+/**
+ * Handle adding extensions
+ */
+async function handleAddExtension() {
+  p.log.step("Add Extension");
+
+  // Select editor with config preference (Approach 1: Always offer choice with default indicated)
+  const selectedEditor = await selectEditorWithPreference();
+
+  const inputType = await p.select({
+    message: "What would you like to add?",
+    options: [
+      { value: "url", label: "📦 Extension from URL", hint: "Marketplace or OpenVSX" },
+      { value: "id", label: "🔍 Extension by Unique Identifier", hint: "e.g., ms-python.python" },
+      { value: "file", label: "📁 Local VSIX file", hint: "Install from disk" },
+      { value: "list", label: "📋 Extensions from list", hint: "Batch install" },
+    ],
+  });
+
+  if (p.isCancel(inputType)) return;
+
+  let input: string;
+
+  switch (inputType) {
+    case "url": {
+      const url = await p.text({
+        message: "Enter extension URL:",
+        placeholder: "https://marketplace.visualstudio.com/items?itemName=...",
+        validate: (value) => {
+          if (!value) return "URL is required";
+          if (!value.startsWith("http")) return "Please enter a valid URL";
+        },
+      });
+      if (p.isCancel(url)) return;
+      input = url;
+      break;
+    }
+
+    case "id": {
+      const id = await p.text({
+        message: "Enter extension ID:",
+        placeholder: "publisher.extension-name",
+        validate: (value) => {
+          if (!value) return "Extension ID is required";
+          if (!value.includes(".")) return "ID should be in format: publisher.name";
+        },
+      });
+      if (p.isCancel(id)) return;
+      input = id;
+      break;
+    }
+
+    case "file": {
+      const filePath = await p.text({
+        message: "Enter VSIX file path:",
+        placeholder: "./extension.vsix",
+        validate: (value) => {
+          if (!value) return "File path is required";
+        },
+      });
+      if (p.isCancel(filePath)) return;
+      input = filePath;
+      break;
+    }
+
+    case "list": {
+      const listPath = await p.text({
+        message: "Enter list file path:",
+        placeholder: "./extensions.txt",
+        validate: (value) => {
+          if (!value) return "File path is required";
+        },
+      });
+      if (p.isCancel(listPath)) return;
+      input = listPath;
+      break;
+    }
+
     default:
-      return false;
+      return;
+  }
+
+  // Execute add command
+  const s = p.spinner();
+  s.start("Processing...");
+
+  try {
+    const addCommand = await loadCommand("add");
+    const options: GlobalOptions = {
+      quiet: false,
+      yes: false,
+      editor: selectedEditor, // Pass selected editor
+    };
+
+    const result = await addCommand.execute([input], options);
+
+    s.stop("Done!");
+
+    if (result.status === "ok") {
+      p.log.success(result.summary);
+    } else {
+      p.log.error(result.summary);
+    }
+  } catch (error) {
+    s.stop("Failed");
+    throw error;
   }
 }
 
 /**
- * Show Install sub-menu
+ * Handle updating extensions
  */
-async function showInstallMenu(config: Config): Promise<boolean> {
-  const choice = await p.select({
-    message: "Install Options:",
+async function handleUpdateExtensions() {
+  p.log.step("Update Extensions");
+
+  // Select editor with config preference (Approach 1: Always offer choice with default indicated)
+  const selectedEditor = await selectEditorWithPreference();
+
+  const { getInstalledExtensions } = await import("../features/export");
+  const installed = await getInstalledExtensions(selectedEditor);
+
+  if (installed.length === 0) {
+    p.log.warning("No extensions found");
+    return;
+  }
+
+  const updateMode = await p.select({
+    message: `What would you like to update? (${installed.length} installed):`,
     options: [
+      { value: "all", label: "🔄 Update all extensions", hint: "Check and update all" },
       {
-        value: "quick-install",
-        label: "Quick install by URL",
-        hint: "Temp download → install → cleanup",
+        value: "search",
+        label: "🔍 Search and select",
+        hint: "Filter by name/publisher/keyword",
       },
       {
-        value: "install-vsix-single",
-        label: "Install single VSIX file",
-        hint: "Install one .vsix file into VS Code/Cursor",
+        value: "browse",
+        label: "📋 Browse and select",
+        hint: installed.length > 30 ? "Paginated view" : "Full list",
       },
-      {
-        value: "install-vsix-dir",
-        label: "Install from directory",
-        hint: "Install all VSIX files from a folder",
-      },
-      {
-        value: "install-list",
-        label: "Install from list",
-        hint: "Install from .txt or extensions.json file",
-      },
-      { value: "back", label: "Back to main menu" },
     ],
   });
 
-  if (p.isCancel(choice)) {
-    return false; // Go Back to main menu
+  if (p.isCancel(updateMode)) return;
+
+  let toUpdate: string[] = [];
+
+  switch (updateMode) {
+    case "all":
+      // Don't set toUpdate - let the update command handle all
+      break;
+    case "search":
+      toUpdate = await handleSearchUpdate(installed);
+      break;
+    case "browse":
+      toUpdate = await handleBrowseUpdate(installed);
+      break;
   }
 
-  if (choice === "back") {
-    return false; // Go Back to main menu
+  if (updateMode !== "all" && toUpdate.length === 0) {
+    p.log.info("No extensions selected for update");
+    return;
   }
 
-  // Execute the selected install command
-  await executeInstallCommand(choice as string, config);
-  return false; // Return to main menu after command execution
+  try {
+    const updateCommand = await loadCommand("update");
+    const options: GlobalOptions = {
+      quiet: false,
+      yes: false,
+      editor: selectedEditor,
+    };
+
+    // Update command manages its own progress display
+    const result = await updateCommand.execute(toUpdate, options);
+
+    if (result.status === "ok") {
+      p.log.success(result.summary);
+    } else {
+      p.log.error(result.summary);
+    }
+  } catch (error) {
+    p.log.error(`Update failed: ${error instanceof Error ? error.message : String(error)}`);
+    throw error;
+  }
 }
 
 /**
- * Show Download sub-menu
+ * Handle setup wizard
  */
-async function showDownloadMenu(config: Config): Promise<boolean> {
-  const choice = await p.select({
-    message: "Download Options:",
+async function handleSetup() {
+  p.log.step("Setup Wizard");
+
+  const setupCommand = await loadCommand("setup");
+  const options: GlobalOptions = {
+    quiet: false,
+    yes: false,
+  };
+
+  const result = await setupCommand.execute([], options);
+
+  if (result.status === "ok") {
+    p.log.success(result.summary);
+  } else {
+    p.log.error(result.summary);
+  }
+}
+
+/**
+ * Handle doctor (health check)
+ */
+async function handleDoctor() {
+  p.log.step("Health Check");
+
+  const s = p.spinner();
+  s.start("Running diagnostics...");
+
+  try {
+    const doctorCommand = await loadCommand("doctor");
+    const options: GlobalOptions = {
+      quiet: false,
+      yes: false,
+    };
+
+    const result = await doctorCommand.execute([], options);
+
+    s.stop("Done!");
+
+    if (result.status === "ok") {
+      p.log.success(result.summary);
+
+      // Offer to auto-fix if issues found
+      if (result.items && result.items.some((item) => item.status === "failed")) {
+        const shouldFix = await p.confirm({
+          message: "Would you like to auto-fix issues?",
+          initialValue: true,
+        });
+
+        if (!p.isCancel(shouldFix) && shouldFix) {
+          s.start("Applying fixes...");
+
+          // Run doctor with --fix flag
+          const fixOptions: GlobalOptions = {
+            quiet: false,
+            yes: false,
+            fix: true,
+          };
+          const fixResult = await doctorCommand.execute([], fixOptions);
+
+          s.stop("Done!");
+
+          if (fixResult.status === "ok") {
+            p.log.success("Fixes applied successfully");
+          } else {
+            p.log.error("Some fixes could not be applied");
+          }
+        }
+      }
+    } else {
+      p.log.error(result.summary);
+    }
+  } catch (error) {
+    s.stop("Failed");
+    throw error;
+  }
+}
+
+/**
+ * Advanced options sub-menu
+ */
+async function handleAdvancedMenu() {
+  const action = await p.select({
+    message: "Advanced Options",
     options: [
-      {
-        value: "single",
-        label: "Download single extension",
-        hint: "Download from marketplace URL",
-      },
-      {
-        value: "bulk",
-        label: "Download multiple extensions",
-        hint: "Bulk download from marketplace URL collection",
-      },
-      {
-        value: "from-list",
-        label: "Download from list",
-        hint: "Download from .txt or extensions.json file",
-      },
-      { value: "back", label: "Back to main menu" },
+      { value: "list", label: "📋 Export extensions list", hint: "Save to file" },
+      { value: "remove", label: "🗑️  Remove extensions", hint: "Uninstall" },
+      { value: "info", label: "ℹ️  Extension info", hint: "View details" },
+      { value: "back", label: "⬅️  Back to main menu" },
     ],
   });
 
-  if (p.isCancel(choice)) {
-    return false; // Go Back to main menu
-  }
+  if (p.isCancel(action) || action === "back") return;
 
-  if (choice === "back") {
-    return false; // Go Back to main menu
+  switch (action) {
+    case "list":
+      await handleListExtensions();
+      break;
+    case "remove":
+      await handleRemoveExtensions();
+      break;
+    case "info":
+      await handleExtensionInfo();
+      break;
   }
-
-  // Execute the selected download command
-  await executeDownloadCommand(choice as string, config);
-  return false; // Return to main menu after command execution
 }
 
 /**
- * Show Update sub-menu
+ * Handle listing extensions (export to file only)
  */
-async function showUpdateMenu(config: Config): Promise<boolean> {
-  const choice = await p.select({
-    message: "Update Options:",
+async function handleListExtensions() {
+  p.log.step("Export Extensions List");
+
+  // Select editor with config preference (Approach 1: Always offer choice with default indicated)
+  const selectedEditor = await selectEditorWithPreference();
+
+  const format = await p.select({
+    message: "Export format:",
     options: [
-      {
-        value: "update-installed",
-        label: "Update installed extensions",
-        hint: "Update to latest versions with backup",
-      },
-      { value: "back", label: "Back to main menu" },
+      { value: "json", label: "📄 JSON", hint: "VS Code extensions.json format" },
+      { value: "yaml", label: "📝 YAML", hint: "Human-readable config" },
+      { value: "txt", label: "📃 Text", hint: "Simple list of IDs" },
     ],
   });
 
-  if (p.isCancel(choice)) {
-    return false; // Go Back to main menu
-  }
+  if (p.isCancel(format)) return;
 
-  if (choice === "back") {
-    return false; // Go Back to main menu
-  }
+  const s = p.spinner();
+  s.start("Exporting extensions...");
 
-  // Execute the selected update command
-  await executeUpdateCommand(choice as string, config);
-  return false; // Return to main menu after command execution
+  try {
+    const listCommand = await loadCommand("list");
+    // Type-safe options that satisfy both GlobalOptions and list command requirements
+    const options: GlobalOptions & {
+      format?: "table" | "json" | "yaml" | "txt" | "csv";
+      output?: string;
+    } = {
+      quiet: false,
+      editor: selectedEditor, // Pass selected editor
+      format: format as "table" | "json" | "yaml" | "txt" | "csv",
+      output: `extensions.${format}`,
+    };
+
+    const result = await listCommand.execute([], options);
+
+    s.stop("Done!");
+
+    if (result.status === "ok") {
+      p.log.success(result.summary);
+    } else {
+      p.log.error(result.summary);
+    }
+  } catch (error) {
+    s.stop("Failed");
+    throw error;
+  }
 }
 
 /**
- * Show Uninstall sub-menu
+ * Handle removing extensions (enhanced with pagination and search)
  */
-async function showUninstallMenu(config: Config): Promise<boolean> {
-  const choice = await p.select({
-    message: "Uninstall Options:",
+async function handleRemoveExtensions() {
+  p.log.step("Remove Extensions");
+
+  const selectedEditor = await selectEditorWithPreference();
+
+  const { getInstalledExtensions } = await import("../features/export");
+  const installed = await getInstalledExtensions(selectedEditor);
+
+  if (installed.length === 0) {
+    p.log.warning("No extensions found");
+    return;
+  }
+
+  const mode = await p.select({
+    message: `Choose removal method (${installed.length} installed):`,
     options: [
       {
-        value: "uninstall-extensions",
-        label: "Uninstall extensions",
-        hint: "Remove extensions from VS Code or Cursor",
+        value: "all",
+        label: `🗑️ Remove all ${installed.length} extensions`,
+        hint: "Clean slate",
       },
-      { value: "back", label: "Back to main menu" },
+      {
+        value: "search",
+        label: "🔍 Search and select",
+        hint: "Filter by name/publisher/keyword",
+      },
+      {
+        value: "browse",
+        label: "📋 Browse and select",
+        hint: installed.length > 30 ? "Paginated view" : "Full list",
+      },
     ],
   });
 
-  if (p.isCancel(choice)) {
-    return false; // Go Back to main menu
+  if (p.isCancel(mode)) return;
+
+  let toRemove: string[] = [];
+
+  switch (mode) {
+    case "all":
+      toRemove = await handleRemoveAll(installed);
+      break;
+    case "search":
+      toRemove = await handleSearchRemove(installed);
+      break;
+    case "browse":
+      toRemove = await handleBrowseRemove(installed);
+      break;
   }
 
-  if (choice === "back") {
-    return false; // Go Back to main menu
+  if (toRemove.length === 0) {
+    p.log.info("No extensions selected for removal");
+    return;
   }
 
-  // Execute the selected uninstall command
-  await executeUninstallCommand(choice as string, config);
-  return false; // Return to main menu after command execution
+  const s = p.spinner();
+  s.start(`Removing ${toRemove.length} extension(s)...`);
+
+  try {
+    const removeCommand = await loadCommand("remove");
+
+    const options: GlobalOptions = {
+      quiet: false,
+      yes: true,
+      editor: selectedEditor,
+    };
+
+    const result = await removeCommand.execute(toRemove, options);
+
+    s.stop("Done!");
+
+    if (result.status === "ok") {
+      p.log.success(result.summary);
+    } else {
+      p.log.error(result.summary);
+    }
+  } catch (error) {
+    s.stop("Failed");
+    throw error;
+  }
 }
 
 /**
- * Show Export sub-menu
+ * Handle extension info
  */
-async function showExportMenu(config: Config): Promise<boolean> {
-  const choice = await p.select({
-    message: "Export Options:",
+async function handleExtensionInfo() {
+  p.log.step("Extension Info");
+
+  const mode = await p.select({
+    message: "What would you like to view?",
     options: [
-      {
-        value: "export",
-        label: "Export installed extensions",
-        hint: "Export to .txt or extensions.json format",
-      },
-      { value: "back", label: "Back to main menu" },
+      { value: "single", label: "🔍 Single extension details", hint: "By Unique Identifier" },
+      { value: "all", label: "📋 All installed extensions", hint: "Table view" },
     ],
   });
 
-  if (p.isCancel(choice)) {
-    return false; // Go Back to main menu
-  }
+  if (p.isCancel(mode)) return;
 
-  if (choice === "back") {
-    return false; // Go Back to main menu
-  }
-
-  // Execute the selected export command
-  await executeExportCommand(choice as string, config);
-  return false; // Return to main menu after command execution
-}
-
-/**
- * Show Version sub-menu
- */
-async function showVersionMenu(config: Config): Promise<boolean> {
-  const choice = await p.select({
-    message: "Version Options:",
-    options: [
-      {
-        value: "versions",
-        label: "Show extension versions",
-        hint: "List available versions for an extension",
+  if (mode === "single") {
+    const extensionId = await p.text({
+      message: "Enter extension ID:",
+      placeholder: "publisher.extension-name",
+      validate: (value) => {
+        if (!value) return "Extension ID is required";
       },
-      { value: "back", label: "Back to main menu" },
-    ],
-  });
+    });
 
-  if (p.isCancel(choice)) {
-    return false; // Go Back to main menu
-  }
+    if (p.isCancel(extensionId)) return;
 
-  if (choice === "back") {
-    return false; // Go Back to main menu
-  }
+    const s = p.spinner();
+    s.start("Fetching info...");
 
-  // Execute the selected version command
-  await executeVersionCommand(choice as string, config);
-  return false; // Return to main menu after command execution
-}
+    try {
+      const infoCommand = await loadCommand("info");
+      const options: GlobalOptions = {
+        quiet: false,
+      };
 
-/**
- * Execute install commands
- */
-async function executeInstallCommand(command: string, config: Config): Promise<void> {
-  switch (command) {
-    case "quick-install": {
-      const { runQuickInstallUI } = await import("./quickInstall");
-      await runQuickInstallUI({ ...config });
-      break;
-    }
-    case "install-vsix-single": {
-      const { runInstallVsixUI } = await import("./install");
-      await runInstallVsixUI({ ...config });
-      break;
-    }
-    case "install-vsix-dir": {
-      const { runInstallVsixDirUI } = await import("./install");
-      await runInstallVsixDirUI({ ...config });
-      break;
-    }
-    case "install-list": {
-      const { runInstallFromListUI } = await import("./install");
-      await runInstallFromListUI({ ...config });
-      break;
-    }
-  }
-}
+      const result = await infoCommand.execute([extensionId], options);
 
-/**
- * Execute download commands
- */
-async function executeDownloadCommand(command: string, config: Config): Promise<void> {
-  switch (command) {
-    case "single": {
-      const { runSingleDownloadUI } = await import("./download");
-      await runSingleDownloadUI({ ...config });
-      break;
+      s.stop("Done!");
+
+      if (result.status === "ok") {
+        p.log.success(result.summary);
+      } else {
+        p.log.error(result.summary);
+      }
+    } catch (error) {
+      s.stop("Failed");
+      throw error;
     }
-    case "bulk": {
-      const { runBulkJsonDownloadUI } = await import("./download");
-      await runBulkJsonDownloadUI({ ...config });
-      break;
-    }
-    case "from-list": {
-      const { fromList } = await import("./fromList");
-      await fromList({ ...config });
-      break;
+  } else {
+    // Show all installed extensions in table format
+    const selectedEditor = await selectEditorWithPreference();
+
+    const s = p.spinner();
+    s.start("Loading extensions...");
+
+    try {
+      const listCommand = await loadCommand("list");
+      const options: GlobalOptions & {
+        format?: "table" | "json" | "yaml" | "txt" | "csv";
+        output?: string;
+      } = {
+        quiet: false,
+        editor: selectedEditor,
+        format: "table",
+        output: undefined, // Display in console, don't save to file
+      };
+
+      const result = await listCommand.execute([], options);
+
+      s.stop("Done!");
+
+      if (result.status === "ok") {
+        p.log.success(result.summary);
+      } else {
+        p.log.error(result.summary);
+      }
+    } catch (error) {
+      s.stop("Failed");
+      throw error;
     }
   }
 }
 
 /**
- * Execute update commands
+ * Show help information
  */
-async function executeUpdateCommand(command: string, config: Config): Promise<void> {
-  switch (command) {
-    case "update-installed": {
-      const { runUpdateInstalledUI } = await import("./updateInstalled");
-      await runUpdateInstalledUI({ ...config });
-      break;
-    }
-  }
-}
+async function handleHelp() {
+  p.log.step("Help");
 
-/**
- * Execute export commands
- */
-async function executeExportCommand(command: string, config: Config): Promise<void> {
-  switch (command) {
-    case "export": {
-      const { exportInstalled } = await import("./exportInstalled");
-      await exportInstalled({ ...config });
-      break;
-    }
-  }
-}
+  p.note(
+    `Main Menu Options:
+  ⚡ Add extension     - Install from URL, file, or list
+  🔄 Update           - Keep extensions up-to-date
+  💻 Setup            - First-time configuration wizard
+  🏥 Fix problems     - Health checks and diagnostics
 
-/**
- * Execute uninstall commands
- */
-async function executeUninstallCommand(command: string, config: Config): Promise<void> {
-  switch (command) {
-    case "uninstall-extensions": {
-      const { runUninstallExtensionsUI } = await import("./uninstallExtensions");
-      await runUninstallExtensionsUI({ ...config });
-      break;
-    }
-  }
-}
+Advanced Options:
+  📋 Export list      - Save to JSON/YAML/TXT
+  🗑️  Remove          - Uninstall with search/filters
+  ℹ️  Extension info   - View details or browse all
 
-/**
- * Execute version commands
- */
-async function executeVersionCommand(command: string, config: Config): Promise<void> {
-  switch (command) {
-    case "versions": {
-      const { listVersions } = await import("./versions");
-      await listVersions({ ...config });
-      break;
-    }
-  }
+Navigation:
+  • Use ↑↓ arrow keys to navigate
+  • Press Space to select (multi-select)
+  • Press Enter to confirm
+  • Press Ctrl+C to cancel or go back
+
+File Formats:
+  • JSON - VS Code extensions.json format
+  • YAML - Human-readable config
+  • TXT  - Simple list of IDs
+
+More Info:
+  • CLI usage: vsix-extension-manager --help
+  • Docs: github.com/gabros20/vsix-extension-manager`,
+    "VSIX Extension Manager v2.0 - Interactive Mode",
+  );
 }

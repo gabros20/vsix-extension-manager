@@ -1,0 +1,9 @@
+alefragnani.project-manager
+astro-build.astro-vscode
+bedirt.gpt-token-counter-live
+bradgashler.htmltagwrap
+bradlc.vscode-tailwindcss
+burkeholland.simple-react-snippets
+christian-kohler.npm-intellisense
+cipchk.cssrem
+Factory.factory-vscode-extension

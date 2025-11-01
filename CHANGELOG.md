@@ -1,3 +1,170 @@
+# Changelog
+
+## [Unreleased]
+
+### Fixed
+
+- **Boolean flag handling:** Fixed critical bug where boolean flags with `defaultValue: "false"` were incorrectly evaluated as `true` due to `Boolean("false")` coercion. Removed all string boolean defaults from command options (add, remove, update, list, info)
+- **Disk space check:** Fixed health check to show actual disk space instead of free RAM. Now uses platform-specific commands (`df` on macOS/Linux, `wmic` on Windows) for accurate reporting
+- **Network connectivity:** Improved marketplace/OpenVSX connectivity checks to use GET requests with redirect support and proper User-Agent headers instead of HEAD requests that often failed
+- **Local VSIX installation:** Fixed path resolution for local VSIX files to use absolute paths, preventing installation failures
+- **EventEmitter warning:** Increased max listeners limit to 20 to prevent warnings during parallel operations (remove, update)
+- **Remove flow UX:** Removed redundant confirmation prompt - now only asks once when removing extensions
+
+### Added
+
+- **YAML import/export support:** Full support for YAML format in extension lists alongside JSON and TXT
+  - Import: Accepts `.yaml` and `.yml` files with auto-detection
+  - Export: `list --format yaml` outputs human-readable YAML
+  - Supports both simple array format and VS Code-compatible object with `recommendations` key
+- **Interactive mode improvements:**
+  - Reorganized Extension Info menu with two options: "Single extension details" and "All installed extensions" (table view)
+  - Moved table viewing from Export to Extension Info menu for better logical organization
+  - Updated help text to be more relevant to interactive mode with menu navigation tips
+  - Improved menu labels for clarity ("Export extensions list" instead of "List installed extensions")
+
+### Changed
+
+- **JSON export format:** `list` command now exports proper VS Code `extensions.json` format with `recommendations` key instead of plain arrays for better compatibility
+- **Extension list parsing:** Added YAML format auto-detection based on content patterns (starts with `-` or contains `: `)
+- **Input detection:** Updated to accept `.yaml` and `.yml` files as valid extension list formats
+- **Interactive help:** Tailored help screen for interactive mode showing menu options and keyboard shortcuts instead of CLI commands
+
+# [2.0.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.16.0...v2.0.0) (2024-12-19)
+
+## 🚀 BREAKING CHANGES
+
+This is a **complete refactor** of the CLI interface. While all functionality is preserved, the command structure and flag names have changed significantly.
+
+### Command Structure Changes
+
+**Old (v1.x) → New (v2.0):**
+
+- `download`, `quick-install`, `from-list`, `install`, `install-direct` → **`add`** (universal entry point)
+- `uninstall` → **`remove`**
+- `update-installed` → **`update`**
+- `export-installed` → **`list`**
+- `versions` → **`info`**
+- New: **`doctor`** (health check and diagnostics)
+- New: **`setup`** (first-run configuration wizard)
+
+### Flag Changes
+
+**Simplified and standardized:**
+
+- `--verbose` → `--debug`
+- `--reinstall` → `--force`
+- `--check-compatibility` → `--check-compat`
+- `--allow-mismatched-binary` → `--allow-mismatch`
+- `--install-parallel` → `--parallel`
+- `--no-install` → `--download-only`
+- `--out-dir` → `--output`
+
+**Removed (use positional arguments):**
+
+- `--url`, `--vsix`, `--file`, `--dir`, `--id` → Use: `vsix add <input>`
+
+### Configuration Changes
+
+- **New:** YAML-based configuration (`.vsix/config.yml`)
+- **New:** Profile support for different environments
+- **Automatic migration** from v1.x config files
+- Enhanced configuration with more options and better organization
+
+### Features
+
+#### Universal `add` Command
+
+- **Smart input detection** - automatically determines input type (URL, file, directory, list, extension ID)
+- **Unified workflow** - one command for all installation scenarios
+- **Plan preview** - shows what will happen before executing
+- **Automatic retry** - intelligent retry with escalating strategies
+- **Enhanced error handling** - contextual suggestions and recovery options
+
+#### Configuration System v2.0
+
+- **YAML configuration** - human-readable, easy to edit
+- **Profile support** - switch between different configurations (production, development, CI)
+- **Automatic migration** - seamlessly upgrades v1.x configs to v2.0
+- **Enhanced precedence** - CLI > ENV > File > Defaults (clearly documented)
+- **First-run wizard** - interactive setup on first use
+
+#### Background Update Checker
+
+- **Non-blocking checks** - doesn't interrupt workflow
+- **Smart caching** - respects configured frequency (never, daily, weekly, always)
+- **Minimal notifications** - subtle hints about available updates
+- **Zero telemetry** - completely local checking
+
+#### Health Check & Diagnostics
+
+- **`doctor` command** - comprehensive health checks
+- **Auto-fix** - automatically repair common issues
+- **Proactive detection** - find problems before they cause failures
+- **Clear reports** - easy-to-understand diagnostic output
+
+#### Standardized Output
+
+- **Consistent JSON API** - machine-readable across all commands
+- **Multiple formats** - table, JSON, YAML, CSV, plain text
+- **Proper exit codes** - reliable for CI/CD integration
+- **Rich details** - comprehensive information in all modes
+
+#### Intelligent Retry System
+
+- **Automatic retry** - handles transient failures
+- **Escalating strategies** - timeout increase, direct install, download-only fallback
+- **User intervention** - prompts for decisions when automated recovery fails
+- **Batch context** - shared retry state across multiple operations
+
+### Improvements
+
+- **Code quality:** ~777 lines of boilerplate removed
+- **Build:** 0 TypeScript errors
+- **Architecture:** Clean separation of command layer and business logic
+- **Error handling:** Contextual suggestions and automated recovery
+- **User experience:** Progressive disclosure, smart defaults, fail-forward design
+- **Performance:** Optimized startup, efficient caching, parallel operations
+- **Testing:** 61 integration tests covering core workflows
+
+### Deprecated/Removed
+
+**Removed commands** (functionality moved to unified commands):
+
+- `download` - Use `add <input> --download-only`
+- `quick-install` - Use `add <url>`
+- `from-list` - Use `add <list-file>`
+- `install` - Use `add <file|directory>`
+- `install-direct` - Use `add` (auto-detects method)
+- `export-installed` - Use `list --output <file>`
+- `update-installed` - Use `update`
+- `uninstall` - Use `remove <id>`
+
+**Interactive mode temporarily disabled:**
+
+- Will be redesigned with v2.0 command structure
+- Use direct commands: `vsix add`, `vsix remove`, `vsix update`, `vsix list`, `vsix info`
+
+### Migration Guide
+
+See [MIGRATION.md](./MIGRATION.md) for complete migration documentation.
+
+**Quick Reference:**
+
+```bash
+# v1.x → v2.0 command mapping
+vsix-extension-manager download --url <url>           → vsix-extension-manager add <url>
+vsix-extension-manager quick-install --url <url>      → vsix-extension-manager add <url>
+vsix-extension-manager install --vsix <file>          → vsix-extension-manager add <file>
+vsix-extension-manager from-list --file <list>        → vsix-extension-manager add <list>
+vsix-extension-manager export-installed -o list.txt   → vsix-extension-manager list --output list.txt
+vsix-extension-manager update-installed               → vsix-extension-manager update
+vsix-extension-manager uninstall <id>                 → vsix-extension-manager remove <id>
+vsix-extension-manager versions <id>                  → vsix-extension-manager info <id>
+```
+
+---
+
 # [1.16.0](https://github.com/gabros20/vsix-extension-manager/compare/v1.15.0...v1.16.0) (2025-10-01)
 
 ### Bug Fixes

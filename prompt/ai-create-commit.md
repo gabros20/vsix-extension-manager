@@ -23,23 +23,37 @@ When a user mentions **"@ai-create-commit.md"**, execute this workflow:
    Also present a compact PR body to fill quickly:
 
    ```
-   - What:
-   - Why:
-   - How:
-   - Test:
-   - Impact: none | minor | breaking
-   - Issue: #___
-   - Notes/Screenshots:
+   ## What
+   [one-liner]
+
+   ## Why
+   [goal]
+
+   ## How
+   [key changes]
+
+   ## Test
+   [steps]
+
+   ## Impact
+   [none|min|breaking]
+
+   ## Issue
+   #[id]
+
+   ## Notes/Screenshots
+   [optional]
    ```
 
 3. Branching logic (before committing):
-   - If current branch is `main` or `master`, create a new feature or fix branch based on chat history/context:
+   - If current branch is `dev`, create a new feature or fix branch based on chat history/context:
      - Prefer `feat/` for enhancements or new behavior
      - Prefer `fix/` for bug fixes or regressions
      - Branch name format: `<type>/<kebab-case-short-slug>` (e.g., `feat/add-dir-select-single-install`)
      - Command: `git checkout -b <branch>`
    - If already on a `feat/*` or `fix/*` branch, stay on it and continue.
    - Echo the chosen branch to the user.
+   - Note: Never work directly on `main` - it's only for releases from `dev`.
 4. If user agrees, stage and commit: `git add [files] && git commit -m "[message]"`
 5. Push the branch: `git push -u origin $(git branch --show-current)`
 6. Create a PR with GitHub CLI using the compact PR template body:
@@ -89,7 +103,7 @@ When a user mentions **"@ai-create-commit.md"**, execute this workflow:
    CURRENT_BRANCH=$(git branch --show-current)
    ```
 
-   - If `$CURRENT_BRANCH` is `main` or `master`, decide type from context (feature vs fix) and create a branch:
+   - If `$CURRENT_BRANCH` is `dev`, decide type from context (feature vs fix) and create a branch:
 
    ```bash
    # Example: choose feat or fix based on chat history/request
@@ -99,6 +113,7 @@ When a user mentions **"@ai-create-commit.md"**, execute this workflow:
    ```
 
    - If already on `feat/*` or `fix/*`, keep the branch and proceed.
+   - Never work directly on `main` - it's reserved for releases only.
 
 3. **Stage All Files**
 
@@ -125,10 +140,28 @@ When a user mentions **"@ai-create-commit.md"**, execute this workflow:
 
    # Use the commit title as PR title; body follows compact PR template
    COMMIT_TITLE="feat: implement authentication flow"
-
    gh pr create \
      --title "$COMMIT_TITLE" \
-     --body "- What: Adds login and logout with JWT support\n- Why: Provide authentication for protected routes\n- How: New auth service, JWT middleware, login/logout commands\n- Test: npm test && manual login/logout in app\n- Impact: minor\n- Issue: #___\n- Notes/Screenshots: "
+     --body "## What
+   Adds login and logout with JWT support
+
+   ## Why
+   Provide authentication for protected routes
+
+   ## How
+   New auth service, JWT middleware, login/logout commands
+
+   ## Test
+   npm test && manual login/logout in app
+
+   ## Impact
+   minor
+
+   ## Issue
+   #___
+
+   ## Notes/Screenshots
+   "
    ```
 
 ### Best Practices
@@ -136,5 +169,5 @@ When a user mentions **"@ai-create-commit.md"**, execute this workflow:
 1. Batch information gathering before decisions
 2. Group related files when staging
 3. Keep commit messages concise and descriptive
-4. Prefer creating a branch from `main`/`master` for each logical unit of work
+4. Prefer creating a branch from `dev` for each logical unit of work
 5. Present complete information to user at once (status, branch action, commit, PR)

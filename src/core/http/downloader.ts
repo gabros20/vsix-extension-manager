@@ -14,11 +14,12 @@ export async function downloadFile(
   filename: string,
   progressCallback?: ProgressCallback,
 ): Promise<string> {
+  const filePath = path.join(outputDir, filename);
+  let partialDownload = false;
+
   try {
     // Ensure output directory exists
     await fs.ensureDir(outputDir);
-
-    const filePath = path.join(outputDir, filename);
 
     // Create axios instance with response type stream
     const response = await axios({
@@ -38,6 +39,9 @@ export async function downloadFile(
 
     // Get content length for progress tracking
     const contentLength = parseInt(response.headers["content-length"] || "0", 10);
+
+    // Mark that we're starting download (for cleanup on error)
+    partialDownload = true;
 
     // Create write stream
     const writeStream = fs.createWriteStream(filePath);
@@ -73,8 +77,20 @@ export async function downloadFile(
       throw new Error("Downloaded file is empty");
     }
 
+    // Download successful, no cleanup needed
+    partialDownload = false;
+
     return filePath;
   } catch (error) {
+    // Clean up partial download on error
+    if (partialDownload) {
+      try {
+        await fs.remove(filePath);
+      } catch {
+        // Ignore cleanup errors, original error is more important
+      }
+    }
+
     if (axios.isAxiosError(error)) {
       if (error.response?.status === 404) {
         throw new Error("Extension version not found. Please check the version number.");

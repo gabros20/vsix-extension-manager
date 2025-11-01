@@ -1,6 +1,7 @@
 import type { ExportFormat } from "../../../core/types";
 import { validate } from "../../../core/validation";
 import { ParsingErrors } from "../../../core/errors";
+import * as yaml from "yaml";
 
 export interface VSCodeExtensionsJson {
   recommendations: string[];
@@ -43,6 +44,9 @@ export function parseExtensionsListDetailed(
   if (!format) {
     if (trimmedContent.startsWith("{") && trimmedContent.includes("recommendations")) {
       format = "extensions.json";
+    } else if (trimmedContent.startsWith("-") || trimmedContent.includes(": ")) {
+      // YAML typically starts with - (for arrays) or contains : (for objects)
+      format = "yaml";
     } else {
       format = "txt";
     }
@@ -73,6 +77,27 @@ export function parseExtensionsListDetailed(
         if (error instanceof Error && error.name === "ParsingError") {
           throw error;
         }
+        throw ParsingErrors.invalidJson(
+          filePath || "input",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+      break;
+
+    case "yaml":
+      try {
+        const parsed = yaml.parse(trimmedContent);
+        // YAML can be a simple array or an object with recommendations
+        if (Array.isArray(parsed)) {
+          allIds = parsed;
+        } else if (parsed && typeof parsed === "object" && "recommendations" in parsed) {
+          allIds = parsed.recommendations;
+        } else {
+          throw new Error(
+            "YAML must be an array of extension IDs or an object with 'recommendations' key",
+          );
+        }
+      } catch (error) {
         throw ParsingErrors.invalidJson(
           filePath || "input",
           error instanceof Error ? error.message : String(error),
@@ -145,6 +170,8 @@ export function parseExtensionsList(
   if (!format) {
     if (trimmedContent.startsWith("{") && trimmedContent.includes("recommendations")) {
       format = "extensions.json";
+    } else if (trimmedContent.startsWith("-") || trimmedContent.includes(": ")) {
+      format = "yaml";
     } else {
       format = "txt";
     }
@@ -180,6 +207,43 @@ export function parseExtensionsList(
 
         const errorDetails = result.errors.map((err) => err.message).join(", ");
         throw ParsingErrors.invalidJson(filePath || "input", errorDetails);
+      } catch (error) {
+        if (error instanceof Error && error.name === "ParsingError") {
+          throw error;
+        }
+        throw ParsingErrors.invalidJson(
+          filePath || "input",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+
+    case "yaml":
+      try {
+        const parsed = yaml.parse(trimmedContent);
+        let ids: string[] = [];
+
+        // YAML can be a simple array or an object with recommendations
+        if (Array.isArray(parsed)) {
+          ids = parsed;
+        } else if (parsed && typeof parsed === "object" && "recommendations" in parsed) {
+          ids = parsed.recommendations;
+        } else {
+          throw new Error(
+            "YAML must be an array of extension IDs or an object with 'recommendations' key",
+          );
+        }
+
+        // Validate each extension ID
+        const invalidIds = ids.filter(
+          (id) => !/^[a-zA-Z0-9][a-zA-Z0-9\-]*\.[a-zA-Z0-9][a-zA-Z0-9\-.]*$/.test(id),
+        );
+        if (invalidIds.length > 0) {
+          throw ParsingErrors.missingFields(filePath || "input", [
+            `Invalid extension IDs: ${invalidIds.join(", ")}`,
+          ]);
+        }
+
+        return ids;
       } catch (error) {
         if (error instanceof Error && error.name === "ParsingError") {
           throw error;

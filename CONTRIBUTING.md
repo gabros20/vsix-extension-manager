@@ -145,9 +145,11 @@ vsix-extension-manager --help
 
 ## 🔄 Pull Request Process
 
-1. **Create a feature branch** from `main`:
+1. **Create a feature branch** from `dev`:
 
    ```bash
+   git checkout dev
+   git pull origin dev
    git checkout -b feature/your-feature-name
    ```
 
@@ -196,8 +198,9 @@ When creating an issue, include:
 This project uses [semantic-release](https://semantic-release.gitbook.io/) for automated versioning and publishing.
 
 - **No manual version bumps** - versions are determined automatically
-- **Push to main** with conventional commits to trigger releases
-- **Releases are automatic** when commits are pushed to main
+- **Development on `dev` branch** - all feature branches merge into `dev`
+- **Releases from `dev` to `main`** - only release PRs from `dev` merge into `main`
+- **Releases are automatic** when commits are pushed to `main`
 
 ## 📚 Documentation
 

@@ -6,9 +6,7 @@
   "types": "dist/index.d.ts",
   "type": "commonjs",
   "bin": {
-    "vsix-extension-manager": "./dist/index.js",
-    "extension-manager": "./dist/index.js",
-    "vsix-downloader": "./dist/index.js"
+    "vsix-extension-manager": "./dist/index.js"
   },
   "files": [
     "dist/**",

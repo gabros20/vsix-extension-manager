@@ -1,6 +1,12 @@
-## VSIX Extension Manager
+## VSIX Extension Manager v2.0
 
-A modern CLI for downloading, exporting, importing, and managing VS Code/Cursor extensions as VSIX files from both the Visual Studio Marketplace and OpenVSX.
+**Stop fighting with "extension not available" errors.** Download, install, and manage VS Code and Cursor extensions directly—no marketplace restrictions, full version control, complete offline support.
+
+Microsoft blocks Cursor from the official marketplace. This CLI bypasses those restrictions by downloading VSIX files directly from both the Visual Studio Marketplace and OpenVSX, giving you complete control over your extension ecosystem.
+
+**Interactive mode or one-liners—your choice.** Run `vsix-extension-manager` for a beautiful guided menu, or use `vsix-extension-manager add` for smart command-line workflows that auto-detect URLs, extension IDs, local files, directories, or lists. Smart retry logic, automatic backups, health checks, and zero-config setup included.
+
+> **🚧 Work in Progress:** v2.0 is currently in rapid development. Features and commands are actively being tested and refined. Expect breaking changes, incomplete features, and potential bugs. Use with caution and update regularly.
 
 [![npm version](https://img.shields.io/npm/v/vsix-extension-manager.svg)](https://www.npmjs.com/package/vsix-extension-manager)
 [![npm downloads](https://img.shields.io/npm/dm/vsix-extension-manager.svg)](https://www.npmjs.com/package/vsix-extension-manager)
@@ -15,30 +21,26 @@ A modern CLI for downloading, exporting, importing, and managing VS Code/Cursor 
 - [Introduction / Why](#introduction--why)
 - [Features / Highlights](#features--highlights)
 - [Installation / Getting Started](#installation--getting-started)
-- [Usage / Examples](#usage--examples)
-  - [Quick Install (one-off)](#quick-install-one-off)
-  - [Interactive Mode](#interactive-mode)
-  - [Single Extension Download](#single-extension-download)
-  - [Bulk Download from JSON](#bulk-download-from-json)
-  - [Export Installed Extensions](#export-installed-extensions)
-  - [Download from Lists](#download-from-lists)
-  - [Install Extensions](#install-extensions)
-- [Update Installed Extensions](#update-installed-extensions)
-- [Uninstall Extensions](#uninstall-extensions)
-- [Direct Installation (Advanced)](#direct-installation-advanced)
-- [Extension Compatibility Checking](#extension-compatibility-checking)
-- [Backup & Rollback](#backup--rollback)
-- [Versions Command](#versions-command)
-- [Manual Installation Methods](#manual-installation-methods)
-- [Configuration / Options](#configuration--options)
-  - [Configuration Files](#configuration-files)
+- [Quick Start (v2.0)](#quick-start-v20)
+  - [Universal `add` Command](#universal-add-command)
+  - [List & Manage Extensions](#list--manage-extensions)
+  - [Update Extensions](#update-extensions)
+  - [Health Check](#health-check)
+- [v2.0 Commands Reference](#v20-commands-reference)
+  - [`add` - Universal Entry Point](#add---universal-entry-point)
+  - [`remove` - Uninstall Extensions](#remove---uninstall-extensions)
+  - [`update` - Update Extensions](#update---update-extensions)
+  - [`list` - List Installed](#list---list-installed)
+  - [`info` - Extension Details](#info---extension-details)
+  - [`doctor` - Health Check](#doctor---health-check)
+  - [`setup` - Configuration Wizard](#setup---configuration-wizard)
+  - [`rollback` - Restore Backups](#rollback---restore-backups)
+- [Configuration v2.0](#configuration-v20)
+  - [YAML Configuration](#yaml-configuration)
+  - [Profiles](#profiles)
   - [Environment Variables](#environment-variables)
-  - [Options Overview](#options-overview)
-  - [Custom Filename Templates](#custom-filename-templates)
-  - [Cache Directory](#cache-directory)
-  - [Progress Indicators & Checksums](#progress-indicators--checksums)
+  - [Precedence Rules](#precedence-rules)
 - [Contributing](#contributing)
-- [Roadmap / TODO](#roadmap--todo)
 - [FAQ / Troubleshooting](#faq--troubleshooting)
 - [License](#license)
 - [Acknowledgments](#acknowledgments)
@@ -51,22 +53,32 @@ VSIX Extension Manager solves this with a fast, reliable CLI for downloading VSI
 
 ### Features / Highlights
 
-- ✅ Works with both Marketplace and OpenVSX (auto-detect or choose explicitly)
-- ✅ Single and bulk downloads, including mixed-source lists
-- ✅ Resolve latest version (stable by default) or prefer pre-release
-- ✅ Export installed extensions from VS Code or Cursor (txt/extensions.json)
-- ✅ Install VSIX files directly into VS Code or Cursor
-- ✅ Install from exported lists with automatic downloading
-- ✅ Direct installation bypassing CLI (for problematic environments)
-- ✅ Uninstall extensions with selective or batch processing
-- ✅ Extension compatibility checking against editor versions
-- ✅ Update installed extensions with automatic backup
-- ✅ Rollback extensions from backups when updates fail
-- ✅ Input lists: .txt or VS Code `extensions.json`
-- ✅ Checksums: generate SHA256 or verify against a known hash
-- ✅ Configurable output/cache directories and filename templates
-- ✅ Retries/backoff, progress bars, quiet mode, and summary reports
-- ✅ Alternative binary names: `extension-manager` and legacy `vsix-downloader`
+#### 🚀 v2.0 Improvements
+
+- ✨ **Universal `add` command** - One command for all scenarios (URL, file, directory, list, ID)
+- 🎯 **Smart input detection** - Automatically determines what to do with your input
+- 🔄 **Intelligent retry** - Automatic error recovery with escalating strategies
+- ⚙️ **Config v2.0** - YAML-based configuration with profiles and auto-migration
+- 🏥 **Health check** - Proactive diagnostics with auto-fix capabilities (disk space, network, compatibility)
+- 🔔 **Update notifications** - Non-intrusive background update checking
+- 📊 **Standardized output** - Consistent JSON API for CI/CD integration
+- 🎨 **Interactive mode** - Beautiful guided menus with improved help and navigation
+- 📝 **YAML support** - Full import/export support for YAML format alongside JSON and TXT
+- 🔧 **Improved diagnostics** - Accurate disk space and network connectivity checks
+- ♻️ **Better UX** - Streamlined confirmation flows and clearer menu labels
+
+#### Core Features
+
+- ✅ **Multi-source support** - Marketplace and OpenVSX with auto-detect
+- ✅ **Batch operations** - Download and install multiple extensions efficiently
+- ✅ **Version management** - Latest (stable/pre-release) or specific versions
+- ✅ **Export/Import** - Share extension lists across machines
+- ✅ **Compatibility checking** - Verify extensions work with your editor version
+- ✅ **Automatic backups** - Safe updates with rollback capability
+- ✅ **Multiple formats** - JSON, YAML, CSV, TXT output options
+- ✅ **Editor detection** - Auto-detect VS Code and Cursor installations
+- ✅ **Parallel operations** - Configurable concurrency for faster workflows
+- ✅ **Progress tracking** - Rich progress bars and time estimates
 
 ### Installation / Getting Started
 
@@ -91,62 +103,322 @@ npm install
 npm run build
 ```
 
-### Usage / Examples
+### Quick Start (v2.0)
 
-#### Quick Install (one-off)
+v2.0 simplifies everything with a universal `add` command that automatically detects what you want to do.
 
-Download an extension by URL to a temporary folder, install it, then clean up.
-
-```bash
-# Quick install (auto-detect editor; prefers Cursor)
-vsix-extension-manager quick-install \
-  --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python"
-
-# Shorthand alias
-vsix-extension-manager qi --url "https://open-vsx.org/extension/ms-python/python"
-
-# Explicit editor and binary
-vsix-extension-manager qi \
-  --url "https://marketplace.visualstudio.com/items?itemName=Fuzionix.file-tree-extractor" \
-  --editor cursor \
-  --cursor-bin "/Applications/Cursor.app/Contents/Resources/app/bin/cursor"
-
-# Non-interactive output for scripts/CI
-vsix-extension-manager qi --url "..." --quiet --json
-```
-
-Behavior:
-
-- Creates a unique temp directory
-- Downloads latest (or pre-release with --pre-release)
-- Prompts for target editor when multiple are available (quiet/json prefers Cursor)
-- Installs the VSIX
-- Cleans up the temp directory regardless of outcome
-
-#### Quick Start - Install Extensions
+**New to the tool?** Simply run `vsix-extension-manager` (no arguments) to launch the interactive mode with guided menus!
 
 ```bash
-# Install a single VSIX file
-vsix-extension-manager install --vsix ./extension.vsix
+# Launch interactive mode
+vsix-extension-manager
 
-# Install all VSIX files from downloads folder
-vsix-extension-manager install --vsix-dir ./downloads
-
-# Install from exported extension list (with auto-download)
-vsix-extension-manager install --file extensions.txt --download-missing
-
-# Download and install in one command
-vsix-extension-manager download \
-  --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" \
-  --version latest \
-  --install-after
-
-# Export from one machine, install on another
-vsix-extension-manager export-installed -o my-extensions.txt
-vsix-extension-manager install --file my-extensions.txt --download-missing
+# Or use the universal add command directly
 ```
+
+#### Universal `add` Command
+
+The `add` command is your one-stop solution for all extension operations:
+
+```bash
+# Install from marketplace URL
+vsix-extension-manager add "https://marketplace.visualstudio.com/items?itemName=ms-python.python"
+
+# Install by extension ID
+vsix-extension-manager add ms-python.python
+
+# Install from local VSIX file
+vsix-extension-manager add ./extension.vsix
+
+# Install all VSIX files from a directory
+vsix-extension-manager add ./downloads
+
+# Install from extension list
+vsix-extension-manager add extensions.txt
+
+# Download only (no install)
+vsix-extension-manager add ms-python.python --download-only
+
+# Specify editor explicitly
+vsix-extension-manager add ms-python.python --editor cursor
+
+# Silent mode for CI/CD
+vsix-extension-manager add extensions.txt --quiet --json
+```
+
+#### List & Manage Extensions
+
+```bash
+# List installed extensions (table view in console)
+vsix-extension-manager list
+
+# Export to file (JSON - VS Code extensions.json format)
+vsix-extension-manager list --format json --output extensions.json
+
+# Export as YAML
+vsix-extension-manager list --format yaml --output extensions.yaml
+
+# Export as plain text
+vsix-extension-manager list --format txt --output extensions.txt
+
+# Detailed information
+vsix-extension-manager list --detailed
+```
+
+**Note:** The `list` command now exports in proper VS Code `extensions.json` format:
+
+```json
+{
+  "recommendations": ["ms-python.python", "dbaeumer.vscode-eslint"]
+}
+```
+
+**Supported Formats:**
+
+- **JSON** - VS Code extensions.json format (with `recommendations` key)
+- **YAML** - Human-readable config (supports both array and object with `recommendations`)
+- **TXT** - Simple newline-separated list of extension IDs
+
+#### Update Extensions
+
+```bash
+# Update all extensions
+vsix-extension-manager update
+
+# Update specific extension
+vsix-extension-manager update ms-python.python
+
+# Check for updates without installing
+vsix-extension-manager update --dry-run
+
+# Update with parallel downloads
+vsix-extension-manager update --parallel 5
+```
+
+#### Health Check
+
+```bash
+# Run health check
+vsix-extension-manager doctor
+
+# Auto-fix detected issues
+vsix-extension-manager doctor --fix
+```
+
+**v2.0 Health Check Improvements:**
+
+- ✅ **Accurate disk space** - Fixed to show actual disk space (not RAM)
+- ✅ **Better network checks** - Improved marketplace connectivity detection with redirect support
+- ✅ **Editor detection** - Auto-detects VS Code and Cursor installations
+- ✅ **Extension integrity** - Checks for corrupted extensions
+- ✅ **Configuration validation** - Verifies config file validity
 
 #### Interactive Mode
+
+Launch the interactive mode for a guided experience:
+
+```bash
+vsix-extension-manager
+```
+
+**Interactive Mode Features:**
+
+- 📋 **Main Menu** - Quick access to add, update, setup, and fix operations
+- ⚙️ **Advanced Menu** - Export lists, remove extensions, view info
+- 🔍 **Smart search** - Find extensions by name, publisher, or keyword
+- 📊 **Table views** - Browse all installed extensions
+- 📝 **Format support** - Export to JSON, YAML, or TXT
+- ❓ **Contextual help** - Press `?` or select Help for interactive tips
+- 🎯 **Improved UX** - Streamlined flows with single confirmations
+
+### v2.0 Commands Reference
+
+#### `add` - Universal Entry Point
+
+Smart command that automatically detects input type and executes the appropriate workflow.
+
+**Usage:**
+
+```bash
+vsix-extension-manager add <input> [options]
+```
+
+**Input Types** (automatically detected):
+
+- **URL**: Marketplace or OpenVSX extension URL
+- **Extension ID**: `publisher.name` format
+- **VSIX File**: Path to `.vsix` file
+- **Directory**: Folder containing `.vsix` files
+- **List File**: `.txt`, `.json` (extensions.json format), `.yaml`, or `.yml` file
+
+**Examples:**
+
+```bash
+# From URL (auto-downloads and installs)
+vsix-extension-manager add "https://marketplace.visualstudio.com/items?itemName=ms-python.python"
+
+# From extension ID (resolves latest version)
+vsix-extension-manager add ms-python.python
+
+# Pre-release version
+vsix-extension-manager add ms-python.python --pre-release
+
+# From local file
+vsix-extension-manager add python-2024.1.0.vsix
+
+# From directory
+vsix-extension-manager add ./my-extensions
+
+# From list (downloads missing, installs all)
+vsix-extension-manager add extensions.txt
+
+# Download only (no install)
+vsix-extension-manager add ms-python.python --download-only --output ./downloads
+
+# Specific editor
+vsix-extension-manager add ms-python.python --editor cursor
+
+# Force reinstall
+vsix-extension-manager add ms-python.python --force
+
+# Multiple parallel downloads
+vsix-extension-manager add extensions.txt --parallel 5
+```
+
+**Common Options:**
+
+- `--editor <type>` - Target editor (cursor, vscode, auto)
+- `--download-only` - Download without installing
+- `--output <path>` - Output directory for downloads
+- `--force` - Force reinstall if already installed
+- `--parallel <n>` - Number of parallel operations (1-10)
+- `--pre-release` - Use pre-release versions
+- `--source <registry>` - Registry (marketplace, open-vsx, auto)
+- `--quiet` - Minimal output
+- `--json` - JSON output for scripts
+- `--yes` - Auto-confirm all prompts
+
+#### `remove` - Uninstall Extensions
+
+```bash
+# Remove single extension
+vsix-extension-manager remove ms-python.python
+
+# Remove multiple extensions
+vsix-extension-manager remove ms-python.python dbaeumer.vscode-eslint
+
+# Remove all extensions (with confirmation)
+vsix-extension-manager remove --all
+
+# Silent mode
+vsix-extension-manager remove ms-python.python --quiet --yes
+```
+
+#### `update` - Update Extensions
+
+```bash
+# Update all installed extensions
+vsix-extension-manager update
+
+# Update specific extensions
+vsix-extension-manager update ms-python.python
+
+# Include pre-release versions
+vsix-extension-manager update --pre-release
+
+# Check for updates without installing
+vsix-extension-manager update --dry-run
+
+# Parallel updates
+vsix-extension-manager update --parallel 3
+```
+
+#### `list` - List Installed
+
+```bash
+# List in table format (console output, not saved)
+vsix-extension-manager list
+
+# Export to JSON (VS Code extensions.json format with "recommendations")
+vsix-extension-manager list --format json --output extensions.json
+
+# Export to YAML
+vsix-extension-manager list --format yaml --output extensions.yaml
+
+# Export to plain text (one ID per line)
+vsix-extension-manager list --format txt --output extensions.txt
+
+# CSV format
+vsix-extension-manager list --format csv --output extensions.csv
+
+# Detailed information
+vsix-extension-manager list --detailed
+```
+
+**Important:** The JSON export now outputs proper VS Code `extensions.json` format:
+
+```json
+{
+  "recommendations": ["ext1", "ext2"]
+}
+```
+
+**Interactive Mode:** In interactive mode, selecting "Export extensions list" will only offer file formats (JSON/YAML/TXT). To view extensions in a table, use "Extension Info" → "All installed extensions".
+
+#### `info` - Extension Details
+
+```bash
+# Show extension information
+vsix-extension-manager info ms-python.python
+
+# Show all available versions
+vsix-extension-manager info ms-python.python --all
+
+# Limit versions shown
+vsix-extension-manager info ms-python.python --limit 5
+
+# JSON output
+vsix-extension-manager info ms-python.python --json
+```
+
+#### `doctor` - Health Check
+
+```bash
+# Run diagnostics
+vsix-extension-manager doctor
+
+# Auto-fix detected issues
+vsix-extension-manager doctor --fix
+
+# JSON output for scripts
+vsix-extension-manager doctor --json
+```
+
+#### `setup` - Configuration Wizard
+
+```bash
+# Run interactive setup wizard
+vsix-extension-manager setup
+
+# Quick setup with minimal prompts
+vsix-extension-manager setup --quick
+
+# Force reconfiguration
+vsix-extension-manager setup --force
+```
+
+#### `rollback` - Restore Backups
+
+```bash
+# List available backups
+vsix-extension-manager rollback --list
+
+# Restore specific backup
+vsix-extension-manager rollback --backup-id <id>
+
+# Restore latest backup for an extension
+vsix-extension-manager rollback --extension-id ms-python.python --latest
+```
 
 ```bash
 vsix-extension-manager
@@ -164,7 +436,6 @@ Interactive Mode Menu:
 **Download**
 
 - Download single extension from marketplace URL
-- Download multiple extensions from JSON collection (URLs + versions)
 - Download from exported list (txt / extensions.json)
 
 **Update**
@@ -225,38 +496,6 @@ vsix-extension-manager download --url "..." --version "1.2.3" --verify-checksum 
 vsix-extension-manager download \
   --url "https://marketplace.visualstudio.com/items?itemName=ms-python.python" \
   --version "2023.20.0" \
-  --install-after
-```
-
-#### Bulk from JSON collection (URLs + versions)
-
-- Template:
-
-```json
-[
-  {
-    "url": "https://marketplace.visualstudio.com/items?itemName=ms-python.python",
-    "version": "latest"
-  },
-  { "url": "https://open-vsx.org/extension/ms-python/python", "version": "2025.4.0" }
-]
-```
-
-- Run (non-interactive):
-
-```bash
-vsix-extension-manager download \
-  --file ./extensions.json \
-  --output ./downloads \
-  --retry 3 \
-  --retry-delay 1500 \
-  --summary ./summary.json \
-  --quiet
-
-# Download and install bulk extensions
-vsix-extension-manager download \
-  --file ./extensions.json \
-  --output ./downloads \
   --install-after
 ```
 
@@ -802,19 +1041,18 @@ code   --install-extension ./downloads/<file>.vsix
 
 ### Which mode should I use?
 
-| Mode                        | Input                                     | Version resolution                       | Parallel                                | Best for                           |
-| --------------------------- | ----------------------------------------- | ---------------------------------------- | --------------------------------------- | ---------------------------------- |
-| **Download Modes**          |                                           |                                          |                                         |                                    |
-| Single extension (URL)      | Marketplace/OpenVSX URL                   | Exact or `latest` (pre-release optional) | N/A                                     | One-off downloads                  |
-| Bulk from JSON collection   | JSON array of `{ url, version, source? }` | Exact or `latest` per entry              | Yes (CLI `--parallel`, non-interactive) | Mixed sources, pinned versions     |
-| Download from exported list | `txt` of IDs or `extensions.json`         | Resolves `latest` automatically          | Yes (CLI)                               | Migrating/export-import workflows  |
-| **Install Modes**           |                                           |                                          |                                         |                                    |
-| Install single VSIX         | Single `.vsix` file or directory path     | N/A (version in filename)                | N/A                                     | Testing individual extensions      |
-| Install from directory      | Directory path (scans for `.vsix`)        | N/A (version in filename)                | Yes (CLI `--parallel`)                  | Bulk setup from downloads          |
-| Install from list           | `txt` or `extensions.json`                | Resolves `latest` (or uses existing)     | Yes (CLI `--parallel`)                  | Complete environment setup         |
-| **Integrated Workflows**    |                                           |                                          |                                         |                                    |
-| Download + Install          | URL + `--install-after`                   | Exact or `latest`                        | N/A                                     | One-step download and install      |
-| List Download + Install     | `txt`/JSON + `--install`                  | Resolves `latest` automatically          | Yes (download and install)              | Complete setup from exported lists |
+| Mode                        | Input                                 | Version resolution                       | Parallel                   | Best for                           |
+| --------------------------- | ------------------------------------- | ---------------------------------------- | -------------------------- | ---------------------------------- |
+| **Download Modes**          |                                       |                                          |                            |                                    |
+| Single extension (URL)      | Marketplace/OpenVSX URL               | Exact or `latest` (pre-release optional) | N/A                        | One-off downloads                  |
+| Download from exported list | `txt` of IDs or `extensions.json`     | Resolves `latest` automatically          | Yes (CLI)                  | Migrating/export-import workflows  |
+| **Install Modes**           |                                       |                                          |                            |                                    |
+| Install single VSIX         | Single `.vsix` file or directory path | N/A (version in filename)                | N/A                        | Testing individual extensions      |
+| Install from directory      | Directory path (scans for `.vsix`)    | N/A (version in filename)                | Yes (CLI `--parallel`)     | Bulk setup from downloads          |
+| Install from list           | `txt` or `extensions.json`            | Resolves `latest` (or uses existing)     | Yes (CLI `--parallel`)     | Complete environment setup         |
+| **Integrated Workflows**    |                                       |                                          |                            |                                    |
+| Download + Install          | URL + `--install-after`               | Exact or `latest`                        | N/A                        | One-step download and install      |
+| List Download + Install     | `txt`/JSON + `--install`              | Resolves `latest` automatically          | Yes (download and install) | Complete setup from exported lists |
 
 ### Configuration / Options
 
@@ -956,7 +1194,7 @@ export VSIX_ALLOW_MISMATCHED_BINARY=false # Allow proceeding when binary identit
   - `--quiet`: Reduce output
   - `--json`: Machine-readable logs
   - `--summary <path>`: Write install summary JSON
-  - `--allow-mismatched-binary`: Proceed even if `code` points to Cursor or vice versa (not recommended)
+  - `--allow-mismatched-binary`: Proceed even if `code` points to Cursor or vice‑versa (not recommended)
 
 - Update:
   - `--editor <vscode|cursor|auto>`: Target editor (default: auto)
@@ -1157,14 +1395,102 @@ See [`TODO.md`](TODO.md) for upcoming features and ideas. Feedback and PRs are a
   - Marketplace: `https://[publisher].gallery.vsassets.io/_apis/public/gallery/publisher/[publisher]/extension/[extension]/[version]/assetbyname/Microsoft.VisualStudio.Services.VSIXPackage`
   - OpenVSX: `https://open-vsx.org/api/[publisher]/[extension]/[version]/file/[publisher].[extension]-[version].vsix`
 
+### Configuration v2.0
+
+v2.0 introduces a modern YAML-based configuration system with profiles and automatic migration from v1.x.
+
+#### YAML Configuration
+
+Create `~/.vsix/config.yml` or `.vsix.yml` in your project:
+
+```yaml
+# ~/.vsix/config.yml
+editor:
+  prefer: cursor # Preference when multiple found
+  cursor-binary: auto # auto | explicit path
+  vscode-binary: auto
+
+safety:
+  check-compatibility: true
+  auto-backup: true
+  verify-checksums: true
+
+performance:
+  parallel-downloads: 3
+  parallel-installs: 1
+
+behavior:
+  skip-installed: ask # ask | always | never
+  update-check: weekly # never | daily | weekly
+  auto-retry: true
+
+# Active profile
+active-profile: production
+
+# Profiles for different environments
+profiles:
+  production:
+    safety:
+      check-compatibility: true
+    performance:
+      parallel-installs: 1
+  development:
+    safety:
+      check-compatibility: false
+    performance:
+      parallel-installs: 3
+```
+
+#### Profiles
+
+Switch between different configurations:
+
+```bash
+# Use specific profile
+vsix-extension-manager add extensions.txt --profile development
+
+# Set active profile in config.yml
+active-profile: development
+```
+
+#### Environment Variables
+
+All options can be set via `VSIX_*` environment variables:
+
+```bash
+export VSIX_EDITOR=cursor
+export VSIX_PARALLEL_DOWNLOADS=5
+export VSIX_AUTO_BACKUP=true
+
+vsix-extension-manager add ms-python.python  # Uses environment settings
+```
+
+#### Precedence Rules
+
+Configuration precedence (highest to lowest):
+
+1. **CLI flags** - `--editor cursor`
+2. **Environment variables** - `VSIX_EDITOR=cursor`
+3. **Config file** - `~/.vsix/config.yml`
+4. **Default values** - Built-in defaults
+
 ### License
 
 MIT — see [LICENSE](LICENSE).
 
 ### Acknowledgments
 
+- [Visual Studio Marketplace](https://marketplace.visualstudio.com/) - Primary extension source
+- [OpenVSX Registry](https://open-vsx.org/) - Alternative open-source extension registry
+- [axios](https://github.com/axios/axios) - HTTP client for reliable downloads
+- [adm-zip](https://github.com/cthackers/adm-zip) - VSIX file extraction and handling
+- [Commander.js](https://github.com/tj/commander.js) - CLI framework
+- [@clack/prompts](https://github.com/natemoo-re/clack) - Beautiful interactive prompts
+- [YAML](https://github.com/eemeli/yaml) - Configuration file parsing
+- [Zod](https://github.com/colinhacks/zod) - Schema validation
+- [semantic-release](https://github.com/semantic-release/semantic-release) - Automated versioning & releases
+- Built with [TypeScript](https://www.typescriptlang.org/) for type safety
 - Inspired by [mjmirza/download-vsix-from-visual-studio-market-place](https://github.com/mjmirza/download-vsix-from-visual-studio-market-place)
-- Built with modern CLI tooling: [Commander.js](https://github.com/tj/commander.js) and [@clack/prompts](https://github.com/natemooe/clack)
 
 <p align="left">
   <a href="https://www.buymeacoffee.com/tamas_gabor">

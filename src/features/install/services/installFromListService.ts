@@ -166,7 +166,7 @@ export class InstallFromListService {
   private detectListFormat(
     filePath: string,
     content: string,
-  ): "txt" | "extensions.json" | undefined {
+  ): "txt" | "extensions.json" | "yaml" | undefined {
     const ext = path.extname(filePath).toLowerCase();
 
     if (ext === ".json") {
@@ -176,6 +176,10 @@ export class InstallFromListService {
       } catch {
         return "txt";
       }
+    }
+
+    if (ext === ".yaml" || ext === ".yml") {
+      return "yaml";
     }
 
     return "txt";
